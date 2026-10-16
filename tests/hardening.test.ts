@@ -126,3 +126,80 @@ test('uncertain classified failures retain reservations and stop this run before
   assert.equal(events.filter(event => event.code === 'PROVIDER_SERVER_ERROR').length, 6);
   assert.ok(!JSON.stringify(events).includes('sensitive-key') && !JSON.stringify(events).includes('Alex Example'));
 });
+
+test('provider cancels oversized streams before consuming the rest at either stage', async () => {
+  for (const stage of ['preflight', 'generation'] as const) {
+    let pulls = 0, cancellations = 0, requests = 0;
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        pulls++;
+        if (pulls === 1) controller.enqueue(new Uint8Array(600_000));
+        else if (pulls === 2) controller.enqueue(new Uint8Array(400_001));
+        else controller.error(new Error('The provider must not read this chunk'));
+      },
+      cancel() { cancellations++; },
+    }, { highWaterMark: 0 });
+    const provider = new OpenAICompatibleProvider('offline-key', undefined, async url => {
+      requests++;
+      if (stage === 'generation' && url.endsWith('/input_tokens')) return Response.json({ input_tokens: 10 });
+      return new Response(body);
+    });
+    await assert.rejects(provider.generate(request, signal), error => error instanceof ProviderError
+      && error.code === 'PROVIDER_RESPONSE_TOO_LARGE' && error.stage === stage);
+    assert.equal(pulls, 2);
+    assert.equal(cancellations, 1);
+    assert.equal(body.locked, false);
+    assert.equal(requests, stage === 'preflight' ? 1 : 2);
+  }
+});
+
+test('provider accepts the exact byte limit and decodes UTF-8 across chunk boundaries', async () => {
+  const encoder = new TextEncoder();
+  const prefix = '{"input_tokens":10,"padding":"';
+  const suffix = '"}';
+  const paddingBytes = 1_000_000 - encoder.encode(prefix + '😀' + suffix).byteLength;
+  const bytes = encoder.encode(prefix + '😀' + 'x'.repeat(paddingBytes) + suffix);
+  const split = encoder.encode(prefix).byteLength + 1; // Split inside a four-byte character.
+  let next = 0;
+  const body = new ReadableStream<Uint8Array>({
+    pull(controller) {
+      if (next === 0) controller.enqueue(bytes.slice(0, split));
+      else if (next === 1) controller.enqueue(bytes.slice(split));
+      else controller.close();
+      next++;
+    },
+  }, { highWaterMark: 0 });
+  const generated = JSON.stringify({ status: 'completed', usage: { input_tokens: 10, output_tokens: 0 },
+    output: [{ type: 'function_call', call_id: 'unicode', name: 'example', arguments: JSON.stringify({ text: '😀' }) }] });
+  const generationBytes = encoder.encode(generated);
+  const generationSplit = encoder.encode(generated.slice(0, generated.indexOf('😀'))).byteLength + 1;
+  const generationBody = new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(generationBytes.slice(0, generationSplit));
+      controller.enqueue(generationBytes.slice(generationSplit));
+      controller.close();
+    },
+  });
+  const provider = new OpenAICompatibleProvider('offline-key', undefined, async url => new Response(
+    url.endsWith('/input_tokens') ? body : generationBody));
+  assert.equal(bytes.byteLength, 1_000_000);
+  const result = await provider.generate(request, signal);
+  assert.equal(result.usage.inputTokens, 10);
+  assert.deepEqual(result.calls[0]?.arguments, { text: '😀' });
+  assert.equal(body.locked, false);
+  assert.equal(generationBody.locked, false);
+});
+
+test('provider cancels an unfinished response stream when the run is aborted', async () => {
+  const controller = new AbortController();
+  let cancellations = 0;
+  const body = new ReadableStream<Uint8Array>({
+    pull() { controller.abort(); },
+    cancel() { cancellations++; },
+  }, { highWaterMark: 0 });
+  const provider = new OpenAICompatibleProvider('offline-key', undefined, async () => new Response(body));
+  await assert.rejects(provider.generate(request, controller.signal), error => error instanceof ProviderError
+    && error.code === 'PROVIDER_ABORTED' && error.stage === 'preflight');
+  assert.equal(cancellations, 1);
+  assert.equal(body.locked, false);
+});

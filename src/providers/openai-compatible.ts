@@ -48,8 +48,32 @@ export class OpenAICompatibleProvider implements LLMProvider {
           // Do not read error bodies: they may echo credentials or candidate data.
           throw new ProviderError(code, stage, status);
         }
-        const text = await response.text();
-        if (Buffer.byteLength(text) > 1_000_000) throw new ProviderError('PROVIDER_RESPONSE_TOO_LARGE', stage);
+        // Bound bytes as they arrive, before buffering or decoding the whole body.
+        if (!response.body) throw new ProviderError('PROVIDER_INVALID_JSON', stage);
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let bytes = 0;
+        let text = '';
+        const cancel = () => { void reader.cancel().catch(() => {}); };
+        requestSignal.addEventListener('abort', cancel, { once: true });
+        try {
+          for (;;) {
+            requestSignal.throwIfAborted();
+            const chunk = await reader.read();
+            requestSignal.throwIfAborted();
+            if (chunk.done) break;
+            bytes += chunk.value.byteLength;
+            if (bytes > 1_000_000) throw new ProviderError('PROVIDER_RESPONSE_TOO_LARGE', stage);
+            text += decoder.decode(chunk.value, { stream: true });
+          }
+          text += decoder.decode();
+        } catch (error) {
+          cancel();
+          throw error;
+        } finally {
+          requestSignal.removeEventListener('abort', cancel);
+          reader.releaseLock();
+        }
         try { return JSON.parse(text); } catch { throw new ProviderError('PROVIDER_INVALID_JSON', stage); }
       } catch (error) {
         if (signal.aborted) throw new ProviderError('PROVIDER_ABORTED', stage);
