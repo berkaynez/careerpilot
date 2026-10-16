@@ -37,6 +37,7 @@ export class BasicPrivacyFilter implements PrivacyFilter {
         id: safeId(observation.id), origin: origin.origin, title: clean(observation.title), text: clean(observation.text),
         controls: observation.controls.map(control => ({
           id: safeId(control.id), kind: control.kind, label: clean(control.label), help: clean(control.help), required: control.required,
+          ...(control.inputType === undefined ? {} : { inputType: clean(control.inputType) }),
           ...(control.buttonEffect === undefined ? {} : { buttonEffect: control.buttonEffect }),
           options: control.options.map(option => ({ id: safeId(option.id), label: clean(option.label) })),
         })),

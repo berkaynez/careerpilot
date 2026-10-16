@@ -75,6 +75,8 @@ export function validateDecision(
       case 'click':
         if (control.kind !== 'button' || control.buttonEffect !== 'navigation') return fail('Not a verified navigation control');
         break;
+      default:
+        return fail('Unsupported browser action');
     }
   }
   return { ok: true };
