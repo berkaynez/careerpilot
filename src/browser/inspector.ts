@@ -60,6 +60,7 @@ export async function inspectPage(page: Page, observationId: string, assignIds =
         help: [helpers.text(element.closest('fieldset')?.querySelector('legend') ?? null), helpers.described(element, 'aria-describedby')].filter(Boolean).join(' · '),
         required: ('required' in element && element.required) || element.getAttribute('aria-required') === 'true',
         ...(isInput ? { inputType: element.type } : {}),
+        ...(element.hasAttribute('data-consent-id') ? { consentId: element.getAttribute('data-consent-id')! } : {}),
         ...(kind === 'button' ? { buttonEffect } : {}),
         options: element instanceof HTMLSelectElement ? [...element.options].map((option, optionIndex) => ({
           id: `${actualId}-option-${optionIndex}`, label: option.label,
