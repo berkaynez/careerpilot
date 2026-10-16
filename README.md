@@ -114,6 +114,8 @@ must support `/responses` **and** `/responses/input_tokens`, including strict to
 The adapter does not fall back to Chat Completions or approximate token counting.
 Provider requests have a 30-second timeout and never follow HTTP redirects or
 automatically retry a failed network request. Never put a credential in a base URL.
+Successful response bodies are read incrementally with a 1,000,000-byte limit.
+Oversized bodies and aborted requests cancel the reader before consuming the rest.
 
 Provider failures use fixed diagnostic codes for authentication, permissions,
 missing endpoints/models, invalid requests, rate/quota limits, server errors,
