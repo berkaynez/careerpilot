@@ -41,6 +41,21 @@ export interface LLMProvider {
   generate(request: LLMRequest, signal: AbortSignal): Promise<LLMResponse>;
 }
 
+export type ProviderErrorCode =
+  | 'PROVIDER_AUTHENTICATION_ERROR' | 'PROVIDER_PERMISSION_ERROR' | 'PROVIDER_NOT_FOUND'
+  | 'PROVIDER_INVALID_REQUEST' | 'PROVIDER_RATE_OR_QUOTA_LIMIT' | 'PROVIDER_SERVER_ERROR'
+  | 'PROVIDER_HTTP_ERROR' | 'PROVIDER_NETWORK_ERROR' | 'PROVIDER_TIMEOUT' | 'PROVIDER_ABORTED'
+  | 'PROVIDER_INVALID_JSON' | 'PROVIDER_INVALID_RESPONSE' | 'PROVIDER_RESPONSE_TOO_LARGE'
+  | 'PROVIDER_INPUT_LIMIT';
+
+/** Safe metadata only. Never retain the original error, body, URL, or headers. */
+export class ProviderError extends Error {
+  constructor(readonly code: ProviderErrorCode, readonly stage: 'preflight' | 'generation', readonly httpStatus?: number) {
+    super(code);
+    this.name = 'ProviderError';
+  }
+}
+
 export interface DecisionValidator<T> { parse(input: unknown): T }
 
 export const modelConfigurations: Readonly<Record<'openai' | 'ollama', ModelConfig>> = {

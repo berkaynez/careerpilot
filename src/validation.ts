@@ -60,6 +60,7 @@ export function validateDecision(
       }
       case 'check': {
         if (!['checkbox', 'radio'].includes(control.kind)) return fail('Not a checkable control');
+        if (control.consentId && (action.evidence.kind !== 'consent' || action.evidence.consentId !== control.consentId)) return fail('Matching explicit consent required');
         const result = action.evidence.kind === 'consent'
           ? validateConsent(policy, action.evidence.consentId) : validateClaim(profile, action.evidence.claim);
         if (!result.ok) return result;
