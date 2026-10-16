@@ -1,8 +1,9 @@
 # CareerPilot
 
-CareerPilot is a personal, AI-first job application agent. Phase 1 provides the
-TypeScript contracts, fictional candidate data, and deterministic guards for a
-future local browser-agent prototype. There is no executable application agent yet.
+CareerPilot is a personal, AI-first job application agent. Phase 2 adds a loopback
+mock application server and a guarded Playwright browser adapter to the Phase 1
+contracts, fictional data, privacy filter, and budget utilities. There is no LLM
+decision loop or real job-site integration yet.
 
 ## Setup
 
@@ -10,13 +11,42 @@ Requires Node.js 22 or newer and npm.
 
 ```sh
 npm ci
+npm run browser:install
 npm run check
 ```
 
 `npm test` runs offline unit tests with Node's test runner through `tsx`.
 `npm run typecheck` checks the source and tests without emitting files.
-No API keys, model downloads, browser installation, or paid calls are required.
-Dependency installation requires access to the npm registry.
+Tests use Playwright's bundled Chromium. No API keys, AI model downloads, or paid
+calls are required. Dependency and Chromium installation require network access;
+all tests then run offline using only loopback servers.
+
+## Local demo
+
+```sh
+npm run demo
+```
+
+Open `http://127.0.0.1:3000` manually to explore the three forms with fictional
+data only. Use `PORT=3001 npm run demo` if port 3000 is occupied. Ctrl+C stops the
+server and discards its in-memory submissions. Nothing is sent to a real employer.
+
+- `/applications/single`: contact, education, project experience, required fields,
+  and accuracy confirmation.
+- `/applications/multi`: validated contact/qualifications steps, back navigation,
+  review, and final confirmation.
+- `/applications/dynamic`: employment-dependent employer question, delayed project
+  question, and up to five repeatable work-history positions.
+
+The browser adapter is exercised by `npm test`; the demo server does not run an
+autonomous form-filling script. Tests contain explicit interactions and assertions,
+not a production decision policy. Automated browser sessions always launch fresh
+Chromium contexts and do not read personal browser profiles.
+
+After manual submission, the page displays a run ID and receipt ID. Read
+`/api/receipts/<runId>` on the same origin to independently check the server's
+receipt. Invalid submissions produce no receipt. Identical retries reuse a receipt;
+changed submissions for the same run return 409. Receipts contain metadata only.
 
 ## Architecture
 
@@ -41,19 +71,27 @@ execution boundaries; it does not map specific forms to candidate answers.
   pre-request reservations, and per-run token/cost totals.
 - `src/validation.ts`: local-origin, candidate-reference, action-count, consent,
   batch, target, and observation-freshness guards.
+- `src/mocks/forms.ts`: accessible mock HTML, form interactions, and server-side
+  field/conditional/history validation.
+- `src/mocks/server.ts`: loopback-only HTTP server and independent receipt store;
+  implements the existing `SubmissionVerifier` interface.
+- `src/mocks/demo.ts`: local demo entry point.
+- `src/browser/inspector.ts`: visible controls, native input types, labels, help,
+  required status, options, errors, and navigation/submission effects.
+- `src/browser/executor.ts`: isolated Chromium, network guard, validated action
+  execution, action events, deadline/abort handling, and batch reinspection.
 - `tests/`: offline tests of the above boundaries and failure cases.
 
-These are contracts and foundation utilities. Phase 1 does not implement browser
-automation, mock forms, provider adapters, API requests, the LLM decision loop,
-runtime tool schemas, job discovery, CV generation, Gmail, or a model router.
-Playwright and provider SDK dependencies will be added when those adapters exist.
+Provider adapters, LLM API requests, the decision loop, runtime LLM tool schemas,
+job discovery, CV generation, Gmail, and a model router remain unimplemented.
+The provider-neutral interface and budget code are unchanged.
 
 ## Candidate data and application policy
 
 The fixture describes an invented candidate. "Verified" means checked against the
 authored fictional source; it is not verification of a real person's credentials.
 Unknown information stays absent. Identity and email are local references such as
-`personal.email`; future executors resolve them locally without sending the values
+`personal.email`; the browser executor resolves them locally without sending the values
 to a model. Do not place personal identifiers in public candidate facts.
 
 Application preferences are separate from facts and personal data. Consent is
@@ -123,27 +161,56 @@ actions and local models can reduce cloud use; their effectiveness is not yet me
 
 ## Browser and batching boundaries
 
-The allowed origin starts unset. Later it must match the exact literal loopback
-HTTP origin and port of the mock server. Navigation, redirects, popups, form actions,
-and browser requests must all be enforced by the future executor. No real job sites
-or real submissions are permitted in the prototype.
+The allowed origin starts unset and must be explicitly set to the mock server's
+exact loopback HTTP origin and port. The server binds only to `127.0.0.1`. It rejects
+unexpected Host headers and cross-origin submission requests, limits payload size,
+and validates required fields, options, consent, and conditional/repeated answers.
+
+The adapter routes context-wide requests before creating pages, blocks service
+workers and WebSockets, closes popups, and rejects off-origin URLs and credentials.
+Only local GET/HEAD requests are normally allowed. A validated submit action opens
+a one-request POST permit for the form's exact action URL and the session's run ID.
+POSTs triggered by filling, selecting, or arbitrary button handlers are blocked.
+Responses are fetched with redirect following disabled; **all redirects, including
+same-origin redirects, are blocked** in this minimal adapter. No real job sites or
+real applications are permitted. This is an application guard for controlled mocks,
+not an operating-system network sandbox for arbitrary hostile websites.
 
 Only fill/select actions can be batched. Batches have a size limit, unique targets,
 and an observation ID. Checks, navigation, waits, and submissions are separate
 decisions. Button effects must be established independently; unknown effects are
-blocked, and a generic click cannot bypass the submission-consent guard. The future
-executor must stop and reinspect when a batch changes the page, and must prevent
-input handlers from triggering unverified submission. Action typing alone is not
-sufficient to guarantee those browser effects.
+blocked, and a generic click cannot bypass the submission-consent guard. Each
+decision consumes its observation. The executor rechecks structural observations
+before execution and after each batched action; a change ends the batch with
+`BATCH_REINSPECT_REQUIRED`. Only the returned prefix ran; the caller must inspect
+again before choosing further actions. Fill values resolve from verified facts or
+local references; select options must exactly match a verified fact's value/label.
 
 Submission success requires an independently verified local-server receipt, not
 an LLM claim or a successful click. Metadata-only event contracts avoid raw answers,
-personal values, model messages, and credentials; a persistent logger is future work.
+personal values, model messages, and credentials. The executor emits action events
+to an optional `EventSink`; a persistent logger is future work.
+
+## Known limitations
+
+The inspector supports native main-document controls and links, not file uploads,
+password fields, custom widgets, shadow DOM, or iframes. Observations omit field
+values, selected state, and checked state. IDs are temporary and valid only for
+their observation. Structural checks are conservative, not an atomic DOM lock.
+Unsupported controls are not given a fallback automation path. The privacy filter
+still must be applied before any future cloud call, especially to review-page text.
+
+Wait actions pause for a bounded 350 ms; repeated inspection is needed for longer
+delays. Native validation errors or server rejection do not become success merely
+because a click executed. Only the independent verifier establishes submission.
+Receipts and submission payloads are held locally in memory and disappear on
+restart. The receipt endpoint is a local development aid, not an authenticated
+multi-user service. Existing in-memory budget limitations still apply.
 
 ## Next phase
 
-Implement the mock server, Playwright adapter, actual `LLMDecisionPolicy`, and
-OpenAI/Ollama adapters. Inject a fake LLM transport for offline tool-loop tests;
+Implement actual `LLMDecisionPolicy` and OpenAI/Ollama adapters, with runtime tool
+validation and durable accounting before paid requests. Inject a fake LLM transport for offline tool-loop tests;
 never activate it as a production fallback. Evaluate live models against unfamiliar
 labels, reordered fields, conditional controls, and truthful-answer cases using
 the same policy interface. Offline unit tests do not establish LLM generalization.
