@@ -35,6 +35,10 @@ export const fictionalCandidate: CandidateProfile = {
   fictional: true,
   facts: [
     { id: 'experience.role', value: 'Software Engineer', provenance },
+    { id: 'experience.company', value: 'Example Systems', provenance },
+    { id: 'experience.employmentStatus', value: 'Employed', provenance },
+    { id: 'education.school', value: 'Example Institute', provenance },
+    { id: 'education.degree', value: 'Bachelor of Science', provenance },
     { id: 'experience.project', value: 'Built an internal task tracking application', provenance },
     { id: 'skills.languages', value: ['TypeScript', 'JavaScript'], provenance },
     { id: 'authorization.US', value: true, provenance },

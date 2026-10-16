@@ -8,6 +8,8 @@ export interface FormControl {
   label: string;
   help: string;
   required: boolean;
+  /** Native HTML input type, without the current field value. */
+  inputType?: string;
   /** Executor must establish button effect; unknown effects are blocked. */
   buttonEffect?: 'navigation' | 'submission' | 'unknown';
   options: readonly { id: string; label: string }[];
