@@ -4,15 +4,22 @@
   "private": true,
   "type": "module",
   "description": "Local-first, AI-led job application agent foundations",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "test": "tsx --test tests/*.test.ts",
     "typecheck": "tsc --noEmit",
-    "check": "npm run typecheck && npm test"
+    "check": "npm run typecheck && npm test",
+    "demo": "tsx src/mocks/demo.ts",
+    "browser:install": "playwright install chromium"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
     "tsx": "^4.0.0",
     "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "playwright": "^1.64.1"
   }
 }
