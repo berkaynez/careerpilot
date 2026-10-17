@@ -333,3 +333,135 @@ evaluations to multi-step/dynamic flows and future provider adapters. The fake
 transport exists only in tests, never as a production fallback. Evaluate live models against unfamiliar
 labels, reordered fields, conditional controls, and truthful-answer cases using
 the same policy interface. Offline unit tests do not establish LLM generalization.
+
+
+## Application preparation
+
+`npm run prepare` creates a local draft packet for a real vacancy. It does not
+open a browser, fetch job URLs, submit applications or alter the selected CV.
+A job JSON contains explicitly reviewed country, advert language, application
+instructions and a short requirement list. URLs are recorded as sources only.
+
+Store real inputs under the ignored `.careerpilot/` directory. The private profile
+contains local contact details, sourced bilingual professional facts, preferences
+and absolute PDF paths. Do not add real inputs to source control. Unit tests use
+fictional data only.
+
+An offline, locally reviewed run requires no API key:
+
+```sh
+npm run prepare -- --profile .careerpilot/profile.json --job .careerpilot/peak-job.json --review .careerpilot/peak-review.json
+```
+
+The tool writes a fresh private `.careerpilot/prepared/<run-id>/` directory with
+the selected PDF, `cover-letter.txt`, a Turkish `review.txt`, and a machine-readable
+`preparation.json`, plus `job.json` containing the exact requirement list. It never silently replaces a previous packet. Company-specific
+examples above are private local inputs, not bundled production defaults.
+
+Document routing follows explicit application instructions first. Otherwise the
+advert language determines the CV language, and country TR selects a photo while
+other countries select no photo. Missing or ambiguous matching assets stop the run.
+A Turkish company posting an English advert therefore selects the English photo CV.
+
+Assessment uses only existing fact IDs. Every requirement must be covered once;
+unknown IDs, free-form candidate claims and ungrounded letter text are rejected.
+`documented` and `related` describe evidence availability, not complete qualification,
+a hiring prediction, or an ATS score. Semantic relevance still requires human review.
+The letter uses locally reviewed candidate prose when configured, otherwise exact selected profile statements, with a fixed application introduction/closing.
+
+An optional model can choose factual references using the existing Responses adapter
+and the same persistent monthly/per-run budget ledger. For a separately approved live
+run, load the existing environment configuration and pass `--model`,
+`--approve-paid-call` AND `--approve-cloud-profile` instead of `--review`.
+Existing .env flags alone are insufficient consent for this workflow. Contact values,
+CV paths, source paths and preferences are excluded from the model request; professional
+facts still leave the computer when cloud mode is explicitly approved. No model calls
+were needed for the local example. Live model quality remains unverified.
+
+Missing Java/Spring Boot evidence must never become a positive claim because a profile
+mentions JavaScript or Node.js. Partial degree equivalence and academic skill exposure
+must remain explicit. Personalised prose generation, automatic job URL ingestion and
+real-site submission are not implemented in this preparation command.
+
+### Prepare from pasted posting text
+
+The optional model path also accepts `--posting` instead of `--job`. This removes
+manual requirement lists and a separate review-plan file: one accounted model request
+extracts requirements and selects candidate references together. It still requires
+fresh paid-call and cloud-profile approval. No URL is fetched.
+
+Put the posting text and explicitly checked metadata in a private JSON file:
+
+```json
+{
+  "version": 1,
+  "id": "example-graduate",
+  "company": "Example Studio",
+  "title": "Graduate Engineer",
+  "country": "TR",
+  "language": "en",
+  "sourceUrl": "https://example.invalid/jobs/graduate",
+  "checkedOn": "2026-10-17",
+  "text": "Qualifications\nRelevant degree required.\nJava Spring Boot experience required.\nResponsibilities\nBuild backend APIs."
+}
+```
+
+Check explicit application instructions yourself: set `documentLanguage`, `photoPolicy`
+and `sponsorship` where stated. Their defaults are null, unspecified and not_stated;
+the model cannot change these fields or infer work authorisation. Country and advert
+language are mandatory. Raw text is bounded to 24,000 characters and remains untrusted.
+
+After a separately approved live run, with the existing environment configuration loaded:
+
+```sh
+npm run prepare -- --profile .careerpilot/profile.json --posting .careerpilot/posting.json --model --approve-paid-call --approve-cloud-profile
+```
+
+Each extracted requirement must be a verbatim excerpt of the model-visible posting
+(whitespace may differ). Invented quotations, unknown candidate references and invalid
+plans stop packet creation; billable invalid responses are still accounted without retry.
+The private packet includes `posting.txt` and `job.json` so the original text and
+extracted requirements can be compared. Contact values are redacted before cloud input;
+professional profile facts and posting text are sent only with the explicit approval.
+
+Verbatim checks prove that selected text exists, not that the model extracted every
+requirement or classified it correctly. Review completeness and relevance before using
+any packet. The letter renderer preserves reviewed general candidate prose when configured, then
+adds up to two selected facts not already covered by that prose.
+This workflow has been tested with a mocked provider only. Live extraction quality,
+automatic URL ingestion, free-form cover-letter writing and real-site submission remain
+unverified or unimplemented; a local test does not establish any of those capabilities.
+
+### General candidate narrative in cover letters
+
+An optional private profile field `coverLetter` contains `reviewedOn` and `sections`.
+Each section has `kind` (`introduction`, `background`, `experience`, `projects`),
+bilingual `text` (`tr`, `en`), and existing `factIds` supporting the text. Start with
+introduction and keep this order; omitted later sections are allowed. The entire
+field remains local and is not included in cloud requests. Example with fictional data:
+
+```json
+{
+  "reviewedOn": "2026-10-17",
+  "sections": [{
+    "kind": "introduction",
+    "text": { "tr": "Yazılım alanında yeni mezunum.", "en": "I am a recent software graduate." },
+    "factIds": ["education"]
+  }]
+}
+```
+
+Use prose reviewed against your actual profile; the example assumes an `education`
+fact already exists. Unknown or duplicate references, reordered sections and overly
+long paragraphs are rejected. Experience and projects are capped at 450 characters
+per language; introduction/background at 650. Keep them brief and balanced.
+
+The renderer keeps this general narrative intact, adds the company and job title,
+and appends at most two model-selected factual sentences not already represented
+by the narrative references. It never pastes raw job requirements as candidate
+claims. The manifest's `letter` section records narrative references separately
+from the model's assessment plan, so actual rendered content can be traced.
+Older profiles without this field still use selected factual sentences. These are
+plain text drafts; no free-form model prose, layout/ATS score or hiring outcome is
+promised. Valid references do not prove semantic accuracy: review the prose when
+creating or updating your profile and review each final application.

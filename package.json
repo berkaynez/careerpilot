@@ -13,7 +13,8 @@
     "check": "npm run typecheck && npm test",
     "demo": "tsx src/mocks/demo.ts",
     "browser:install": "playwright install chromium",
-    "agent": "node --env-file=.env --import tsx src/cli.ts"
+    "agent": "node --env-file=.env --import tsx src/cli.ts",
+    "prepare": "node --import tsx src/preparation/cli.ts"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
