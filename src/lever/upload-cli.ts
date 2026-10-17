@@ -1,9 +1,10 @@
+import { applicationTargetSchema } from '../jobs/target.js';
 import { terminalReview } from './review.js';
 import { randomUUID } from 'node:crypto';
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { readLocalJSON } from '../preparation/files.js';
-import { profileSchema, jobSchema } from '../preparation/core.js';
+import { profileSchema } from '../preparation/core.js';
 import { leverAnswersSchema } from './form.js';
 import { requireUploadConsent, createLeverUploadDraft } from './upload.js';
 
@@ -15,7 +16,7 @@ async function main() {
   if (values['keep-open'] && (!process.stdin.isTTY || !process.stdout.isTTY)) throw new Error('LEVER_INTERACTIVE_TERMINAL_REQUIRED');
   if (!values.profile || !values.job) throw new Error('LEVER_ARGUMENTS_INVALID');
   const profile = profileSchema.parse(await readLocalJSON(resolve(values.profile)));
-  const job = jobSchema.parse(await readLocalJSON(resolve(values.job)));
+  const job = applicationTargetSchema.parse(await readLocalJSON(resolve(values.job)));
   const answers = leverAnswersSchema.parse(values.answers ? await readLocalJSON(resolve(values.answers)) : {});
   const directory = resolve(process.env.CAREERPILOT_STATE_DIR ?? '.careerpilot', 'upload-reviews', randomUUID());
   try { console.log(JSON.stringify(await createLeverUploadDraft({ profile, job, answers, directory, consent, ...(values['keep-open'] ? {review: terminalReview} : {}) }), null, 2)); }

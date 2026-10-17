@@ -5,6 +5,7 @@ import type { Readable, Writable } from 'node:stream';
 export interface LeverReviewSession {
   page: Page;
   directory: string;
+  remainingFields: {label: string; reason: string}[];
   /** Called only after the human types DEVRET; never clicks or submits anything. */
   releaseToUser(): Promise<void>;
 }
@@ -48,6 +49,7 @@ export async function reviewDecision(page: Page, input: Readable, output: Writab
 
 export async function terminalReview(session: LeverReviewSession) {
   process.stdout.write(`Kontrol görüntüsü: ${session.directory}\n`);
+  if (session.remainingFields.length) process.stdout.write('Sana bırakılan alanlar/onaylar: '+JSON.stringify(session.remainingFields)+'\n');
   if (await reviewDecision(session.page, process.stdin, process.stdout) !== 'release') return;
   await session.releaseToUser();
   process.stdout.write('Kontrol sende. Bilgileri inceleyip gerekirse düzelt; KVKK, CAPTCHA ve gönderme adımlarını kendin tamamla. İşin bitince bu tarayıcı penceresini kapat. Program başvuru sonucunu takip etmiyor.\n');

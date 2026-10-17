@@ -71,7 +71,7 @@ export function validatePlan(raw: unknown, profile: Profile, job: Job): Plan {
   return plan;
 }
 
-export function selectCV(profile: Profile, job: Job) {
+export function selectCV(profile: Profile, job: Pick<Job, 'language' | 'documentLanguage' | 'country' | 'photoPolicy'>) {
   const selectedLanguage = job.documentLanguage ?? job.language;
   const photo = job.photoPolicy === 'required' || (job.photoPolicy === 'unspecified' && job.country === 'TR');
   const matches = profile.cvs.filter(cv => cv.language === selectedLanguage && cv.photo === photo);
