@@ -465,3 +465,110 @@ Older profiles without this field still use selected factual sentences. These ar
 plain text drafts; no free-form model prose, layout/ATS score or hiring outcome is
 promised. Valid references do not prove semantic accuracy: review the prose when
 creating or updating your profile and review each final application.
+
+## Lever form inspection and local rehearsal
+
+`npm run lever:inspect -- --profile .careerpilot/profile.json --job .careerpilot/peak-job.json --answers .careerpilot/lever-answers.json`
+follows the exact application link from one public jobs.lever.co posting, inspects
+its form and writes a private `.careerpilot/form-reviews/<id>/` packet. This is a
+read-only network workflow: scripts/workers are disabled, all writes and cross-origin
+resources are blocked, and contact values are never entered into the live page.
+It uses no model or API credits. It does not navigate LinkedIn or sign in there;
+the employer URL must already be present in the job input.
+
+Optional private answers contain `university` (exact displayed option), `linkedin`,
+`github` and `portfolio` HTTPS URLs. Unknown required questions, ambiguous controls,
+missing answers and consent decisions remain unresolved. Current employer is not
+inferred from an internship. The selected CV is recorded, not uploaded. Resume
+upload approval and the legal privacy consent remain separate unresolved steps.
+There is no cover-letter upload unless a future inspected form actually requests it.
+
+The separate rehearsal helper fills only authored 127.0.0.1 pages and is tested on
+a fictional Lever-shaped fixture. It never uploads a file, accepts consent, clicks
+submit, or permits live-site filling. The separately approved filled-preview mode
+is described below; real upload has a separate consent-gated mode below; application submission is not implemented. A live read-only CLI run on the Peak posting on 2026-10-17 followed the application
+link and prepared five fields, leaving CV upload and privacy consent unresolved.
+No personal data was entered, no file was uploaded and no model call was made.
+Other Lever postings and JavaScript-dependent forms remain unverified. Do not treat a rehearsal as a real application.
+Private review packets contain contact values and local CV paths; do not commit or share them.
+
+### Filled form preview with explicit approval
+
+`npm run lever:preview -- --profile .careerpilot/profile.json --job .careerpilot/peak-job.json --answers .careerpilot/lever-answers.json --approve-contact-sharing --approve-cv-selection`
+
+Both per-run approvals are required before launching a browser or reading the CV.
+Do not run this against a real profile without the user's approval for the specific
+employer and data. It reopens the exact employer form in a fresh script-disabled
+session, fills only mapped fields, selects the matching PDF in the browser's file
+input, verifies the resulting field values and captures a private `filled-form.png`
+and `preview.json` under `.careerpilot/form-previews/<id>/`.
+
+This is a **filled preview**, not a server upload or a resumable application.
+The browser closes after capture. All POST requests, site scripts, workers and
+cross-origin resources remain blocked; selecting a PDF does not trigger Lever's
+remote resume parsing. `cvUploaded` and `submitted` remain false. No checkbox,
+radio, CAPTCHA, legal consent or submit button is activated. Unknown required
+answers stop the run before data entry. It uses no model/API tokens.
+
+This increment passed authored fictional form tests. With explicit per-run approval,
+a live Peak preview on 2026-10-17 filled five fields and verified local selection of
+the English photo CV, then saved a screenshot and closed the browser. KVKK consent
+remained unchecked; cvUploaded=false, submitted=false and modelCalls=0. Real upload,
+a separate scripted upload mode is described below; application submission remains unimplemented. Do not call a locally
+selected filename a successful upload.
+
+### One CV upload without submitting an application
+
+The private Lever answers can include both `linkedin` and `github` HTTPS links;
+these map to the site's corresponding URL fields alongside the existing five
+contact/university fields. No portfolio URL is inferred from an email domain.
+
+A synthetic, fully blocked live probe on 2026-10-17 observed the hosted form's
+`POST https://jobs.lever.co/parseResume` request containing `resume` and `accountId`.
+Every write was aborted before transmission. This identifies an internal hosted-form
+behaviour, not a documented or stable public standalone-upload API.
+
+After explicit per-run approval to share the named CV and contact/link information
+with the employer through Lever, the new mode is:
+
+```sh
+npm run lever:upload-draft -- --profile .careerpilot/profile.json --job .careerpilot/peak-job.json --answers .careerpilot/lever-answers.json --approve-contact-sharing --approve-cv-upload
+```
+
+This is real file transmission, unlike `lever:preview`. It permits only one exact
+multipart request to the observed resume endpoint, matching the selected PDF's
+name, MIME type and bytes and the account ID from that job's form. Extra form fields,
+different files, destinations, redirects and repeat requests are blocked. Other
+POST requests, sockets, workers, third-party scripts, CAPTCHA widgets and submission
+controls remain blocked; this mode does not accept legal consent or submit.
+
+Upload verification requires a successful HTTP response, a newly populated site
+storage field and the expected filename displayed by the site. Resume parsing can
+overwrite contact fields, so the program reapplies and verifies the sourced values
+and links afterwards. A private screenshot and metadata checkpoint are written
+under `.careerpilot/upload-reviews/<id>/`; contact values and parsed resume response
+bodies are not logged. The browser closes after capture, so this is not a resumable
+application. An uploaded file may be retained by Lever even without final submission.
+
+Uncertain or failed uploads stop without retry, and the checkpoint distinguishes
+request allowance from verified upload. Review it before authorising any repeat.
+One explicitly approved live CV upload was verified on 2026-10-17. The screenshot
+revealed an incorrect parser-filled current employer and an empty location, so its
+form checkpoint was corrected to `stopped_requires_review` with `fieldsVerified:false`.
+No application was submitted, no legal consent accepted and no repeat CV upload made.
+
+The fixes clear an unsourced current employer, select an exact reviewed city suggestion
+and recheck every field after focus changes and screenshot capture. For scripted Lever
+forms with `selectedLocation`, answers must include `locationSelection` with a reviewed
+`query` and exact suggestion `label`. Only that exact GET `/searchLocations?text=...`
+is permitted; other API reads remain blocked. This is a display equivalent of the
+profile city, not permission to invent a location. Fictional browser fixtures cover
+parser overwrites, autocomplete, final-value checks and uncertain uploads. A separately approved repeat of the corrected full flow subsequently passed live
+verification: upload evidence and all seven planned fields were verified, including
+the selected city, cleared unsourced employer and both profile links. No application
+was submitted, no consent accepted and no model call made. Changed hosted-form
+behaviour must still stop.
+
+The corrected location adapter was separately verified on the live form using only
+the city query: one city-search GET, zero writes, no CV/contact upload and no consent.
+The city-only check was followed by the separately approved full verification above.
