@@ -563,9 +563,12 @@ forms with `selectedLocation`, answers must include `locationSelection` with a r
 `query` and exact suggestion `label`. Only that exact GET `/searchLocations?text=...`
 is permitted; other API reads remain blocked. This is a display equivalent of the
 profile city, not permission to invent a location. Fictional browser fixtures cover
-parser overwrites, autocomplete, final-value checks and uncertain uploads. The fixed
-full live upload flow has not been repeated; changed hosted-form behaviour must stop.
+parser overwrites, autocomplete, final-value checks and uncertain uploads. A separately approved repeat of the corrected full flow subsequently passed live
+verification: upload evidence and all seven planned fields were verified, including
+the selected city, cleared unsourced employer and both profile links. No application
+was submitted, no consent accepted and no model call made. Changed hosted-form
+behaviour must still stop.
 
 The corrected location adapter was separately verified on the live form using only
 the city query: one city-search GET, zero writes, no CV/contact upload and no consent.
-This does not establish that the corrected full upload flow has passed live review.
+The city-only check was followed by the separately approved full verification above.
