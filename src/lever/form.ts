@@ -55,7 +55,8 @@ export async function inspectLeverForm(page: Page, expectedUrl: string): Promise
 const line = z.string().trim().min(1).max(250).refine(value => !/[\u0000-\u001f\u007f]/.test(value));
 const web = z.url().refine(value => { const u = new URL(value); return u.protocol === 'https:' && !u.username && !u.password; });
 export const leverAnswersSchema = z.strictObject({ university: line.optional(),
-  linkedin: web.optional(), github: web.optional(), portfolio: web.optional() });
+  linkedin: web.optional(), github: web.optional(), portfolio: web.optional(),
+  locationSelection: z.strictObject({ query: line, label: line }).optional() });
 export type LeverAnswers = z.infer<typeof leverAnswersSchema>;
 export interface LeverDraft {
   status: 'review_required'; url: string;
@@ -70,7 +71,7 @@ export function planLeverDraft(profile: Profile, form: LeverForm, answers: Lever
     name: { value: profile.contact.name, source: 'contact.name' },
     email: { value: profile.contact.email, source: 'contact.email' },
     phone: { value: profile.contact.phone, source: 'contact.phone' },
-    location: { value: profile.contact.location, source: 'contact.location' },
+    location: { value: answers.locationSelection?.label ?? profile.contact.location, source: answers.locationSelection ? 'contact.location + application.locationSelection' : 'contact.location' },
     'urls[LinkedIn]': { value: answers.linkedin, source: 'application.linkedin' },
     'urls[GitHub]': { value: answers.github, source: 'application.github' },
     'urls[Portfolio]': { value: answers.portfolio, source: 'application.portfolio' },
@@ -115,7 +116,7 @@ export async function rehearseLeverDraft(page: Page, draft: LeverDraft) {
 }
 
 /** Internal helper: only callers that establish the session policy may use this. */
-export async function fillLeverFields(page: Page, draft: LeverDraft) {
+export async function fillLeverFields(page: Page, draft: LeverDraft, locationSelection?: LeverAnswers['locationSelection']) {
   const current = await inspectLeverForm(page, draft.url);
   // Validate the entire plan before entering even the first value.
   for (const field of draft.fields) {
@@ -126,8 +127,37 @@ export async function fillLeverFields(page: Page, draft: LeverDraft) {
     const exact = page.locator(`[name=${JSON.stringify(field.name)}]`);
     if (await exact.count() !== 1) throw new Error('LEVER_STALE_FORM');
     if (field.kind === 'select') await exact.selectOption(field.value, { force: true });
-    else await exact.fill(field.value);
+    else if (field.name === 'location' && locationSelection) {
+      if (field.value !== locationSelection.label) throw new Error('LEVER_LOCATION_SELECTION_MISMATCH');
+      const selected = page.locator('input[name="selectedLocation"]');
+      if (await selected.count() !== 1) throw new Error('LEVER_LOCATION_CONTROL_UNRECOGNISED');
+      if (await exact.inputValue() !== field.value || !await selected.inputValue()) {
+        await exact.fill('');
+        await exact.pressSequentially(locationSelection.query);
+        // filter matches the option element itself, including text-only divs.
+        const choice = page.locator('.dropdown-location').filter({ hasText: new RegExp('^'+locationSelection.label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')+'$') });
+        await choice.waitFor({state:'visible'});
+        if (await choice.count() !== 1) throw new Error('LEVER_LOCATION_OPTION_NOT_UNIQUE');
+        await choice.click();
+      }
+      if (!await selected.inputValue()) throw new Error('LEVER_LOCATION_NOT_SELECTED');
+    } else await exact.fill(field.value);
     if (await exact.inputValue() !== field.value) throw new Error('LEVER_FILL_NOT_VERIFIED');
   }
+  const company = page.locator('input[name="org"]');
+  if (!draft.fields.some(field => field.name === 'org') && await company.count() === 1) await company.fill('');
+  await verifyLeverFields(page, draft, locationSelection);
   return draft.fields.length;
+}
+
+/** Recheck all fields after focus changes; per-action success does not establish final form correctness. */
+export async function verifyLeverFields(page: Page, draft: LeverDraft, locationSelection?: LeverAnswers['locationSelection']) {
+  if (page.url() !== draft.url) throw new Error('LEVER_UNEXPECTED_PAGE');
+  for (const field of draft.fields) {
+    const locator = page.locator(`[name=${JSON.stringify(field.name)}]`);
+    if (await locator.count() !== 1 || await locator.inputValue() !== field.value) throw new Error('LEVER_FINAL_FIELDS_NOT_VERIFIED');
+  }
+  if (locationSelection && !await page.locator('input[name="selectedLocation"]').inputValue()) throw new Error('LEVER_LOCATION_NOT_SELECTED');
+  const company = page.locator('input[name="org"]');
+  if (!draft.fields.some(field => field.name === 'org') && await company.count() === 1 && await company.inputValue()) throw new Error('LEVER_UNSOURCED_EMPLOYER');
 }

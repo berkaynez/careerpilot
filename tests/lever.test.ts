@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
 import { createServer } from 'node:http';
-import { leverUrls, canInspectLeverRequest, inspectLeverForm, planLeverDraft, rehearseLeverDraft } from '../src/lever/form.js';
+import { leverUrls, canInspectLeverRequest, inspectLeverForm, planLeverDraft, rehearseLeverDraft, fillLeverFields, verifyLeverFields } from '../src/lever/form.js';
 import { fillPreviewPage, createLeverPreview, readPreviewCV } from '../src/lever/preview.js';
 import { mkdtemp, writeFile, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -136,4 +136,23 @@ test('preview reads only bounded regular PDF files and refuses symlinks or inval
   const linked = join(dir,'linked.pdf'); await symlink(pdf, linked);
   await assert.rejects(readPreviewCV(linked));
   await writeFile(pdf,'not a PDF'); await assert.rejects(readPreviewCV(pdf),/LEVER_CV_INVALID/);
+});
+
+
+test('final verification catches location cleared on blur and removes unsourced parser employers', async t => {
+  const server = createServer((_request,response) => { response.setHeader('Content-Type','text/html; charset=utf-8'); response.end(html); });
+  await new Promise<void>(resolve => server.listen(0,'127.0.0.1',resolve));
+  const address = server.address(); assert.ok(address && typeof address !== 'string');
+  const url = `http://127.0.0.1:${address.port}/regression`;
+  const browser = await chromium.launch({headless:true});
+  t.after(async () => { await browser.close(); await new Promise<void>(resolve => server.close(() => resolve())); });
+  const page = await browser.newPage(); await page.goto(url);
+  const form = await inspectLeverForm(page,url);
+  const draft = planLeverDraft(profile,form,{university:'Example University',github:'https://github.com/example'});
+  await page.locator('[name="org"]').fill('Fictional previous internship');
+  await fillLeverFields(page,draft);
+  assert.equal(await page.locator('[name="org"]').inputValue(),'');
+  await page.locator('[name="location"]').evaluate(element => element.addEventListener('blur',()=>{(element as HTMLInputElement).value='';}));
+  await assert.rejects(fillLeverFields(page,draft),/LEVER_FINAL_FIELDS_NOT_VERIFIED/);
+  await assert.rejects(verifyLeverFields(page,draft),/LEVER_FINAL_FIELDS_NOT_VERIFIED/);
 });
