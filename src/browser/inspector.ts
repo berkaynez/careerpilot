@@ -9,6 +9,10 @@ export async function inspectPage(page: Page, observationId: string, assignIds =
     const helpers = {
       visible(element: Element): boolean {
         const style = getComputedStyle(element);
+        for (let ancestor: Element | null = element; ancestor; ancestor = ancestor.parentElement) {
+          const ancestorStyle = getComputedStyle(ancestor);
+          if (ancestorStyle.opacity === '0' || ancestorStyle.visibility === 'collapse') return false;
+        }
         return element.getClientRects().length > 0 && style.visibility !== 'hidden' && style.display !== 'none'
           && !element.closest('[hidden],[inert],[aria-hidden="true"]');
       },
@@ -78,7 +82,7 @@ export async function inspectPage(page: Page, observationId: string, assignIds =
       const style = getComputedStyle(element);
 
       if (style.display === 'none' || style.visibility === 'hidden'
-        || style.visibility === 'collapse') {
+        || style.visibility === 'collapse' || style.opacity === '0') {
         copiedElements[index]?.remove();
       }
     });

@@ -77,14 +77,15 @@ export function browserJobReader(launch: () => Promise<Browser> = () => chromium
   };
 }
 
-/** At most one observed LinkedIn -> employer transition, never login, guessing or unlimited crawling. */
+/** At most one observed job-board -> employer transition, never login, guessing or unlimited crawling. */
 export async function resolveJobLink(value: string, read = browserJobReader()): Promise<LinkResolution> {
   const input=jobLink(value), visited=[input.url];
   let page: PublicJobPage;
   try { page=await read(input); }
   catch { return {status:'employer_link_required',input,reason:'public_page_unavailable',candidates:[],visited}; }
-  if (input.platform!=='linkedin') return {status:'resolved',input,employer:input,page,visited};
+  if (!['linkedin','indeed','kariyer'].includes(input.platform)) return {status:'resolved',input,employer:input,page,visited};
   const candidates=employerLinks(page.links);
+  if (!candidates.length && input.platform!=='linkedin' && page.title && page.company && page.text.length>=20) return {status:'resolved',input,employer:input,page,visited};
   if (candidates.length!==1) return {status:'employer_link_required',input,reason:candidates.length?'ambiguous_employer_links':'no_employer_link',candidates,visited};
   const employer=candidates[0]!; visited.push(employer.url);
   try { page=await read(employer); }

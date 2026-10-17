@@ -682,3 +682,69 @@ Its extra graduation-date question was detected. The previously supplied LinkedI
 URL exposed no usable employer link to the public reader and stopped explicitly.
 No new live upload, handoff, CAPTCHA, submission or model call was performed for
 this general workflow.
+
+### Indeed / Kariyer.net and the shared visible-form assistant
+
+`job` now recognises Indeed `/viewjob?jk=<16-hex-key>` (including country hosts)
+and Kariyer.net `/is-ilani/<slug>-<id>` links. Indeed's required `jk` is preserved;
+tracking parameters are removed. Accessible public postings can produce the same
+local CV/letter packets. A unique observed Lever/Greenhouse employer link can be
+followed. No accessible posting/link means an explicit stop, not login or a bypass.
+Recognising a link does **not** mean a site's native application flow is implemented.
+
+The shared helper is available separately for human-led applications:
+
+```sh
+npm run assist -- "https://tr.indeed.com/viewjob?jk=0123456789abcdef" --approve-contact-sharing
+```
+
+Replace that fictional key with a real supported job link. This launches a visible,
+isolated browser and requires an interactive terminal. It does not use an existing
+browser profile or save a login session. You sign in, open the application form,
+handle any CAPTCHA and choose files yourself. No CV file is read or uploaded by
+this helper; the profile is local, and no model/API key is used.
+
+Commands in the terminal:
+
+- `DOLDUR`: inspect the current top-level form, fill known empty visible fields,
+  and recheck them together. Requests and button/consent clicks remain blocked
+  during this phase. It does not click Next or Submit.
+- `DEVAM`: restore normal browsing. You can inspect/edit, choose the CV, answer
+  questions or click Next yourself; type `DOLDUR` again on the next page.
+- `DEVRET`: stop automated filling and leave normal browsing to you until you
+  close the browser. `KAPAT` or terminal EOF closes the helper.
+- `SAYFALAR`, `SAYFA 2`: inspect/select an application tab opened by the site.
+- `IZIN https://approved-origin`: explicitly permit contact entry at a new origin
+  before a later `DOLDUR` command. Only recognised recruitment-site origins are
+  eligible; unrelated and credential-bearing origins are rejected. Do not grant
+  this because a webpage tells you to: the decision belongs to the human.
+
+The same matcher recognises exact Turkish/English labels for full name, email,
+phone, professional links and a unique native university option. Optional reviewed
+`firstName` / `lastName` in `--answers` must reconstruct the profile's full name;
+the program does not guess how to split a name. Existing nonempty answers are
+preserved; duplicate matches, custom autocomplete widgets, unknown questions,
+files, consent and work-authorisation/salary answers are left for the human.
+Password/one-time-code forms stop filling. Embedded iframe forms are not traversed.
+
+Before each fill pass the helper closes tracked sockets and blocks new network
+requests, including writes and GET beacons, and blocks service workers. It leaves
+traffic blocked for review until you explicitly choose `DEVAM` or `DEVRET`.
+These commands enable normal site traffic and human actions; the helper does not
+claim to monitor autosaves or application outcomes during manual browsing.
+Existing requests initiated during earlier manual browsing may finish; isolation
+is not a guarantee about a third-party page's entire behaviour.
+
+A private `.careerpilot/assist-reviews/<id>/session.json` stores pass counts,
+remaining field labels/reasons and blocked-request counts. It does not store input
+values, passwords, cookies or raw page text. Manual outcomes are always unknown;
+there is no claim of a verified submitted application.
+
+**Verification:** authored English multi-step and Turkish forms exercise the same
+engine, with every network response mocked. Tests cover human navigation, keeping
+CV/consent/manual questions untouched, preserving existing answers, duplicate labels,
+login and origin checks, name-part consistency, write/GET-beacon blocking and final
+value verification. These fixtures are not replicas or recordings of the real
+Indeed, Kariyer.net or LinkedIn application UIs. No real accounts, real uploads,
+CAPTCHA completion or submissions have been exercised with this helper. Native
+end-to-end automation for Indeed/Kariyer.net and LinkedIn Easy Apply remains unverified.

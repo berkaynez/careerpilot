@@ -19,7 +19,8 @@
     "lever:preview": "node --import tsx src/lever/preview-cli.ts",
     "lever:upload-draft": "node --import tsx src/lever/upload-cli.ts",
     "lever:review": "node --import tsx src/lever/upload-cli.ts --keep-open",
-    "job": "node --import tsx src/jobs/cli.ts"
+    "job": "node --import tsx src/jobs/cli.ts",
+    "assist": "node --import tsx src/applications/cli.ts"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
