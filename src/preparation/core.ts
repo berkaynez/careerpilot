@@ -3,6 +3,7 @@ import { z } from 'zod';
 import type { BudgetManager } from '../budget.js';
 import type { LLMProvider, LLMRequest, ModelConfig, ToolDefinition } from '../llm.js';
 import { validateModelConfig } from '../llm.js';
+import { letterProfileSchema, renderCoverLetter } from './letters.js';
 
 const line = z.string().trim().min(1).max(1200).refine(value => !/[\u0000-\u001f\u007f]/.test(value));
 const id = z.string().regex(/^[a-zA-Z0-9_.-]{1,80}$/);
@@ -14,10 +15,15 @@ export const profileSchema = z.strictObject({
   contact: z.strictObject({ name: line, email: z.email(), phone: line, location: line }),
   preferences: z.strictObject({ countries: z.array(country).min(1), roles: z.array(line).min(1),
     authorizedCountries: z.array(country), sponsorshipRequiredElsewhere: z.boolean() }),
+  coverLetter: letterProfileSchema.optional(),
   facts: z.array(z.strictObject({ id, text: texts, source: line })).min(1).max(100),
   cvs: z.array(z.strictObject({ id, language, photo: z.boolean(),
     path: z.string().refine(value => isAbsolute(value) && value.toLowerCase().endsWith('.pdf')) })).min(1).max(10),
 }).superRefine((profile, context) => {
+  const knownFacts = new Set(profile.facts.map(fact => fact.id));
+  for (const section of profile.coverLetter?.sections ?? []) {
+    if (section.factIds.some(id => !knownFacts.has(id))) context.addIssue({ code: 'custom', message: 'Unknown letter fact ID' });
+  }
   for (const items of [profile.facts, profile.cvs]) {
     if (new Set(items.map(item => item.id)).size !== items.length) context.addIssue({ code: 'custom', message: 'Duplicate IDs' });
   }
@@ -138,19 +144,8 @@ export function renderPreparation(profile: Profile, job: Job, rawPlan: unknown, 
   const cv = selectCV(profile, job);
   const facts = new Map(profile.facts.map(fact => [fact.id, fact]));
   const selectedLanguage = job.documentLanguage ?? job.language;
-  const focus = job.requirements.find(item => item.id === plan.focusRequirementId)!;
-  const statements = plan.coverLetterFactIds.map(factId => facts.get(factId)!.text[selectedLanguage]);
-  const coverLetter = selectedLanguage === 'en'
-    ? [`Dear ${job.company} Recruitment Team,`,
-      `I am applying for the ${job.title} position at ${job.company}. I am interested in the role's focus on ${focus.text.replace(/[.!]$/, '')}.`,
-      ...statements,
-      'I would welcome the opportunity to discuss my project work and how I could contribute to your team. Thank you for considering my application.',
-      `Kind regards,\n${profile.contact.name}`].join('\n\n')
-    : [`${job.company} İşe Alım Ekibine,`,
-      `${job.company} bünyesindeki ${job.title} pozisyonuna başvurmak istiyorum. İlandaki ${focus.text.replace(/[.!]$/, '')} konusu ilgimi çekiyor.`,
-      ...statements,
-      'Proje çalışmalarımı ve ekibinize nasıl katkıda bulunabileceğimi bir görüşmede paylaşmak isterim. Değerlendirmeniz için teşekkür ederim.',
-      `Saygılarımla,\n${profile.contact.name}`].join('\n\n');
+  const letter = renderCoverLetter(profile, job, plan);
+  const coverLetter = letter.content;
   const authorized = profile.preferences.authorizedCountries.includes(job.country);
   const requiresSponsorship = !authorized && profile.preferences.sponsorshipRequiredElsewhere;
   const authorization = authorized ? 'Kullanıcı beyanına göre çalışma hakkı var.'
@@ -174,9 +169,12 @@ export function renderPreparation(profile: Profile, job: Job, rawPlan: unknown, 
       return [`- ${requirement.text} [${priorityLabels[requirement.priority]}]: ${levels[item.evidenceLevel]}`,
         ...item.factIds.map(factId => `  Profilindeki bilgi: ${facts.get(factId)!.text.tr}`)];
     }),
-    'Ön yazı yalnızca mevcut profil cümleleriyle oluşturuldu; ilgi cümlesi ilan şartından alındı.',
+    letter.evidence.mode === 'reviewed_profile'
+      ? 'Ön yazı yerelde gözden geçirilmiş genel aday anlatımıyla oluşturuldu; model bu metni değiştirmedi.'
+      : 'Ön yazı seçilen mevcut profil cümleleriyle oluşturuldu; gözden geçirilmiş genel anlatım tanımlı değil.',
+    'Ön yazıdaki bilgi referansları preparation.json dosyasında kayıtlıdır; referans bulunması metnin doğruluğunu tek başına kanıtlamaz.',
     'CV dosyasının kendisi değiştirilmedi. Göndermeden önce ilan şartları ve kendi katkıların kontrol edilmeli.',
   ].filter(Boolean).join('\n');
   return { version: 1 as const, status: 'draft_requires_review' as const, origin, cv,
-    language: selectedLanguage, requiresSponsorship, plan, coverLetter, report };
+    language: selectedLanguage, requiresSponsorship, plan, coverLetter, letterEvidence: letter.evidence, report };
 }
