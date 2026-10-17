@@ -26,7 +26,7 @@ const experience = `<fieldset><legend>Experience</legend>
   <label>Most recent job title<input name="role" required maxlength="160"></label>
   <label>Describe a relevant project<textarea name="project" required maxlength="2000" aria-describedby="project-help"></textarea></label>
   <small id="project-help">Use only truthful details from the fictional candidate profile.</small></fieldset>`;
-const accuracy = `<label><input type="checkbox" name="accuracy" required> I confirm these fictional application details are accurate</label>`;
+const accuracy = `<label><input type="checkbox" name="accuracy" data-consent-id="application.accuracy" required> I confirm these fictional application details are accurate</label>`;
 
 export function applicationHtml(kind: ApplicationKind, runId: string): string {
   let content: string;
