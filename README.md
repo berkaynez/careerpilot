@@ -333,3 +333,52 @@ evaluations to multi-step/dynamic flows and future provider adapters. The fake
 transport exists only in tests, never as a production fallback. Evaluate live models against unfamiliar
 labels, reordered fields, conditional controls, and truthful-answer cases using
 the same policy interface. Offline unit tests do not establish LLM generalization.
+
+
+## Application preparation
+
+`npm run prepare` creates a local draft packet for a real vacancy. It does not
+open a browser, fetch job URLs, submit applications or alter the selected CV.
+A job JSON contains explicitly reviewed country, advert language, application
+instructions and a short requirement list. URLs are recorded as sources only.
+
+Store real inputs under the ignored `.careerpilot/` directory. The private profile
+contains local contact details, sourced bilingual professional facts, preferences
+and absolute PDF paths. Do not add real inputs to source control. Unit tests use
+fictional data only.
+
+An offline, locally reviewed run requires no API key:
+
+```sh
+npm run prepare -- --profile .careerpilot/profile.json --job .careerpilot/peak-job.json --review .careerpilot/peak-review.json
+```
+
+The tool writes a fresh private `.careerpilot/prepared/<run-id>/` directory with
+the selected PDF, `cover-letter.txt`, a Turkish `review.txt`, and a machine-readable
+`preparation.json`. It never silently replaces a previous packet. Company-specific
+examples above are private local inputs, not bundled production defaults.
+
+Document routing follows explicit application instructions first. Otherwise the
+advert language determines the CV language, and country TR selects a photo while
+other countries select no photo. Missing or ambiguous matching assets stop the run.
+A Turkish company posting an English advert therefore selects the English photo CV.
+
+Assessment uses only existing fact IDs. Every requirement must be covered once;
+unknown IDs, free-form candidate claims and ungrounded letter text are rejected.
+`documented` and `related` describe evidence availability, not complete qualification,
+a hiring prediction, or an ATS score. Semantic relevance still requires human review.
+The letter uses exact selected profile statements and a fixed introduction/closing.
+
+An optional model can choose factual references using the existing Responses adapter
+and the same persistent monthly/per-run budget ledger. For a separately approved live
+run, load the existing environment configuration and pass `--model`,
+`--approve-paid-call` AND `--approve-cloud-profile` instead of `--review`.
+Existing .env flags alone are insufficient consent for this workflow. Contact values,
+CV paths, source paths and preferences are excluded from the model request; professional
+facts still leave the computer when cloud mode is explicitly approved. No model calls
+were needed for the local example. Live model quality remains unverified.
+
+Missing Java/Spring Boot evidence must never become a positive claim because a profile
+mentions JavaScript or Node.js. Partial degree equivalence and academic skill exposure
+must remain explicit. Personalised prose generation, automatic job URL ingestion and
+real-site submission are not implemented in this preparation command.
