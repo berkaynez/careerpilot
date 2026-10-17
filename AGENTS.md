@@ -13,6 +13,7 @@ These instructions apply to the whole repository.
 - Keep real profiles, CVs, job-specific drafts and contact details in the ignored `.careerpilot/` directory or an explicitly chosen private output directory.
 - Tracked examples and tests must use fictional data. Never commit real applicant documents or credentials.
 - Automated tests use authored fictional forms and mocked transports.
+- Public LinkedIn/Lever/Greenhouse link intake and local document preparation are supported. Greenhouse filling/upload and LinkedIn Easy Apply are not implemented.
 - Live Lever inspection, approved preparation and explicit human handoff are supported. Each real upload/contact-sharing run requires separate user approval.
 - Real application preparation is a separate local workflow. It must never submit applications.
 - Use only sourced profile facts. Do not invent skills, work history, proficiency, salary floors or work authorisation.

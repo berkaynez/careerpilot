@@ -611,3 +611,74 @@ fictional mocked endpoint with the original upload retained. All external respon
 are mocked. The keep-open/handoff mode, real CAPTCHA and final submission have not
 been exercised on the live employer site; the earlier live checks cover automated
 preparation and upload only.
+
+### Start from job links instead of a company-specific job file
+
+The general entry point is `npm run job`. It uses the local private profile and
+shared Lever answers by default. No manually authored `job.json`, API key or model
+call is needed for this workflow.
+
+```sh
+npm run job -- "https://jobs.lever.co/example/11111111-1111-4111-8111-111111111111" --country TR --language en
+```
+
+Use a real posting URL in place of the fictional example. Supported public inputs:
+LinkedIn `/jobs/view/...`, Lever posting/application URLs and Greenhouse hosted
+`/<company>/jobs/<id>` URLs. Up to ten URLs may be supplied for sequential **local
+preparation**; supervised upload/review accepts only one job per invocation.
+
+Public pages are read without login, scripts, form filling, uploads or model calls.
+For LinkedIn, the program follows one unique, actually observed supported employer
+link, including an observed external-apply redirect target. It never guesses that
+link, bypasses a login/access challenge, or searches arbitrary destinations. If
+there is no accessible unique link, `employer_link_required` explains the limitation;
+provide the employer URL you get from the site's Apply button. Unsupported sites
+are rejected explicitly.
+
+The country and advert language must be supplied explicitly (`TR`/`GB` etc., `tr`
+or `en`); they are not silently inferred from the applicant's preferences or the
+site's interface language. Title/company are extracted from public job metadata or
+matching headings/page titles; use `--title` / `--company` if unavailable. Explicit
+`--document-language` and `--photo-policy required|forbidden|unspecified` cover special
+application instructions. Review these choices against the advert before sharing.
+
+A private `.careerpilot/jobs/<id>/` packet contains the source/discovery record,
+`application.json`, `posting.json`, copied selected CV, a general candidate-first
+`cover-letter.txt`, and Turkish `next-steps.txt`. Lever packets also contain inspected
+form fields and a draft with missing answers. The cover letter reuses reviewed
+profile prose or sourced general profile facts; this step **does not** perform a
+qualification assessment or claim the candidate is a match. The raw `posting.json`
+can be used with the existing separately approved model preparation workflow later.
+
+- Lever: known fields can be filled and the selected CV uploaded in the approved
+  supervised mode below; additional required answers/files remain for the human.
+- Greenhouse: prepares the local CV/letter packet and source link for manual use;
+  automated filling/upload is **not implemented**.
+- LinkedIn Easy Apply, Workday and other application systems are **not implemented**.
+
+For an explicitly approved real Lever run in an interactive terminal:
+
+```sh
+npm run job -- "https://jobs.lever.co/example/11111111-1111-4111-8111-111111111111" --country TR --language en --review --approve-contact-sharing --approve-cv-upload
+```
+
+This invocation really shares the selected CV/contact values with the resolved Lever
+employer. It keeps the form open and shows remaining questions/consents before the
+human types `DEVRET`. Unknown text/select/file questions are not answered by the
+program; ambiguous mappings or an unrecognised resume control still stop. The
+unattended upload mode continues to refuse missing required answers before upload.
+After manual transfer only the user edits remaining fields, accepts consent, solves
+CAPTCHA or submits. No automatic submission or paid call was added. To open a
+previously prepared Lever packet without repeating public intake, the existing
+`lever:review` command accepts its `application.json` with `--job` and its
+`answers.json` with `--answers` (plus the profile and sharing flags).
+
+**Verification:** offline tests cover LinkedIn-to-employer resolution, two independent
+employers and company-specific questions, Greenhouse manual preparation, document
+routing, unsupported destinations, missing metadata and supervised handling of an
+unfamiliar required question. On 2026-10-17 the live Dream Games public posting and
+form were read and a local packet generated without transmitting applicant data.
+Its extra graduation-date question was detected. The previously supplied LinkedIn
+URL exposed no usable employer link to the public reader and stopped explicitly.
+No new live upload, handoff, CAPTCHA, submission or model call was performed for
+this general workflow.
