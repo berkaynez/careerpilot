@@ -510,8 +510,9 @@ remote resume parsing. `cvUploaded` and `submitted` remain false. No checkbox,
 radio, CAPTCHA, legal consent or submit button is activated. Unknown required
 answers stop the run before data entry. It uses no model/API tokens.
 
-This increment has been tested on authored fictional forms only. The read-only
-live inspection was verified previously; live preview filling is still pending
-specific data-sharing approval. Real upload, active-site JavaScript and submission
-remain separate implementation and verification work. Do not call a locally
+This increment passed authored fictional form tests. With explicit per-run approval,
+a live Peak preview on 2026-10-17 filled five fields and verified local selection of
+the English photo CV, then saved a screenshot and closed the browser. KVKK consent
+remained unchecked; cvUploaded=false, submitted=false and modelCalls=0. Real upload,
+active-site JavaScript and submission remain separate implementation and verification work. Do not call a locally
 selected filename a successful upload.
