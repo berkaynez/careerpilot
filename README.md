@@ -355,7 +355,7 @@ npm run prepare -- --profile .careerpilot/profile.json --job .careerpilot/peak-j
 
 The tool writes a fresh private `.careerpilot/prepared/<run-id>/` directory with
 the selected PDF, `cover-letter.txt`, a Turkish `review.txt`, and a machine-readable
-`preparation.json`. It never silently replaces a previous packet. Company-specific
+`preparation.json`, plus `job.json` containing the exact requirement list. It never silently replaces a previous packet. Company-specific
 examples above are private local inputs, not bundled production defaults.
 
 Document routing follows explicit application instructions first. Otherwise the
@@ -382,3 +382,52 @@ Missing Java/Spring Boot evidence must never become a positive claim because a p
 mentions JavaScript or Node.js. Partial degree equivalence and academic skill exposure
 must remain explicit. Personalised prose generation, automatic job URL ingestion and
 real-site submission are not implemented in this preparation command.
+
+### Prepare from pasted posting text
+
+The optional model path also accepts `--posting` instead of `--job`. This removes
+manual requirement lists and a separate review-plan file: one accounted model request
+extracts requirements and selects candidate references together. It still requires
+fresh paid-call and cloud-profile approval. No URL is fetched.
+
+Put the posting text and explicitly checked metadata in a private JSON file:
+
+```json
+{
+  "version": 1,
+  "id": "example-graduate",
+  "company": "Example Studio",
+  "title": "Graduate Engineer",
+  "country": "TR",
+  "language": "en",
+  "sourceUrl": "https://example.invalid/jobs/graduate",
+  "checkedOn": "2026-10-17",
+  "text": "Qualifications\nRelevant degree required.\nJava Spring Boot experience required.\nResponsibilities\nBuild backend APIs."
+}
+```
+
+Check explicit application instructions yourself: set `documentLanguage`, `photoPolicy`
+and `sponsorship` where stated. Their defaults are null, unspecified and not_stated;
+the model cannot change these fields or infer work authorisation. Country and advert
+language are mandatory. Raw text is bounded to 24,000 characters and remains untrusted.
+
+After a separately approved live run, with the existing environment configuration loaded:
+
+```sh
+npm run prepare -- --profile .careerpilot/profile.json --posting .careerpilot/posting.json --model --approve-paid-call --approve-cloud-profile
+```
+
+Each extracted requirement must be a verbatim excerpt of the model-visible posting
+(whitespace may differ). Invented quotations, unknown candidate references and invalid
+plans stop packet creation; billable invalid responses are still accounted without retry.
+The private packet includes `posting.txt` and `job.json` so the original text and
+extracted requirements can be compared. Contact values are redacted before cloud input;
+professional profile facts and posting text are sent only with the explicit approval.
+
+Verbatim checks prove that selected text exists, not that the model extracted every
+requirement or classified it correctly. Review completeness and relevance before using
+any packet. The existing conservative letter renderer is unchanged: it assembles
+profile sentences, rather than reproducing the separately edited general cover letters.
+This workflow has been tested with a mocked provider only. Live extraction quality,
+automatic URL ingestion, free-form cover-letter writing and real-site submission remain
+unverified or unimplemented; a local test does not establish any of those capabilities.
