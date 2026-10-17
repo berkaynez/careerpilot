@@ -367,7 +367,7 @@ Assessment uses only existing fact IDs. Every requirement must be covered once;
 unknown IDs, free-form candidate claims and ungrounded letter text are rejected.
 `documented` and `related` describe evidence availability, not complete qualification,
 a hiring prediction, or an ATS score. Semantic relevance still requires human review.
-The letter uses exact selected profile statements and a fixed introduction/closing.
+The letter uses locally reviewed candidate prose when configured, otherwise exact selected profile statements, with a fixed application introduction/closing.
 
 An optional model can choose factual references using the existing Responses adapter
 and the same persistent monthly/per-run budget ledger. For a separately approved live
@@ -426,8 +426,42 @@ professional profile facts and posting text are sent only with the explicit appr
 
 Verbatim checks prove that selected text exists, not that the model extracted every
 requirement or classified it correctly. Review completeness and relevance before using
-any packet. The existing conservative letter renderer is unchanged: it assembles
-profile sentences, rather than reproducing the separately edited general cover letters.
+any packet. The letter renderer preserves reviewed general candidate prose when configured, then
+adds up to two selected facts not already covered by that prose.
 This workflow has been tested with a mocked provider only. Live extraction quality,
 automatic URL ingestion, free-form cover-letter writing and real-site submission remain
 unverified or unimplemented; a local test does not establish any of those capabilities.
+
+### General candidate narrative in cover letters
+
+An optional private profile field `coverLetter` contains `reviewedOn` and `sections`.
+Each section has `kind` (`introduction`, `background`, `experience`, `projects`),
+bilingual `text` (`tr`, `en`), and existing `factIds` supporting the text. Start with
+introduction and keep this order; omitted later sections are allowed. The entire
+field remains local and is not included in cloud requests. Example with fictional data:
+
+```json
+{
+  "reviewedOn": "2026-10-17",
+  "sections": [{
+    "kind": "introduction",
+    "text": { "tr": "Yazılım alanında yeni mezunum.", "en": "I am a recent software graduate." },
+    "factIds": ["education"]
+  }]
+}
+```
+
+Use prose reviewed against your actual profile; the example assumes an `education`
+fact already exists. Unknown or duplicate references, reordered sections and overly
+long paragraphs are rejected. Experience and projects are capped at 450 characters
+per language; introduction/background at 650. Keep them brief and balanced.
+
+The renderer keeps this general narrative intact, adds the company and job title,
+and appends at most two model-selected factual sentences not already represented
+by the narrative references. It never pastes raw job requirements as candidate
+claims. The manifest's `letter` section records narrative references separately
+from the model's assessment plan, so actual rendered content can be traced.
+Older profiles without this field still use selected factual sentences. These are
+plain text drafts; no free-form model prose, layout/ATS score or hiring outcome is
+promised. Valid references do not prove semantic accuracy: review the prose when
+creating or updating your profile and review each final application.

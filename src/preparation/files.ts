@@ -35,6 +35,6 @@ export async function writePreparation(directory: string, profile: Profile, job:
   await writeFile(join(directory, 'preparation.json'), JSON.stringify({ version: result.version, status: result.status,
     origin, cv: { id: result.cv.id, file: cvName, language: result.language, photo: result.cv.photo },
     requiresSponsorship: result.requiresSponsorship, sourceUrl: job.sourceUrl, checkedOn: job.checkedOn,
-    plan: result.plan }, null, 2) + '\n', { flag: 'wx', mode: 0o600 });
+    plan: result.plan, letter: result.letterEvidence }, null, 2) + '\n', { flag: 'wx', mode: 0o600 });
   return { directory, cvFile: cvName, status: result.status };
 }
