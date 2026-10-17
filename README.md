@@ -572,3 +572,42 @@ behaviour must still stop.
 The corrected location adapter was separately verified on the live form using only
 the city query: one city-search GET, zero writes, no CV/contact upload and no consent.
 The city-only check was followed by the separately approved full verification above.
+
+### Keep the prepared form open and take control
+
+```sh
+npm run lever:review -- --profile .careerpilot/profile.json --job .careerpilot/peak-job.json --answers .careerpilot/lever-answers.json --approve-contact-sharing --approve-cv-upload
+```
+
+This is the same real, consent-gated CV upload as `lever:upload-draft`, with a visible
+isolated browser. It requires an interactive terminal and performs no model calls.
+Do not use it just to view a previous screenshot: each invocation uploads the selected
+CV again. `lever:upload-draft --keep-open` is equivalent.
+
+After upload and final field verification, the browser stays open and the terminal
+waits for an explicit choice:
+
+- `DEVRET`: take manual control of this same prepared form. Normal browser network
+  traffic is enabled and submission/consent click guards are removed. Only deferred
+  hCaptcha bootstrap scripts are restarted; the CV is not reattached or uploaded again.
+  Review/edit the information and complete any legal consent, CAPTCHA and submission
+  yourself. The program never clicks these controls or solves CAPTCHA.
+- `KAPAT`, terminal EOF, or closing the prepared page before transfer: close without
+  granting manual control or submitting. An already uploaded CV may remain on Lever.
+- Other terminal text keeps the form guarded. Before transfer the program checks the
+  values, CV storage/filename and unchecked consent again; changed/missing evidence
+  stops the session rather than silently releasing an incorrect form.
+
+Leave the terminal running during manual work; close the prepared browser window when
+finished. The program does not watch personal edits, legal consent, CAPTCHA or the
+application outcome after transfer. Its checkpoint records `manualControl:true`,
+`automationSubmitted:false`, and `submitted:null` / `consentAccepted:null`; the saved
+screenshot and `verificationTime` describe the form **before** manual control. Closing
+this isolated browser loses the session; there is no saved login or cross-run resume.
+
+Offline browser tests exercise keeping the form open, refusal/cancellation, a changed
+field preventing transfer, deferred CAPTCHA script loading and manual submission to a
+fictional mocked endpoint with the original upload retained. All external responses
+are mocked. The keep-open/handoff mode, real CAPTCHA and final submission have not
+been exercised on the live employer site; the earlier live checks cover automated
+preparation and upload only.
