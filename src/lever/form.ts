@@ -110,6 +110,12 @@ export function planLeverDraft(profile: Profile, form: LeverForm, answers: Lever
 export async function rehearseLeverDraft(page: Page, draft: LeverDraft) {
   const url = new URL(page.url());
   if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1' || page.url() !== draft.url) throw new Error('LEVER_REHEARSAL_LOCAL_ONLY');
+  const filledCount = await fillLeverFields(page, draft);
+  return { status: 'rehearsed' as const, filledCount, submitted: false as const };
+}
+
+/** Internal helper: only callers that establish the session policy may use this. */
+export async function fillLeverFields(page: Page, draft: LeverDraft) {
   const current = await inspectLeverForm(page, draft.url);
   // Validate the entire plan before entering even the first value.
   for (const field of draft.fields) {
@@ -121,6 +127,7 @@ export async function rehearseLeverDraft(page: Page, draft: LeverDraft) {
     if (await exact.count() !== 1) throw new Error('LEVER_STALE_FORM');
     if (field.kind === 'select') await exact.selectOption(field.value, { force: true });
     else await exact.fill(field.value);
+    if (await exact.inputValue() !== field.value) throw new Error('LEVER_FILL_NOT_VERIFIED');
   }
-  return { status: 'rehearsed' as const, filledCount: draft.fields.length, submitted: false as const };
+  return draft.fields.length;
 }

@@ -15,7 +15,8 @@
     "browser:install": "playwright install chromium",
     "agent": "node --env-file=.env --import tsx src/cli.ts",
     "prepare": "node --import tsx src/preparation/cli.ts",
-    "lever:inspect": "node --import tsx src/lever/cli.ts"
+    "lever:inspect": "node --import tsx src/lever/cli.ts",
+    "lever:preview": "node --import tsx src/lever/preview-cli.ts"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
