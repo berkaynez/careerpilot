@@ -485,9 +485,33 @@ There is no cover-letter upload unless a future inspected form actually requests
 
 The separate rehearsal helper fills only authored 127.0.0.1 pages and is tested on
 a fictional Lever-shaped fixture. It never uploads a file, accepts consent, clicks
-submit, or permits live-site filling. No live form filling or submission support
-is claimed. A live read-only CLI run on the Peak posting on 2026-10-17 followed the application
+submit, or permits live-site filling. The separately approved filled-preview mode
+is described below; server upload and submission are not implemented. A live read-only CLI run on the Peak posting on 2026-10-17 followed the application
 link and prepared five fields, leaving CV upload and privacy consent unresolved.
 No personal data was entered, no file was uploaded and no model call was made.
 Other Lever postings and JavaScript-dependent forms remain unverified. Do not treat a rehearsal as a real application.
 Private review packets contain contact values and local CV paths; do not commit or share them.
+
+### Filled form preview with explicit approval
+
+`npm run lever:preview -- --profile .careerpilot/profile.json --job .careerpilot/peak-job.json --answers .careerpilot/lever-answers.json --approve-contact-sharing --approve-cv-selection`
+
+Both per-run approvals are required before launching a browser or reading the CV.
+Do not run this against a real profile without the user's approval for the specific
+employer and data. It reopens the exact employer form in a fresh script-disabled
+session, fills only mapped fields, selects the matching PDF in the browser's file
+input, verifies the resulting field values and captures a private `filled-form.png`
+and `preview.json` under `.careerpilot/form-previews/<id>/`.
+
+This is a **filled preview**, not a server upload or a resumable application.
+The browser closes after capture. All POST requests, site scripts, workers and
+cross-origin resources remain blocked; selecting a PDF does not trigger Lever's
+remote resume parsing. `cvUploaded` and `submitted` remain false. No checkbox,
+radio, CAPTCHA, legal consent or submit button is activated. Unknown required
+answers stop the run before data entry. It uses no model/API tokens.
+
+This increment has been tested on authored fictional forms only. The read-only
+live inspection was verified previously; live preview filling is still pending
+specific data-sharing approval. Real upload, active-site JavaScript and submission
+remain separate implementation and verification work. Do not call a locally
+selected filename a successful upload.

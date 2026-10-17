@@ -3,6 +3,10 @@ import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
 import { createServer } from 'node:http';
 import { leverUrls, canInspectLeverRequest, inspectLeverForm, planLeverDraft, rehearseLeverDraft } from '../src/lever/form.js';
+import { fillPreviewPage, createLeverPreview, readPreviewCV } from '../src/lever/preview.js';
+import { mkdtemp, writeFile, rm, symlink } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import type { Profile } from '../src/preparation/core.js';
 
 const source = 'https://jobs.lever.co/example/11111111-1111-4111-8111-111111111111';
@@ -83,4 +87,53 @@ test('rehearsal rejects live pages before entering candidate data', async () => 
   await assert.rejects(rehearseLeverDraft(page as Parameters<typeof rehearseLeverDraft>[0], {
     status: 'review_required', url: source+'/apply', fields: [], blockers: [], resumeField: 'resume',
   }), /LEVER_REHEARSAL_LOCAL_ONLY/);
+});
+
+
+test('real-form preview requires both approvals before browser launch or personal input', async () => {
+  for (const consent of [{ contactApproved: false, cvSelectionApproved: true }, { contactApproved: true, cvSelectionApproved: false }]) {
+    await assert.rejects(createLeverPreview({ profile, job: {} as Parameters<typeof createLeverPreview>[0]['job'],
+      answers: {}, directory: '/not-created', consent }), /LEVER_PREVIEW_CONSENT_REQUIRED/);
+  }
+});
+
+test('script-disabled preview verifies field values and local PDF selection while consent and POST handlers stay inactive', async t => {
+  let posts = 0;
+  const fixture = html.replace('<form ', '<script>document.documentElement.dataset.scriptRan="yes"</script><form oninput="fetch(\'/submit\', {method: \'POST\'})" ');
+  const server = createServer((request, response) => { if (request.method === 'POST') posts++; response.setHeader('Content-Type','text/html; charset=utf-8'); response.end(fixture); });
+  await new Promise<void>(resolve => server.listen(0,'127.0.0.1', resolve));
+  const address = server.address(); assert.ok(address && typeof address !== 'string');
+  const url = `http://127.0.0.1:${address.port}/preview`;
+  const browser = await chromium.launch({ headless: true });
+  t.after(async () => { await browser.close(); await new Promise<void>(resolve => server.close(() => resolve())); });
+  const context = await browser.newContext({ javaScriptEnabled: false, serviceWorkers: 'block' });
+  await context.route('**/*', route => route.request().method() === 'GET' ? route.continue() : route.abort());
+  const page = await context.newPage(); await page.goto(url);
+  const form = await inspectLeverForm(page, url);
+  const pdf = { name: 'fictional.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4\nfictional fixture') };
+  const consent = { contactApproved: true, cvSelectionApproved: true };
+  await assert.rejects(fillPreviewPage(page, form, profile, {}, pdf, consent), /LEVER_MISSING_ANSWERS/);
+  assert.equal(await page.locator('[name="email"]').inputValue(), '');
+  const result = await fillPreviewPage(page, form, profile, { university: 'Example University' }, pdf, consent);
+  assert.equal(result.status, 'filled_preview_only');
+  assert.equal(result.filledCount, 5);
+  assert.equal(result.cvState, 'selected_in_browser_only');
+  assert.equal(result.cvUploaded, false); assert.equal(result.submitted, false);
+  assert.equal(await page.locator('[name="email"]').inputValue(), profile.contact.email);
+  assert.equal(await page.locator('select').inputValue(), 'fictional-university');
+  assert.equal(await page.locator('[type="checkbox"]').isChecked(), false);
+  assert.equal(await page.locator('[type="file"]').evaluate(element => (element as HTMLInputElement).files?.[0]?.name), 'fictional.pdf');
+  assert.equal(await page.evaluate(() => document.documentElement.dataset.scriptRan), undefined);
+  assert.equal(posts, 0);
+});
+
+test('preview reads only bounded regular PDF files and refuses symlinks or invalid content', async t => {
+  const dir = await mkdtemp(join(tmpdir(), 'careerpilot-preview-cv-'));
+  t.after(() => rm(dir,{recursive:true,force:true}));
+  const pdf = join(dir,'fictional.pdf');
+  await writeFile(pdf,'%PDF-1.4\nfictional fixture');
+  assert.equal((await readPreviewCV(pdf)).name,'fictional.pdf');
+  const linked = join(dir,'linked.pdf'); await symlink(pdf, linked);
+  await assert.rejects(readPreviewCV(linked));
+  await writeFile(pdf,'not a PDF'); await assert.rejects(readPreviewCV(pdf),/LEVER_CV_INVALID/);
 });
