@@ -13,7 +13,7 @@ export async function readLocalJSON(path: string): Promise<unknown> {
   } catch { throw new Error('PREP_INPUT_INVALID'); } finally { await handle.close(); }
 }
 
-export async function writePreparation(directory: string, profile: Profile, job: Job, plan: unknown, origin: 'local_review' | 'model') {
+export async function writePreparation(directory: string, profile: Profile, job: Job, plan: unknown, origin: 'local_review' | 'model', postingText?: string) {
   const result = renderPreparation(profile, job, plan, origin);
   const cvHandle = await open(result.cv.path, constants.O_RDONLY | constants.O_NOFOLLOW);
   let cv: Buffer;
@@ -30,6 +30,8 @@ export async function writePreparation(directory: string, profile: Profile, job:
   await writeFile(join(directory, cvName), cv, { flag: 'wx', mode: 0o600 });
   await writeFile(join(directory, 'cover-letter.txt'), result.coverLetter + '\n', { flag: 'wx', mode: 0o600 });
   await writeFile(join(directory, 'review.txt'), result.report + '\n', { flag: 'wx', mode: 0o600 });
+  if (postingText !== undefined) await writeFile(join(directory, 'posting.txt'), postingText, { flag: 'wx', mode: 0o600 });
+  await writeFile(join(directory, 'job.json'), JSON.stringify(job, null, 2) + '\n', { flag: 'wx', mode: 0o600 });
   await writeFile(join(directory, 'preparation.json'), JSON.stringify({ version: result.version, status: result.status,
     origin, cv: { id: result.cv.id, file: cvName, language: result.language, photo: result.cv.photo },
     requiresSponsorship: result.requiresSponsorship, sourceUrl: job.sourceUrl, checkedOn: job.checkedOn,
