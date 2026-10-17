@@ -24,7 +24,7 @@ export const letterProfileSchema = z.strictObject({
 });
 
 /** Reviewed local prose is preserved; a model can select references but cannot rewrite this narrative. */
-export function renderCoverLetter(profile: Profile, job: Job, plan: Plan) {
+export function renderCoverLetter(profile: Profile, job: Pick<Job, 'company' | 'title' | 'language' | 'documentLanguage'>, plan: Pick<Plan, 'coverLetterFactIds'>) {
   const language = job.documentLanguage ?? job.language;
   const facts = new Map(profile.facts.map(fact => [fact.id, fact]));
   const base = profile.coverLetter;

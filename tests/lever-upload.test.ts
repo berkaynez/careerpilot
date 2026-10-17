@@ -76,7 +76,7 @@ document.querySelector('[name="resume"]').addEventListener('change', function(ev
 document.querySelector('#btn-submit').addEventListener('click', function(){fetch('/submit',{method:'POST',body:'fictional application'});});
 </script><script src="https://js.hcaptcha.com/1/api.js?onload=fictionalReady"></script>`;
 
-async function runFixture(t: TestContext, fail: boolean, reviewMode?: 'close' | 'release' | 'changed') {
+async function runFixture(t: TestContext, fail: boolean, reviewMode?: 'close' | 'release' | 'changed' | 'incomplete', missingQuestion=false) {
   const dir = await mkdtemp(join(tmpdir(),'careerpilot-upload-')); t.after(() => rm(dir,{recursive:true,force:true}));
   const cv = join(dir,pdf.name); await writeFile(cv,pdf.buffer);
   const profile = profileSchema.parse({version:1, contact:{name:'Fictional Applicant',email:'fictional@example.invalid',phone:'+90 555 000 0000',location:'Fictional City'},
@@ -104,7 +104,7 @@ async function runFixture(t: TestContext, fail: boolean, reviewMode?: 'close' | 
         }
         if (request.url().startsWith('https://jobs.lever.co/searchLocations?')) { locationSearches++; await route.fulfill({status:200,contentType:'application/json',body:'[]'}); return; }
         if(request.method()!=='GET'){submissions++;await route.fulfill({status:200,body:'fictional received'});return;}
-        await route.fulfill({status:200,contentType:'text/html; charset=utf-8',body:fixture});
+        await route.fulfill({status:200,contentType:'text/html; charset=utf-8',body:missingQuestion?fixture.replace('<form method="post">','<form method="post"><label>Graduation date<input name="graduation" required></label>'):fixture});
       });
       return context;
     };
@@ -122,16 +122,22 @@ async function runFixture(t: TestContext, fail: boolean, reviewMode?: 'close' | 
       assert.equal(await page.locator('input[name="privacy"]').isChecked(),false);
       await page.locator('#btn-submit').click();
       assert.equal(submissions,0);
-      if(reviewMode==='changed') {
+      if(missingQuestion && !reviewMode) {
+    await assert.rejects(createLeverUploadDraft(input,launch),/LEVER_MISSING_ANSWERS/);
+    assert.equal(uploads,0);assert.equal(submissions,0);return;
+  }
+  if(reviewMode==='changed') {
         await page.locator('input[name="email"]').fill('changed@example.invalid');
         await session.releaseToUser(); return;
       }
-      if(reviewMode==='release') {
+      if(reviewMode==='release' || reviewMode==='incomplete') {
         const decisionInput=new PassThrough(), decisionOutput=new PassThrough();
         const decision=reviewDecision(page,decisionInput,decisionOutput);
         decisionInput.write('DEVRET\n');
         assert.equal(await decision,'release');
+        if(reviewMode==='incomplete')assert.ok(session.remainingFields.some(field=>field.label==='Graduation date'));
         await session.releaseToUser();
+        if(reviewMode==='incomplete')await page.locator('[name="graduation"]').fill('07/2026');
         await assert.rejects(session.releaseToUser(),/LEVER_CONTROL_ALREADY_TRANSFERRED/);
         await page.waitForFunction(()=>document.body.dataset.captchaReady==='true');
         assert.equal(captchaScripts,1);
@@ -146,21 +152,25 @@ async function runFixture(t: TestContext, fail: boolean, reviewMode?: 'close' | 
       }
       await page.close();
     }} : {})};
+  if(missingQuestion && !reviewMode) {
+    await assert.rejects(createLeverUploadDraft(input,launch),/LEVER_MISSING_ANSWERS/);
+    assert.equal(uploads,0);assert.equal(submissions,0);return;
+  }
   if(reviewMode==='changed') await assert.rejects(createLeverUploadDraft(input,launch),/LEVER_FINAL_FIELDS_NOT_VERIFIED/);
   else if(fail) await assert.rejects(createLeverUploadDraft(input,launch),/LEVER_UPLOAD_NOT_CONFIRMED/);
   else {
     const result=await createLeverUploadDraft(input,launch);
-    assert.equal(result.cvUploaded,true);assert.equal(result.fieldsFilled,7);assert.equal(result.submitted,reviewMode==='release'?null:false);
+    assert.equal(result.cvUploaded,true);assert.equal(result.fieldsFilled,7);assert.equal(result.submitted,(reviewMode==='release' || reviewMode==='incomplete')?null:false);
     assert.equal((await stat(join(directory,'uploaded-form.png'))).mode & 0o777,0o600);
   }
   const checkpoint=JSON.parse(await readFile(join(directory,'upload-review.json'),'utf8'));
   assert.equal(checkpoint.uploadRequestAllowed,true);
   assert.equal(checkpoint.uploadVerified,!fail);
   assert.equal(checkpoint.fieldsVerified,!fail && reviewMode!=='changed');
-  assert.equal(checkpoint.consentAccepted,reviewMode==='release'?null:false);assert.equal(checkpoint.submitted,reviewMode==='release'?null:false);
-  assert.equal(checkpoint.automationSubmitted,false);assert.equal(checkpoint.manualControl,reviewMode==='release');
+  assert.equal(checkpoint.consentAccepted,(reviewMode==='release' || reviewMode==='incomplete')?null:false);assert.equal(checkpoint.submitted,(reviewMode==='release' || reviewMode==='incomplete')?null:false);
+  assert.equal(checkpoint.automationSubmitted,false);assert.equal(checkpoint.manualControl,reviewMode==='release' || reviewMode==='incomplete');
   assert.equal(checkpoint.cvState,fail?'upload_outcome_uncertain':'server_upload_verified');
-  assert.equal(uploads,1);assert.equal(submissions,reviewMode==='release'?1:0);assert.equal(locationSearches,1);
+  assert.equal(uploads,1);assert.equal(submissions,(reviewMode==='release' || reviewMode==='incomplete')?1:0);assert.equal(locationSearches,1);
   assert.ok(!JSON.stringify(checkpoint).includes(profile.contact.email));
 }
 
@@ -190,4 +200,11 @@ test('explicit handoff retains the same upload and enables manual completion and
 });
 test('changed profile values stop handoff before normal traffic or submission is enabled', async t => {
   await runFixture(t,false,'changed');
+});
+
+test('supervised review leaves unfamiliar required questions for the human while preserving verified profile fields', async t => {
+  await runFixture(t,false,'incomplete',true);
+});
+test('unattended upload still stops before transmission when a required answer is missing', async t => {
+  await runFixture(t,false,undefined,true);
 });

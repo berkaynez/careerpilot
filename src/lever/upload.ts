@@ -2,11 +2,13 @@ import { chromium } from 'playwright';
 import type { Browser } from 'playwright';
 import { mkdir, chmod, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import { profileSchema, jobSchema, selectCV } from '../preparation/core.js';
-import type { Profile, Job } from '../preparation/core.js';
+import { profileSchema, selectCV } from '../preparation/core.js';
+import type { Profile } from '../preparation/core.js';
 import { leverUrls, inspectLeverForm, planLeverDraft, fillLeverFields, verifyLeverFields, leverAnswersSchema } from './form.js';
 import type { LeverAnswers } from './form.js';
 import { readPreviewCV } from './preview.js';
+import { applicationTargetSchema } from '../jobs/target.js';
+import type { ApplicationTarget } from '../jobs/target.js';
 import { guardSubmission } from './review.js';
 import type { LeverReviewSession } from './review.js';
 import { canBootstrapUpload, canSearchLeverLocation } from './upload-probe.js';
@@ -41,11 +43,11 @@ export class ResumeUploadGate {
   }
 }
 
-export async function createLeverUploadDraft(input: { profile: Profile; job: Job; answers: LeverAnswers;
+export async function createLeverUploadDraft(input: { profile: Profile; job: ApplicationTarget; answers: LeverAnswers;
   directory: string; consent: UploadConsent; review?: (session: LeverReviewSession) => Promise<void> },
   launchBrowser: () => Promise<Browser> = () => chromium.launch({ headless: !input.review })) {
   requireUploadConsent(input.consent);
-  const profile = profileSchema.parse(input.profile), job = jobSchema.parse(input.job), answers = leverAnswersSchema.parse(input.answers);
+  const profile = profileSchema.parse(input.profile), job = applicationTargetSchema.parse(input.job), answers = leverAnswersSchema.parse(input.answers);
   const urls = leverUrls(job.sourceUrl), asset = selectCV(profile, job), cv = await readPreviewCV(asset.path);
   await mkdir(dirname(input.directory), { recursive: true, mode: 0o700 });
   await mkdir(input.directory, { mode: 0o700 });
@@ -53,12 +55,13 @@ export async function createLeverUploadDraft(input: { profile: Profile; job: Job
   let gate: ResumeUploadGate | undefined;
   let uploadVerified = false, fieldsVerified = false, blockedWrites = 0, manualControl = false;
   let verificationTime: string | null = null;
+  let remainingFields: {label:string;reason:string}[]=[];
   const checkpoint = async (status: string) => writeFile(join(input.directory, 'upload-review.json'), JSON.stringify({
     status, cv: { id: asset.id, file: cv.name, language: asset.language, photo: asset.photo },
     uploadRequestAllowed: gate?.allowed ?? false, uploadVerified, fieldsVerified, blockedWrites,
     cvState: uploadVerified ? 'server_upload_verified' : gate?.allowed ? 'upload_outcome_uncertain' : 'not_uploaded',
     submitted: manualControl ? null : false, consentAccepted: manualControl ? null : false, modelCalls: 0,
-    automationSubmitted: false, manualControl, verificationTime,
+    automationSubmitted: false, manualControl, verificationTime, remainingFields,
     note: manualControl ? 'Control transferred to the human. Fields were verified before transfer; later changes, consent and submission are not observed. No resumable session after closing.' : input.review ? 'Prepared form stays open for review. Submission and consent remain blocked until the human explicitly takes control. An uploaded file may be retained by Lever.' : 'Browser closes after capture. This is not a resumable or submitted application. A permitted upload may be retained by Lever even without a submitted application.'
   }, null, 2)+'\n', { mode: 0o600 });
   try {
@@ -87,7 +90,11 @@ export async function createLeverUploadDraft(input: { profile: Profile; job: Job
     await page.goto(urls.apply, { waitUntil: 'load', timeout: 30_000 });
     const releaseGuard = await guardSubmission(page);
     const form = await inspectLeverForm(page, urls.apply), draft = planLeverDraft(profile, form, answers);
-    if (draft.blockers.some(item => !['cv_upload_requires_separate_approval','user_decision_required'].includes(item.reason))) throw new Error('LEVER_MISSING_ANSWERS');
+    const manualReasons=['missing_required_answer','university_option_not_unique','unknown_required_file'];
+    remainingFields=draft.blockers.filter(item=>item.reason!=='cv_upload_requires_separate_approval').map(item=>({
+      label:form.fields.find(field=>field.name===item.name)?.label ?? 'Unrecognised field',reason:item.reason,
+    }));
+    if (draft.blockers.some(item => !['cv_upload_requires_separate_approval','user_decision_required',...(input.review?manualReasons:[])].includes(item.reason))) throw new Error('LEVER_MISSING_ANSWERS');
     if (await page.locator('input[type="checkbox"]:checked,input[type="radio"]:checked').count()) throw new Error('LEVER_PREEXISTING_CONSENT');
     const account = page.locator('input[type="hidden"][name="accountId"]');
     const storage = page.locator('input[type="hidden"][name="resumeStorageId"]');
@@ -119,7 +126,7 @@ export async function createLeverUploadDraft(input: { profile: Profile; job: Job
     await checkpoint(input.review ? 'awaiting_user_review' : 'uploaded_draft_requires_review');
     if (input.review) {
       await page.bringToFront();
-      await input.review({page, directory: input.directory, releaseToUser: async () => {
+      await input.review({page, directory: input.directory, remainingFields, releaseToUser: async () => {
         if (manualControl) throw new Error('LEVER_CONTROL_ALREADY_TRANSFERRED');
         await verifyLeverFields(page, draft, answers.locationSelection);
         if (!await storage.inputValue() || await page.locator('.visible-resume-upload .filename').textContent() !== cv.name
