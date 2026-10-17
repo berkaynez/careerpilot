@@ -7,6 +7,8 @@ import type { Profile, Job } from '../preparation/core.js';
 import { leverUrls, inspectLeverForm, planLeverDraft, fillLeverFields, verifyLeverFields, leverAnswersSchema } from './form.js';
 import type { LeverAnswers } from './form.js';
 import { readPreviewCV } from './preview.js';
+import { guardSubmission } from './review.js';
+import type { LeverReviewSession } from './review.js';
 import { canBootstrapUpload, canSearchLeverLocation } from './upload-probe.js';
 
 export interface UploadConsent { contactApproved: boolean; cvUploadApproved: boolean }
@@ -40,7 +42,8 @@ export class ResumeUploadGate {
 }
 
 export async function createLeverUploadDraft(input: { profile: Profile; job: Job; answers: LeverAnswers;
-  directory: string; consent: UploadConsent }, launchBrowser: () => Promise<Browser> = () => chromium.launch({ headless: true })) {
+  directory: string; consent: UploadConsent; review?: (session: LeverReviewSession) => Promise<void> },
+  launchBrowser: () => Promise<Browser> = () => chromium.launch({ headless: !input.review })) {
   requireUploadConsent(input.consent);
   const profile = profileSchema.parse(input.profile), job = jobSchema.parse(input.job), answers = leverAnswersSchema.parse(input.answers);
   const urls = leverUrls(job.sourceUrl), asset = selectCV(profile, job), cv = await readPreviewCV(asset.path);
@@ -48,28 +51,23 @@ export async function createLeverUploadDraft(input: { profile: Profile; job: Job
   await mkdir(input.directory, { mode: 0o700 });
   const browser = await launchBrowser();
   let gate: ResumeUploadGate | undefined;
-  let uploadVerified = false, fieldsVerified = false, blockedWrites = 0;
+  let uploadVerified = false, fieldsVerified = false, blockedWrites = 0, manualControl = false;
+  let verificationTime: string | null = null;
   const checkpoint = async (status: string) => writeFile(join(input.directory, 'upload-review.json'), JSON.stringify({
     status, cv: { id: asset.id, file: cv.name, language: asset.language, photo: asset.photo },
     uploadRequestAllowed: gate?.allowed ?? false, uploadVerified, fieldsVerified, blockedWrites,
     cvState: uploadVerified ? 'server_upload_verified' : gate?.allowed ? 'upload_outcome_uncertain' : 'not_uploaded',
-    submitted: false, consentAccepted: false, modelCalls: 0,
-    note: 'Browser closes after capture. This is not a resumable or submitted application. A permitted upload may be retained by Lever even without a submitted application.'
+    submitted: manualControl ? null : false, consentAccepted: manualControl ? null : false, modelCalls: 0,
+    automationSubmitted: false, manualControl, verificationTime,
+    note: manualControl ? 'Control transferred to the human. Fields were verified before transfer; later changes, consent and submission are not observed. No resumable session after closing.' : input.review ? 'Prepared form stays open for review. Submission and consent remain blocked until the human explicitly takes control. An uploaded file may be retained by Lever.' : 'Browser closes after capture. This is not a resumable or submitted application. A permitted upload may be retained by Lever even without a submitted application.'
   }, null, 2)+'\n', { mode: 0o600 });
   try {
     const context = await browser.newContext({ serviceWorkers: 'block', acceptDownloads: false });
-    await context.routeWebSocket('**/*', socket => socket.close());
-    await context.addInitScript(() => {
-      window.addEventListener('submit', event => { event.preventDefault(); event.stopImmediatePropagation(); }, true);
-      window.addEventListener('click', event => {
-        const target = event.target;
-        if (target instanceof Element && target.closest('button[type="submit"],input[type="submit"],#btn-submit,#hcaptchaSubmitBtn')) {
-          event.preventDefault(); event.stopImmediatePropagation();
-        }
-      }, true);
-    });
+    await context.routeWebSocket('**/*', socket => { if (manualControl) socket.connectToServer(); else socket.close(); });
+    const deferredCaptchaScripts = new Set<string>();
     await context.route('**/*', async route => {
       const request = route.request();
+      if (manualControl) { await route.fallback(); return; }
       if (request.method() !== 'GET') {
         const allowed = request.resourceType() === 'xhr' && gate
           && await gate.allow(request.url(), request.method(), request.headers()['content-type'] ?? '', request.postDataBuffer());
@@ -79,10 +77,15 @@ export async function createLeverUploadDraft(input: { profile: Profile; job: Job
       }
       if (canSearchLeverLocation(request.url(), request.method(), request.resourceType(), answers.locationSelection?.query)
         || canBootstrapUpload(request.url(), request.method(), request.resourceType(), job.sourceUrl)) await route.fallback();
-      else await route.abort();
+      else {
+        const url = new URL(request.url());
+        if (request.resourceType() === 'script' && url.protocol === 'https:' && (url.hostname === 'hcaptcha.com' || url.hostname.endsWith('.hcaptcha.com'))) deferredCaptchaScripts.add(url.href);
+        await route.abort();
+      }
     });
     const page = await context.newPage(); page.setDefaultTimeout(15_000);
     await page.goto(urls.apply, { waitUntil: 'load', timeout: 30_000 });
+    const releaseGuard = await guardSubmission(page);
     const form = await inspectLeverForm(page, urls.apply), draft = planLeverDraft(profile, form, answers);
     if (draft.blockers.some(item => !['cv_upload_requires_separate_approval','user_decision_required'].includes(item.reason))) throw new Error('LEVER_MISSING_ANSWERS');
     if (await page.locator('input[type="checkbox"]:checked,input[type="radio"]:checked').count()) throw new Error('LEVER_PREEXISTING_CONSENT');
@@ -112,13 +115,34 @@ export async function createLeverUploadDraft(input: { profile: Profile; job: Job
     if (blockedWrites || await page.locator('input[type="checkbox"]:checked,input[type="radio"]:checked').count()) throw new Error('LEVER_UNEXPECTED_SIDE_EFFECT');
     await page.screenshot({ path: join(input.directory, 'uploaded-form.png'), fullPage: true });
     await chmod(join(input.directory, 'uploaded-form.png'), 0o600);
-    await verifyLeverFields(page, draft, answers.locationSelection); fieldsVerified = true;
-    await checkpoint('uploaded_draft_requires_review');
-    return { directory: input.directory, status: 'uploaded_draft_requires_review', fieldsFilled: draft.fields.length,
-      cvUploaded: true, submitted: false, consentAccepted: false, modelCalls: 0 };
+    await verifyLeverFields(page, draft, answers.locationSelection); fieldsVerified = true; verificationTime = new Date().toISOString();
+    await checkpoint(input.review ? 'awaiting_user_review' : 'uploaded_draft_requires_review');
+    if (input.review) {
+      await page.bringToFront();
+      await input.review({page, directory: input.directory, releaseToUser: async () => {
+        if (manualControl) throw new Error('LEVER_CONTROL_ALREADY_TRANSFERRED');
+        await verifyLeverFields(page, draft, answers.locationSelection);
+        if (!await storage.inputValue() || await page.locator('.visible-resume-upload .filename').textContent() !== cv.name
+          || blockedWrites || await page.locator('input[type="checkbox"]:checked,input[type="radio"]:checked').count()) throw new Error('LEVER_HANDOFF_NOT_VERIFIED');
+        // Persist intent before opening normal browser traffic. No agent actions may fill, click or submit after this point.
+        await checkpoint('manual_handoff_authorised');
+        await releaseGuard();
+        manualControl = true;
+        await checkpoint('manual_control_outcome_unknown');
+        // Only deferred CAPTCHA bootstrap scripts are restarted; never resume parsing or reattach the CV.
+        await page.evaluate(urls => {
+          for (const url of urls) {
+            const script = document.createElement('script'); script.src = url; script.async = true; document.head.appendChild(script);
+          }
+        }, [...deferredCaptchaScripts]);
+      }});
+      await checkpoint(manualControl ? 'manual_session_closed_outcome_unknown' : 'review_closed_without_submission');
+    }
+    return { directory: input.directory, status: manualControl ? 'manual_session_closed_outcome_unknown' : input.review ? 'review_closed_without_submission' : 'uploaded_draft_requires_review', fieldsFilled: draft.fields.length,
+      cvUploaded: true, submitted: manualControl ? null : false, consentAccepted: manualControl ? null : false, manualControl, modelCalls: 0 };
   } catch (error) {
-    fieldsVerified = false;
-    await checkpoint('stopped_requires_review');
+    if (!manualControl) fieldsVerified = false;
+    await checkpoint(manualControl ? 'manual_session_ended_outcome_unknown' : 'stopped_requires_review');
     throw error;
   } finally { await browser.close(); }
 }
