@@ -486,7 +486,7 @@ There is no cover-letter upload unless a future inspected form actually requests
 The separate rehearsal helper fills only authored 127.0.0.1 pages and is tested on
 a fictional Lever-shaped fixture. It never uploads a file, accepts consent, clicks
 submit, or permits live-site filling. The separately approved filled-preview mode
-is described below; server upload and submission are not implemented. A live read-only CLI run on the Peak posting on 2026-10-17 followed the application
+is described below; real upload has a separate consent-gated mode below; application submission is not implemented. A live read-only CLI run on the Peak posting on 2026-10-17 followed the application
 link and prepared five fields, leaving CV upload and privacy consent unresolved.
 No personal data was entered, no file was uploaded and no model call was made.
 Other Lever postings and JavaScript-dependent forms remain unverified. Do not treat a rehearsal as a real application.
@@ -514,5 +514,45 @@ This increment passed authored fictional form tests. With explicit per-run appro
 a live Peak preview on 2026-10-17 filled five fields and verified local selection of
 the English photo CV, then saved a screenshot and closed the browser. KVKK consent
 remained unchecked; cvUploaded=false, submitted=false and modelCalls=0. Real upload,
-active-site JavaScript and submission remain separate implementation and verification work. Do not call a locally
+a separate scripted upload mode is described below; application submission remains unimplemented. Do not call a locally
 selected filename a successful upload.
+
+### One CV upload without submitting an application
+
+The private Lever answers can include both `linkedin` and `github` HTTPS links;
+these map to the site's corresponding URL fields alongside the existing five
+contact/university fields. No portfolio URL is inferred from an email domain.
+
+A synthetic, fully blocked live probe on 2026-10-17 observed the hosted form's
+`POST https://jobs.lever.co/parseResume` request containing `resume` and `accountId`.
+Every write was aborted before transmission. This identifies an internal hosted-form
+behaviour, not a documented or stable public standalone-upload API.
+
+After explicit per-run approval to share the named CV and contact/link information
+with the employer through Lever, the new mode is:
+
+```sh
+npm run lever:upload-draft -- --profile .careerpilot/profile.json --job .careerpilot/peak-job.json --answers .careerpilot/lever-answers.json --approve-contact-sharing --approve-cv-upload
+```
+
+This is real file transmission, unlike `lever:preview`. It permits only one exact
+multipart request to the observed resume endpoint, matching the selected PDF's
+name, MIME type and bytes and the account ID from that job's form. Extra form fields,
+different files, destinations, redirects and repeat requests are blocked. Other
+POST requests, sockets, workers, third-party scripts, CAPTCHA widgets and submission
+controls remain blocked; this mode does not accept legal consent or submit.
+
+Upload verification requires a successful HTTP response, a newly populated site
+storage field and the expected filename displayed by the site. Resume parsing can
+overwrite contact fields, so the program reapplies and verifies the sourced values
+and links afterwards. A private screenshot and metadata checkpoint are written
+under `.careerpilot/upload-reviews/<id>/`; contact values and parsed resume response
+bodies are not logged. The browser closes after capture, so this is not a resumable
+application. An uploaded file may be retained by Lever even without final submission.
+
+Uncertain or failed uploads stop without retry, and the checkpoint distinguishes
+request allowance from verified upload. Review it before authorising any repeat.
+The upload flow and both links passed browser tests using fictional responses and
+PDF bytes only. Real CV transmission has NOT been performed or verified yet. The
+blocked probe does not establish that a live upload will succeed; changed hosted
+form behaviour must fail closed rather than silently using another endpoint.
