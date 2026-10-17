@@ -60,6 +60,7 @@ export async function inspectPage(page: Page, observationId: string, assignIds =
         help: [helpers.text(element.closest('fieldset')?.querySelector('legend') ?? null), helpers.described(element, 'aria-describedby')].filter(Boolean).join(' · '),
         required: ('required' in element && element.required) || element.getAttribute('aria-required') === 'true',
         ...(isInput ? { inputType: element.type } : {}),
+        ...(element.hasAttribute('data-consent-id') ? { consentId: element.getAttribute('data-consent-id')! } : {}),
         ...(kind === 'button' ? { buttonEffect } : {}),
         options: element instanceof HTMLSelectElement ? [...element.options].map((option, optionIndex) => ({
           id: `${actualId}-option-${optionIndex}`, label: option.label,
@@ -70,7 +71,19 @@ export async function inspectPage(page: Page, observationId: string, assignIds =
       .filter(helpers.visible).map(element => element instanceof HTMLInputElement || element instanceof HTMLSelectElement || element instanceof HTMLTextAreaElement
         ? element.validationMessage : helpers.text(element)).filter(Boolean);
     const clone = document.body.cloneNode(true) as HTMLElement;
-    clone.querySelectorAll('input,textarea,select,script,style,[hidden]').forEach(element => element.remove());
+    const originalElements = document.body.querySelectorAll('*');
+    const copiedElements = clone.querySelectorAll('*');
+
+    originalElements.forEach((element, index) => {
+      const style = getComputedStyle(element);
+
+      if (style.display === 'none' || style.visibility === 'hidden'
+        || style.visibility === 'collapse') {
+        copiedElements[index]?.remove();
+      }
+    });
+    clone.querySelectorAll('input,textarea,select,script,style,[hidden],[aria-hidden="true"]')
+    .forEach(element => element.remove());
     return { id: observationId, origin: location.origin, title: document.title,
       text: (clone.textContent ?? '').trim().replace(/\s+/g, ' '), controls, errors };
   }, { observationId, assignIds });

@@ -10,6 +10,8 @@ export interface FormControl {
   required: boolean;
   /** Native HTML input type, without the current field value. */
   inputType?: string;
+  /** Trusted mock markup binds consent controls to an explicit policy grant. */
+  consentId?: string;
   /** Executor must establish button effect; unknown effects are blocked. */
   buttonEffect?: 'navigation' | 'submission' | 'unknown';
   options: readonly { id: string; label: string }[];
@@ -65,6 +67,7 @@ export interface ActionResult {
 
 export interface BrowserExecutor {
   observe(signal: AbortSignal): Promise<BrowserObservation>;
+  canSubmit?(signal: AbortSignal): Promise<boolean>;
   execute(decision: Exclude<AgentDecision, { kind: 'stop' }>, signal: AbortSignal): Promise<readonly ActionResult[]>;
 }
 

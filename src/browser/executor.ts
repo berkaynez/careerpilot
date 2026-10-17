@@ -119,6 +119,21 @@ export class PlaywrightBrowserExecutor implements BrowserExecutor {
     return structuredClone(this.observation);
   }
 
+  async canSubmit(signal: AbortSignal): Promise<boolean> {
+    this.assertActive(signal);
+    return this.page.evaluate(() => {
+      if (document.forms.length !== 1) return false;
+      const form = document.forms[0]!;
+      const destination = new URL(form.action);
+      if (destination.origin !== location.origin || form.method !== 'post'
+        || !/^\/applications\/(single|multi|dynamic)\/submit$/.test(destination.pathname)) return false;
+      const required = [...form.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>('[required],[aria-required="true"]')];
+      if (required.some(element => !(element instanceof HTMLInputElement || element instanceof HTMLSelectElement || element instanceof HTMLTextAreaElement)
+        || (element instanceof HTMLInputElement && ['file', 'password', 'hidden'].includes(element.type)))) return false;
+      return form.checkValidity();
+    });
+  }
+
   async execute(decision: Exclude<AgentDecision, { kind: 'stop' }>, signal: AbortSignal): Promise<readonly ActionResult[]> {
     if (this.busy) return [{ observationId: decision.observationId, status: 'rejected', code: 'ACTION_IN_PROGRESS' }];
     this.busy = true;
