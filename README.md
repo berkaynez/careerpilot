@@ -486,7 +486,8 @@ There is no cover-letter upload unless a future inspected form actually requests
 The separate rehearsal helper fills only authored 127.0.0.1 pages and is tested on
 a fictional Lever-shaped fixture. It never uploads a file, accepts consent, clicks
 submit, or permits live-site filling. No live form filling or submission support
-is claimed. Public Peak markup was inspected through the browser, but the CLI's
-network navigation and selectors still need a live read-only run to establish
-compatibility beyond the local fixture. Do not treat a rehearsal as a real application.
+is claimed. A live read-only CLI run on the Peak posting on 2026-10-17 followed the application
+link and prepared five fields, leaving CV upload and privacy consent unresolved.
+No personal data was entered, no file was uploaded and no model call was made.
+Other Lever postings and JavaScript-dependent forms remain unverified. Do not treat a rehearsal as a real application.
 Private review packets contain contact values and local CV paths; do not commit or share them.
