@@ -465,3 +465,28 @@ Older profiles without this field still use selected factual sentences. These ar
 plain text drafts; no free-form model prose, layout/ATS score or hiring outcome is
 promised. Valid references do not prove semantic accuracy: review the prose when
 creating or updating your profile and review each final application.
+
+## Lever form inspection and local rehearsal
+
+`npm run lever:inspect -- --profile .careerpilot/profile.json --job .careerpilot/peak-job.json --answers .careerpilot/lever-answers.json`
+follows the exact application link from one public jobs.lever.co posting, inspects
+its form and writes a private `.careerpilot/form-reviews/<id>/` packet. This is a
+read-only network workflow: scripts/workers are disabled, all writes and cross-origin
+resources are blocked, and contact values are never entered into the live page.
+It uses no model or API credits. It does not navigate LinkedIn or sign in there;
+the employer URL must already be present in the job input.
+
+Optional private answers contain `university` (exact displayed option), `linkedin`,
+`github` and `portfolio` HTTPS URLs. Unknown required questions, ambiguous controls,
+missing answers and consent decisions remain unresolved. Current employer is not
+inferred from an internship. The selected CV is recorded, not uploaded. Resume
+upload approval and the legal privacy consent remain separate unresolved steps.
+There is no cover-letter upload unless a future inspected form actually requests it.
+
+The separate rehearsal helper fills only authored 127.0.0.1 pages and is tested on
+a fictional Lever-shaped fixture. It never uploads a file, accepts consent, clicks
+submit, or permits live-site filling. No live form filling or submission support
+is claimed. Public Peak markup was inspected through the browser, but the CLI's
+network navigation and selectors still need a live read-only run to establish
+compatibility beyond the local fixture. Do not treat a rehearsal as a real application.
+Private review packets contain contact values and local CV paths; do not commit or share them.
