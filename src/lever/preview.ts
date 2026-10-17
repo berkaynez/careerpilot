@@ -4,7 +4,7 @@ import { basename, join, dirname } from 'node:path';
 import type { Page } from 'playwright';
 import { profileSchema, jobSchema, selectCV } from '../preparation/core.js';
 import type { Profile, Job } from '../preparation/core.js';
-import { leverAnswersSchema, planLeverDraft, fillLeverFields } from './form.js';
+import { leverAnswersSchema, planLeverDraft, fillLeverFields, verifyLeverFields } from './form.js';
 import type { LeverAnswers, LeverForm } from './form.js';
 import { openLeverSession } from './session.js';
 
@@ -60,6 +60,7 @@ export async function createLeverPreview(input: { profile: Profile; job: Job; an
     await chmod(input.directory, 0o700);
     await page.screenshot({ path: join(input.directory, 'filled-form.png'), fullPage: true });
     await chmod(join(input.directory, 'filled-form.png'), 0o600);
+    await verifyLeverFields(page, result.draft);
     await writeFile(join(input.directory, 'preview.json'), JSON.stringify({ ...result,
       cv: { id: cvAsset.id, file: cv.name, language: cvAsset.language, photo: cvAsset.photo },
       note: 'Isolated script-disabled preview. File was selected locally, not uploaded. Browser closes after capture; this is not a resumable or submitted application.' }, null, 2)+'\n', { flag: 'wx', mode: 0o600 });

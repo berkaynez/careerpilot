@@ -4,10 +4,10 @@ import { mkdir, chmod, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { profileSchema, jobSchema, selectCV } from '../preparation/core.js';
 import type { Profile, Job } from '../preparation/core.js';
-import { leverUrls, inspectLeverForm, planLeverDraft, fillLeverFields, leverAnswersSchema } from './form.js';
+import { leverUrls, inspectLeverForm, planLeverDraft, fillLeverFields, verifyLeverFields, leverAnswersSchema } from './form.js';
 import type { LeverAnswers } from './form.js';
 import { readPreviewCV } from './preview.js';
-import { canBootstrapUpload } from './upload-probe.js';
+import { canBootstrapUpload, canSearchLeverLocation } from './upload-probe.js';
 
 export interface UploadConsent { contactApproved: boolean; cvUploadApproved: boolean }
 export function requireUploadConsent(consent: UploadConsent) {
@@ -77,7 +77,8 @@ export async function createLeverUploadDraft(input: { profile: Profile; job: Job
         else { blockedWrites++; await route.abort(); }
         return;
       }
-      if (canBootstrapUpload(request.url(), request.method(), request.resourceType(), job.sourceUrl)) await route.fallback();
+      if (canSearchLeverLocation(request.url(), request.method(), request.resourceType(), answers.locationSelection?.query)
+        || canBootstrapUpload(request.url(), request.method(), request.resourceType(), job.sourceUrl)) await route.fallback();
       else await route.abort();
     });
     const page = await context.newPage(); page.setDefaultTimeout(15_000);
@@ -91,8 +92,9 @@ export async function createLeverUploadDraft(input: { profile: Profile; job: Job
     if (await account.count() !== 1 || await storage.count() !== 1 || await file.count() !== 1 || await storage.inputValue()) throw new Error('LEVER_UPLOAD_CONTROL_UNRECOGNISED');
     const accountId = await account.inputValue();
     if (!accountId || accountId.length > 100) throw new Error('LEVER_UPLOAD_CONTROL_UNRECOGNISED');
+    if (await page.locator('input[name="selectedLocation"]').count() && draft.fields.some(field => field.name === 'location') && !answers.locationSelection) throw new Error('LEVER_LOCATION_SELECTION_REQUIRED');
     gate = new ResumeUploadGate(cv, accountId);
-    await fillLeverFields(page, draft);
+    await fillLeverFields(page, draft, answers.locationSelection);
     if (blockedWrites) throw new Error('LEVER_UNEXPECTED_SIDE_EFFECT');
     gate.armed = true;
     const uploaded = page.waitForResponse(response => response.url() === resumeEndpoint && response.request().method() === 'POST', { timeout: 30_000 });
@@ -106,14 +108,16 @@ export async function createLeverUploadDraft(input: { profile: Profile; job: Job
     }, cv.name, { timeout: 15_000 });
     uploadVerified = true;
     // Resume parsing may overwrite fields; reapply and verify the sourced values afterwards.
-    await fillLeverFields(page, draft); fieldsVerified = true;
+    await fillLeverFields(page, draft, answers.locationSelection);
     if (blockedWrites || await page.locator('input[type="checkbox"]:checked,input[type="radio"]:checked').count()) throw new Error('LEVER_UNEXPECTED_SIDE_EFFECT');
     await page.screenshot({ path: join(input.directory, 'uploaded-form.png'), fullPage: true });
     await chmod(join(input.directory, 'uploaded-form.png'), 0o600);
+    await verifyLeverFields(page, draft, answers.locationSelection); fieldsVerified = true;
     await checkpoint('uploaded_draft_requires_review');
     return { directory: input.directory, status: 'uploaded_draft_requires_review', fieldsFilled: draft.fields.length,
       cvUploaded: true, submitted: false, consentAccepted: false, modelCalls: 0 };
   } catch (error) {
+    fieldsVerified = false;
     await checkpoint('stopped_requires_review');
     throw error;
   } finally { await browser.close(); }

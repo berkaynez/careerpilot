@@ -552,7 +552,20 @@ application. An uploaded file may be retained by Lever even without final submis
 
 Uncertain or failed uploads stop without retry, and the checkpoint distinguishes
 request allowance from verified upload. Review it before authorising any repeat.
-The upload flow and both links passed browser tests using fictional responses and
-PDF bytes only. Real CV transmission has NOT been performed or verified yet. The
-blocked probe does not establish that a live upload will succeed; changed hosted
-form behaviour must fail closed rather than silently using another endpoint.
+One explicitly approved live CV upload was verified on 2026-10-17. The screenshot
+revealed an incorrect parser-filled current employer and an empty location, so its
+form checkpoint was corrected to `stopped_requires_review` with `fieldsVerified:false`.
+No application was submitted, no legal consent accepted and no repeat CV upload made.
+
+The fixes clear an unsourced current employer, select an exact reviewed city suggestion
+and recheck every field after focus changes and screenshot capture. For scripted Lever
+forms with `selectedLocation`, answers must include `locationSelection` with a reviewed
+`query` and exact suggestion `label`. Only that exact GET `/searchLocations?text=...`
+is permitted; other API reads remain blocked. This is a display equivalent of the
+profile city, not permission to invent a location. Fictional browser fixtures cover
+parser overwrites, autocomplete, final-value checks and uncertain uploads. The fixed
+full live upload flow has not been repeated; changed hosted-form behaviour must stop.
+
+The corrected location adapter was separately verified on the live form using only
+the city query: one city-search GET, zero writes, no CV/contact upload and no consent.
+This does not establish that the corrected full upload flow has passed live review.
