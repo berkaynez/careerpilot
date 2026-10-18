@@ -44,7 +44,7 @@ export const jobSchema = z.strictObject({
 export const planSchema = z.strictObject({
   assessments: z.array(z.strictObject({ requirementId: id,
     evidenceLevel: z.enum(['documented', 'related', 'not_documented']), factIds: z.array(id).max(8) })).min(1).max(40),
-  coverLetterFactIds: z.array(id).min(1).max(4),
+  coverLetterFactIds: z.array(id).max(4),
   focusRequirementId: id,
 });
 export type Profile = z.infer<typeof profileSchema>;
@@ -69,6 +69,41 @@ export function validatePlan(raw: unknown, profile: Profile, job: Job): Plan {
     || new Set(plan.coverLetterFactIds).size !== plan.coverLetterFactIds.length
     || plan.coverLetterFactIds.some(factId => !evidence.has(factId))) throw new Error('PREP_PLAN_INVALID');
   return plan;
+}
+
+/** Versioned evidence coverage, not a hiring prediction. Invalid/incomplete plans never produce a score. */
+export function buildMatchAnalysis(profile: Profile, job: Job, rawPlan: unknown) {
+  const plan = validatePlan(rawPlan, profile, job);
+  const weights = { essential: 3, preferred: 1, responsibility: 0 } as const;
+  const credits = { documented: 1, related: 0.5, not_documented: 0 } as const;
+  const assessments = new Map(plan.assessments.map(item => [item.requirementId, item]));
+  const requirements = job.requirements.map(requirement => {
+    const assessment = assessments.get(requirement.id)!;
+    const weight = weights[requirement.priority];
+    return { requirementId: requirement.id, priority: requirement.priority,
+      evidenceLevel: assessment.evidenceLevel, factIds: [...assessment.factIds],
+      weight, earned: weight * credits[assessment.evidenceLevel] };
+  });
+  const possible = requirements.reduce((sum, item) => sum + item.weight, 0);
+  const earned = requirements.reduce((sum, item) => sum + item.earned, 0);
+  const authorized = profile.preferences.authorizedCountries.includes(job.country);
+  return {
+    policyVersion: 'evidence-coverage-v1' as const,
+    status: possible ? 'scored' as const : 'not_scored' as const,
+    score: possible ? Math.round(100 * earned / possible) : null,
+    reason: possible ? null : 'no_scorable_requirements' as const,
+    weights, credits, totals: { earned, possible }, requirements,
+    strengths: requirements.filter(item => item.weight && item.evidenceLevel === 'documented').map(item => item.requirementId),
+    partialEvidence: requirements.filter(item => item.weight && item.evidenceLevel === 'related').map(item => item.requirementId),
+    notDocumented: requirements.filter(item => item.weight && item.evidenceLevel === 'not_documented').map(item => item.requirementId),
+    essentialReview: requirements.filter(item => item.priority === 'essential' && item.evidenceLevel !== 'documented').map(item => item.requirementId),
+    workAuthorization: {
+      country: job.country,
+      status: authorized ? 'authorized' as const : profile.preferences.sponsorshipRequiredElsewhere ? 'sponsorship_required' as const : 'unconfirmed' as const,
+      employerSponsorship: job.sponsorship,
+      sponsorshipConflict: !authorized && profile.preferences.sponsorshipRequiredElsewhere && job.sponsorship === 'unavailable',
+    },
+  };
 }
 
 export function selectCV(profile: Profile, job: Pick<Job, 'language' | 'documentLanguage' | 'country' | 'photoPolicy'>) {
@@ -104,7 +139,7 @@ Return exactly one prepare_application call. Assess EVERY requirement once. Use 
 Use 'related' for partial evidence, equivalent-degree uncertainty, or only academic/project exposure.
 Use 'not_documented' with no fact IDs when evidence is missing. Never infer Java from JavaScript,
 Spring Boot from Node.js, NoSQL from SQL, or production-scale experience from an academic prototype.
-Choose 1-4 relevant fact IDs for the letter, from the assessments. Do not invent candidate claims,
+Choose up to 4 relevant fact IDs for the letter, from the assessments; use an empty list when none have evidence. Do not invent candidate claims,
 company facts, eligibility, scores, experience years, salary, or credentials. No browser or submission actions.` },
     { role: 'user', content: JSON.stringify({ company: clean(job.company), title: clean(job.title),
       requirements: job.requirements.map(item => ({ ...item, text: clean(item.text) })),
@@ -141,6 +176,7 @@ export async function planWithModel(profile: Profile, job: Job, options: Prepara
 
 export function renderPreparation(profile: Profile, job: Job, rawPlan: unknown, origin: 'local_review' | 'model') {
   const plan = validatePlan(rawPlan, profile, job);
+  const match = buildMatchAnalysis(profile, job, plan);
   const cv = selectCV(profile, job);
   const facts = new Map(profile.facts.map(fact => [fact.id, fact]));
   const selectedLanguage = job.documentLanguage ?? job.language;
@@ -159,6 +195,10 @@ export function renderPreparation(profile: Profile, job: Job, rawPlan: unknown, 
     `Değerlendirme kaynağı: ${origin === 'model' ? 'Model; insan doğrulaması gerekli' : 'Yerel inceleme; bu işlemde model çağrısı yok'}`,
     origin === 'model' ? 'İlanla karşılaştırarak şartların eksiksizliğini ve eşleştirmelerin doğruluğunu kontrol edin.' : '',
     'Aşağıdaki eşleştirme tam yeterlilik, işe alınma olasılığı veya ATS puanı değildir.',
+    match.score === null ? 'Uyum puanı hesaplanmadı: puanlanabilir gereksinim yok.' : `Profil dayanaklarına göre uyum puanı: ${match.score}/100`,
+    'Puan bir tahmin değil, çıkarılan gereksinimlerdeki dayanak kapsamıdır. Eksik gereksinimler veya hatalı eşleştirme sonucu değiştirebilir.',
+    `Hesaplama (${match.policyVersion}): temel şart 3, tercih edilen 1, görev 0; doğrudan dayanak 1, kısmi 0,5, belgelenmeyen 0. Kazanılan/toplam: ${match.totals.earned}/${match.totals.possible}.`,
+    'Belgelenmeyen bilgi, becerinin bulunmadığının kanıtı değildir. Her şartı ve profil dayanağını gözden geçirin.',
     `CV dili: ${selectedLanguage === 'en' ? 'İngilizce' : 'Türkçe'} | Fotoğraf: ${cv.photo ? 'Var' : 'Yok'}`,
     `Çalışma hakkı: ${authorization}`,
     `İlanda sponsorluk bilgisi: ${sponsorshipLabels[job.sponsorship]}`,
@@ -166,7 +206,9 @@ export function renderPreparation(profile: Profile, job: Job, rawPlan: unknown, 
     'ŞARTLAR VE PROFİLDEKİ DAYANAKLAR',
     ...plan.assessments.flatMap(item => {
       const requirement = job.requirements.find(entry => entry.id === item.requirementId)!;
+      const contribution = match.requirements.find(entry => entry.requirementId === item.requirementId)!;
       return [`- ${requirement.text} [${priorityLabels[requirement.priority]}]: ${levels[item.evidenceLevel]}`,
+        contribution.weight ? `  Puan katkısı: ${contribution.earned}/${contribution.weight}` : '  Görev tanımı: puanlamaya dahil değil.',
         ...item.factIds.map(factId => `  Profilindeki bilgi: ${facts.get(factId)!.text.tr}`)];
     }),
     letter.evidence.mode === 'reviewed_profile'
@@ -176,5 +218,5 @@ export function renderPreparation(profile: Profile, job: Job, rawPlan: unknown, 
     'CV dosyasının kendisi değiştirilmedi. Göndermeden önce ilan şartları ve kendi katkıların kontrol edilmeli.',
   ].filter(Boolean).join('\n');
   return { version: 1 as const, status: 'draft_requires_review' as const, origin, cv,
-    language: selectedLanguage, requiresSponsorship, plan, coverLetter, letterEvidence: letter.evidence, report };
+    language: selectedLanguage, requiresSponsorship, plan, match, coverLetter, letterEvidence: letter.evidence, report };
 }

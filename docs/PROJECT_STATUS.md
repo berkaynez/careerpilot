@@ -12,7 +12,8 @@ Hedef başvuru hazırlama süresini %80 azaltmaktır; henüz ölçülmüş bir s
 
 Onaylanan teslim sırası ve teknik kararlar [hibrit mimari](HYBRID_ARCHITECTURE.md)
 belgesindedir. Aşağıdaki aktif iş listesi uygulamanın tek güncel devam kaydıdır.
-Yerel panel, 0–100 puan ve panelden asistan başlatma henüz uygulanmadı.
+0–100 uyum puanı ve dayanak raporu mevcut hazırlık akışına eklendi.
+Yerel panel ve panelden asistan başlatma henüz uygulanmadı.
 
 ## Mevcut parçalar ve kanıtları
 
@@ -38,55 +39,38 @@ Yerel panel, 0–100 puan ve panelden asistan başlatma henüz uygulanmadı.
   18 Ekim'deki Infobip formunu sohbetin tarayıcı aracı hazırladı, kullanıcı gönderdi;
   başarı ekranı gözlendi. Bu, CareerPilot CLI testi değildir.
 
-## Tek aktif iş: ortak yardımcı dalını kapatmak
+## Önceki dal kapandı
 
-Yerel çalışma dalı: `feature/multi-platform-assist`.
-Yerel `main` kaydı: PR #7 birleşimi. Bu kayıt uzaktan güncellenmeden GitHub'daki
-son durum veya açık PR durumu hakkında kesin hüküm verilmez.
+PR #8, `f1f656e` ile main'e birleştirildi; kullanıcının switch/pull işleminden
+sonra yerel main üzerinde doğrulandı. Ortak yardımcı ve hibrit mimari planı korundu.
+Önceki terminal GitHub erişim sorunu bu yerel birleşim doğrulamasını değiştirmez.
 
-Dalın mevcut kapsamı:
+## Tek aktif iş: açıklanabilir uyum analizi
 
-- Ortak gözetimli form yardımı ve Indeed/Kariyer.net bağlantı tanıma.
-- E-posta ile başlayan giriş ekranında durma.
-- Tek alanlı erişilebilir soru grupları ve metin alanlarını tanıma.
-- Kullanıcının sağladığı maaş/ihbar cevabını yalnızca aynı tam sayfa adresinde kullanma.
-- Mevcut cevapları koruma ve sayfa/ilan değişince eski cevabı yazmadan durma.
-- Kapsamı ve kullanım bilgisini tek yerde toplama.
+Çalışma dalı: `feature/explainable-match-score`, birleşmiş main üzerinden açıldı.
 
-Bu dal mevcut form desteği, doküman toparlaması ve onaylanan hibrit yönün planıyla kapanır.
-Panel veya yeni adaptör uygulaması bu dala eklenmez.
-Önceden yapılmış değişiklikler korunur. Kullanıcıya ait `.vscode/` dosyaları
-bu çalışmanın parçası değildir. Kullanıcı 18 Ekim 2026 tarihinde bu dal için
-commit/PR/birleşim işlemlerini onayladı. Gerçekleşmeyen push/merge tamamlandı diye yazılmaz.
+- [x] Mevcut ilandan gereksinim çıkarma ve profil eşleme akışı kullanılıyor.
+- [x] Doğrulanmış değerlendirmeden sürümlü, deterministik 0–100 puan hesaplanıyor.
+- [x] Temel/tercih/görev ağırlıkları ve her şartın katkısı raporda görünüyor.
+- [x] Güçlü, kısmi ve belgelenmeyen dayanaklar bilgi referanslarıyla ayrılıyor.
+- [x] Puan, çalışma hakkı ve sponsorluk kararlarından ayrı tutuluyor.
+- [x] Sıfır dayanak gerçek 0; puanlanabilir gereksinim yokluğu null; hatalı analiz hata üretiyor.
+- [x] CLI sonucu, özel preparation.json ve review.txt aynı analizi gösteriyor.
+- [x] TypeScript, 110 çevrimdışı test ve whitespace kontrolü geçti.
 
-Dalın kapanış ölçütleri:
+Bu iş panel, yeni site adaptörü veya gerçek model denemesi içermez. Yeni skor
+ücretsiz yerel hesaplamadır; model eşleştirmesinin doğruluğu ve çıkarılan şartların
+eksiksizliği insan incelemesi gerektirir. Test sayısı ürün başarısı yerine geçmez.
+Kullanıcıya ait `.vscode/` dosyaları bu dalın parçası değildir.
 
-- [x] Yeni özelliklerin kapsamı ve gerçek-site sınırları belgeli.
-- [x] TypeScript ve 106 çevrimdışı test, önceki işlevsel değişikliklerden sonra geçti.
-- [x] Kurgusal testler: eksik cevap, farklı ilan, çok alanlı grup ve değişen soru/adres.
-- [x] Son doküman düzenlemesinden sonra TypeScript, 106 çevrimdışı test ve whitespace kontrolü geçti.
-- [x] Yeni ürün yönü, teslim sırası ve güvenlik sınırları mimari belgede toplandı.
-- [x] Kapanış kodu TypeScript ve 106 çevrimdışı testten geçti; `4cc9a37` ile commit edildi.
-- [x] Mimari plan ve güncel kullanım belgeleri ayrı doküman commit paketine hazırlandı.
-- [ ] GitHub erişimi sağlanınca mevcut PR varsa güncelle ve birleştir; yoksa tek PR aç.
+## Sonraki teslimler
 
-GitHub erişim durumu (18 Ekim 2026): `git fetch origin` kimlik doğrulaması
-olmadığı için başarısız. Sohbet tarayıcısında GitHub oturumu açık değil ve özel
-repo görünmüyor. Güncel uzak dal/PR durumu doğrulanamadı; uzakta birleşim yapılmadı.
-
-Test sayısı başarı ölçütü değildir. Kontroller alanların doğru doldurulduğunu,
-yanlış cevabın taşınmadığını ve gizlilik/onay sınırlarının korunduğunu göstermelidir.
-
-## Dal kapandıktan sonraki işler
-
-1. **Analiz ve açıklanabilir puan:** mevcut `preparePostingWithModel` ve doğrulanmış
-   `Plan` yapısını kullan. Skor formülü kodda hesaplanır, gereksinim/faktör katkıları
-   görünürdür. Belgesiz bilgi, eksik analiz ve çalışma hakkı puandan ayrı gösterilir.
-2. **Yerel panel:** hafif HTML/CSS/JavaScript + mevcut Node/TypeScript. İlan ekle,
+1. **Yerel panel:** hafif HTML/CSS/JavaScript + mevcut Node/TypeScript. İlan ekle,
    analiz görüntüle, başvuru durumunu takip et. Kayıtlar özel yerel dizinde kalır.
-3. **Form asistanı bağlantısı:** mevcut doldur/devam/devral akışını panelden erişilir
+   Panel yeni bir skor motoru kurmaz; tamamlanan analiz işlevini kullanır.
+2. **Form asistanı bağlantısı:** mevcut doldur/devam/devral akışını panelden erişilir
    yap; onaylı CV yüklemesini desteklenen yerde kullan, diğer yerde kullanıcıya bırak.
-4. **Gerçek pilot ve ölçüm:** programın hibrit akışıyla bir hazırlığı doğrula;
+3. **Gerçek pilot ve ölçüm:** programın hibrit akışıyla bir hazırlığı doğrula;
    gerçek/manuel/taklit işlemleri ayır, toplam süreyi ve kalan manuel adımları kaydet.
 
 Ayrıntılı kabul ölçütleri mimari belgede. Yeni UI yönü açıkça onaylandığı için
@@ -96,7 +80,7 @@ entegrasyonu MVP kapsamına alınmadı.
 
 ## Harcama ve veri sınırları
 
-Bu dal kapanışı ve mimari planlama çalışmasında ücretli API çağrısı veya gerçek başvuru yapılmaz.
+Bu uyum analizi geliştirmesinde ücretli API çağrısı veya gerçek başvuru yapılmaz.
 `job`, yerel `prepare` ve `assist` ücretli model kullanmaz. `agent` ve açıkça
 onaylanan model incelemeleri farklıdır. Kod varsayılanları aylık 5 USD ve koşu
 başına 0,10 USD'dir; özel `.env` farklı olabilir. Bu limitler ödeme hesabının

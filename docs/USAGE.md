@@ -795,3 +795,37 @@ On 2026-10-18 a separate, supervised browser session reached an Infobip Workday
 application receipt after the user submitted it. That session used the chat's browser
 tools, not the shared `assist` CLI; it does not establish native Workday automation.
 No paid model call was made for that browser session.
+
+
+### Explainable match score
+
+`prepare` now includes `matchScore` (0–100 or `null`) in its CLI result and a
+`match` object in the private `preparation.json`. The readable `review.txt` shows
+the score, formula, each requirement's earned/possible points and existing profile
+evidence. This also applies after the existing consented model-posting analysis;
+scoring adds no second model call. `job` link packets without a reviewed requirement
+assessment still do not have a qualification score.
+
+Policy `evidence-coverage-v1` uses essential weight 3, preferred weight 1 and
+responsibility weight 0. Evidence credit is 1 for documented, 0.5 for related and
+0 for not documented. The rounded score is `100 * earned / possible`. It measures
+coverage of extracted requirements, not hiring probability or an external ATS score.
+Extraction and semantic matching require human review; valid references alone do
+not prove relevance or that every requirement was extracted.
+
+All missing evidence can produce a genuine zero without inventing letter facts
+(`coverLetterFactIds` may be empty). Responsibility-only postings produce `null`
+with `no_scorable_requirements`. Invalid or incomplete analyses fail validation;
+there is no default score on error. Work authorisation and sponsorship conflicts
+are recorded separately and cannot be overridden by a high score.
+
+The existing offline reviewed-plan command now also produces the score:
+
+```sh
+npm run prepare -- --profile .careerpilot/profile.json --job .careerpilot/job.json --review .careerpilot/review.json
+```
+
+All three inputs must already exist and match the documented schemas. This command
+uses the supplied local review, makes no paid call and submits no application.
+Model analysis remains a separate explicitly approved operation with the existing
+budget/privacy controls. Live-model scoring quality has not been evaluated in this change.
