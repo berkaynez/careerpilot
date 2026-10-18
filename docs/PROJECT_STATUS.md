@@ -13,7 +13,8 @@ Hedef başvuru hazırlama süresini %80 azaltmaktır; henüz ölçülmüş bir s
 Onaylanan teslim sırası ve teknik kararlar [hibrit mimari](HYBRID_ARCHITECTURE.md)
 belgesindedir. Aşağıdaki aktif iş listesi uygulamanın tek güncel devam kaydıdır.
 0–100 uyum puanı ve dayanak raporu mevcut hazırlık akışına eklendi.
-Yerel panel ve panelden asistan başlatma henüz uygulanmadı.
+Yerel panelde ilan kaydı, analiz görüntüleme ve durum takibi eklendi.
+Panelden form asistanı başlatma henüz uygulanmadı.
 
 ## Mevcut parçalar ve kanıtları
 
@@ -45,32 +46,39 @@ PR #8, `f1f656e` ile main'e birleştirildi; kullanıcının switch/pull işlemin
 sonra yerel main üzerinde doğrulandı. Ortak yardımcı ve hibrit mimari planı korundu.
 Önceki terminal GitHub erişim sorunu bu yerel birleşim doğrulamasını değiştirmez.
 
-## Tek aktif iş: açıklanabilir uyum analizi
+## Tamamlanan analiz teslimi
 
-Çalışma dalı: `feature/explainable-match-score`, birleşmiş main üzerinden açıldı.
+`6e78f63` açıklanabilir skor ve raporu ekledi; TypeScript ve 110 çevrimdışı test geçti.
+Bu commit henüz ayrıca main'e birleştirilmedi; aşağıdaki panel dalı onu da içerir.
+Skor gerçek işe alınma/ATS tahmini değil, değerlendirilmiş gereksinimlerdeki dayanak kapsamıdır.
 
-- [x] Mevcut ilandan gereksinim çıkarma ve profil eşleme akışı kullanılıyor.
-- [x] Doğrulanmış değerlendirmeden sürümlü, deterministik 0–100 puan hesaplanıyor.
-- [x] Temel/tercih/görev ağırlıkları ve her şartın katkısı raporda görünüyor.
-- [x] Güçlü, kısmi ve belgelenmeyen dayanaklar bilgi referanslarıyla ayrılıyor.
-- [x] Puan, çalışma hakkı ve sponsorluk kararlarından ayrı tutuluyor.
-- [x] Sıfır dayanak gerçek 0; puanlanabilir gereksinim yokluğu null; hatalı analiz hata üretiyor.
-- [x] CLI sonucu, özel preparation.json ve review.txt aynı analizi gösteriyor.
-- [x] TypeScript, 110 çevrimdışı test ve whitespace kontrolü geçti.
+## Tek aktif iş: yerel panel
 
-Bu iş panel, yeni site adaptörü veya gerçek model denemesi içermez. Yeni skor
-ücretsiz yerel hesaplamadır; model eşleştirmesinin doğruluğu ve çıkarılan şartların
-eksiksizliği insan incelemesi gerektirir. Test sayısı ürün başarısı yerine geçmez.
-Kullanıcıya ait `.vscode/` dosyaları bu dalın parçası değildir.
+Çalışma dalı: `feature/local-hub`, `feature/explainable-match-score` üzerinden açıldı.
+Eski skor dalı için ayrıca PR açılmadıysa skor + panel aynı PR'de main'e incelenebilir.
+
+- [x] Yeni bağımlılık eklemeden Node/TypeScript + yerel HTML/CSS/JavaScript paneli.
+- [x] İlan metni, şirket/rol, kaynak URL, ülke ve dil kaydı; arama ve durum filtreleri.
+- [x] Mevcut profil/analiz/skor kodunu kullanan ayrıntı ekranı ve kanıt bazlı gereksinimler.
+- [x] Özel kayıtlar, atomik yazma ve yeniden açıldığında kalıcılık.
+- [x] Önceki hazırlık paketinden ücretsiz analiz içe aktarma; mevcut profil ile yeniden doğrulama.
+- [x] Gerçek/örnek dizinlerini ayıran, model çağrısına izin vermeyen kurgusal demo.
+- [x] Model varsayılan kapalı; etkinleştirilirse her analizde iki ayrı onay ve mevcut bütçe kontrolü.
+- [x] Yenilemede çağrı yapmama, çift analizi engelleme, hata kodu ve başarılı çağrı maliyeti kaydı.
+- [x] Başvuruldu durumunun kullanıcı beyanı olduğunu ve CV'nin yüklenmediğini açık gösterme.
+- [x] Tarayıcı: ekleme, arama, filtre, durum değiştirme, yeniden yükleme, içe aktarma, masaüstü/dar görünüm.
+- [x] TypeScript, 116 çevrimdışı test, arayüz JavaScript sözdizimi ve whitespace kontrolü geçti.
+
+Bu teslim panelden form asistanını başlatmaz, CV yüklemez veya gerçek başvuru
+olasılığını test etmez. UI model sonuçlarını taklit ederek canlı kalite kanıtı
+oluşturmaz. Doğrulama kurgusal aday/ilanlarla yapıldı; ücretli model çağrısı yok.
+Kullanıcıya ait `.vscode/` dosyaları korunur ve commit'e eklenmez.
 
 ## Sonraki teslimler
 
-1. **Yerel panel:** hafif HTML/CSS/JavaScript + mevcut Node/TypeScript. İlan ekle,
-   analiz görüntüle, başvuru durumunu takip et. Kayıtlar özel yerel dizinde kalır.
-   Panel yeni bir skor motoru kurmaz; tamamlanan analiz işlevini kullanır.
-2. **Form asistanı bağlantısı:** mevcut doldur/devam/devral akışını panelden erişilir
+1. **Form asistanı bağlantısı:** mevcut doldur/devam/devral akışını panelden erişilir
    yap; onaylı CV yüklemesini desteklenen yerde kullan, diğer yerde kullanıcıya bırak.
-3. **Gerçek pilot ve ölçüm:** programın hibrit akışıyla bir hazırlığı doğrula;
+2. **Gerçek pilot ve ölçüm:** programın hibrit akışıyla bir hazırlığı doğrula;
    gerçek/manuel/taklit işlemleri ayır, toplam süreyi ve kalan manuel adımları kaydet.
 
 Ayrıntılı kabul ölçütleri mimari belgede. Yeni UI yönü açıkça onaylandığı için
@@ -80,7 +88,7 @@ entegrasyonu MVP kapsamına alınmadı.
 
 ## Harcama ve veri sınırları
 
-Bu uyum analizi geliştirmesinde ücretli API çağrısı veya gerçek başvuru yapılmaz.
+Bu yerel panel geliştirmesinde ücretli API çağrısı veya gerçek başvuru yapılmaz.
 `job`, yerel `prepare` ve `assist` ücretli model kullanmaz. `agent` ve açıkça
 onaylanan model incelemeleri farklıdır. Kod varsayılanları aylık 5 USD ve koşu
 başına 0,10 USD'dir; özel `.env` farklı olabilir. Bu limitler ödeme hesabının

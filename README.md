@@ -4,8 +4,9 @@ CareerPilot, **Yarı-Otonom İş Başvuru Komuta Merkezi** (Hybrid Job Applicati
 olarak geliştiriliyor: ilanları ve AI analizini tek yerde görmek, doğru belgeleri
 hazırlamak ve form doldurmayı insan gözetiminde hızlandırmak.
 
-Bugünkü sürüm CLI tabanlı bir prototiptir. İlan–profil analizinden açıklanabilir
-0–100 uyum puanı hesaplanır; yerel panel sıradaki teslimdir.
+Bugünkü sürüm yerelde çalışan bir prototiptir. İlan–profil analizinden açıklanabilir
+0–100 uyum puanı hesaplanır. Yerel panelde ilan ekleme, analiz görüntüleme ve
+başvuru takibi vardır; panelden form yardımcısı başlatma sıradaki teslimdir.
 
 ## Nereden devam ediyoruz?
 
@@ -18,8 +19,24 @@ Hedef akış: **ilan ekle → dayanaklı uyum analizini incele → formu hazırl
 kendin kontrol edip gönder → durumunu takip et.** Öncelik Türkiye'deki uygun
 başvurular; uluslararası başvurularda konum ve çalışma hakkı ayrıca doğrulanır.
 
+## Yerel panel
+
+```sh
+npm run hub -- --demo
+```
+
+Kurgusal örneklerle paneli `http://127.0.0.1:3210` adresinde açar. Gerçek profil
+kullanılmaz, ücretli çağrı yapılamaz. İlan ekleme, arama/filtreleme, analiz
+ayrıntıları ve durum takibi çalışır; kayıtlar yeniden açıldığında korunur.
+
+Özel profilinle kullanmak için `npm run hub` çalıştır. Panel varsayılan olarak
+model çağrısı yapmaz; mevcut hazırlık paketlerinden `job.json` ve
+`preparation.json` dosyalarını içe aktarabilir. Model analizini etkinleştirme,
+özel profil ve kayıt dizinleri [kullanım referansında](docs/USAGE.md#local-hub-dashboard) açıklanır.
+
 ## Şu an neler var?
 
+- `hub`: yerel ilan listesi, analiz ayrıntıları ve kullanıcı beyanına dayalı durum takibi.
 - `job`: desteklenen bir ilan bağlantısından yerel hazırlık paketi oluşturur.
   İlan okuyamamak, giriş/CAPTCHA veya belirsiz işveren bağlantısı akışı durdurabilir.
 - `assist`: kullanıcının açtığı başvuru sayfasındaki bilinen boş alanları doldurur.
