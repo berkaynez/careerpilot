@@ -748,3 +748,14 @@ value verification. These fixtures are not replicas or recordings of the real
 Indeed, Kariyer.net or LinkedIn application UIs. No real accounts, real uploads,
 CAPTCHA completion or submissions have been exercised with this helper. Native
 end-to-end automation for Indeed/Kariyer.net and LinkedIn Easy Apply remains unverified.
+
+
+A public-browser check on 2026-10-18 opened an Indeed posting and its
+“Şirket Sitesinden Başvur” control. That control displayed an email-only sign-in
+iframe. No account information was entered. The standalone public reader could
+not access that same posting; the browser observation does not establish reader
+or signed-in application compatibility. The assistant now recognises visible
+email-only sign-in headings and auth iframes before filling any contact field;
+ordinary header login links or hidden auth frames do not block a real form.
+These detection changes are covered with fictional browser fixtures. No signed-in
+flow, real contact fill, upload or application submission was tested.
