@@ -120,3 +120,41 @@ test('ordinary sign-in header links and hidden auth iframes do not block the act
   const result=await fillKnownApplicationFields(app.page,input);
   assert.equal(result.filled,3);assert.notEqual(result.status,'login_required');
 });
+
+
+test('scoped supplied answers fill single-question groups and textareas without inventing authorisation or salary units',async t=>{
+  const app=await fixture(`<div role="group" aria-label="What are your base salary expectations for this role?*"><input id="salary" type="number" required></div>
+    <div role="group" aria-labelledby="notice-label"><p id="notice-label">What is your notice period? / What would be your possible start date?*</p><textarea id="notice" required></textarea></div>
+    <label>Currency<input id="currency" required></label><label>Are you legally eligible to work?<input id="permission" required></label>`);
+  t.after(()=>app.browser.close());await app.transport.protect(app.page);
+  const result=await fillKnownApplicationFields(app.page,{...input,answers:{...input.answers,application:{url:origin+'/apply',salaryExpectation:'1600',noticePeriod:'Two weeks.'}}});
+  assert.equal(result.filled,2);assert.equal(await app.page.locator('#salary').inputValue(),'1600');
+  assert.equal(await app.page.locator('#notice').inputValue(),'Two weeks.');
+  assert.equal(await app.page.locator('#permission').inputValue(),'');assert.equal(await app.page.locator('#currency').inputValue(),'');
+  assert.equal(app.writes(),0);assert.ok(!JSON.stringify(result).includes('1600'));
+});
+
+test('application answers never carry over to another posting and group ambiguity leaves fields untouched',async t=>{
+  const app=await fixture(`<label>Email<input id="email"></label><label>Salary expectations<input id="salary" required></label>
+    <div role="group" aria-label="Notice period"><input id="one" required><input id="two" required></div>`);
+  t.after(()=>app.browser.close());await app.transport.protect(app.page);
+  const result=await fillKnownApplicationFields(app.page,{...input,answers:{...input.answers,application:{url:origin+'/different-job',salaryExpectation:'1600',noticePeriod:'Two weeks.'}}});
+  assert.equal(result.filled,1);assert.equal(await app.page.locator('#salary').inputValue(),'');
+  assert.equal(await app.page.locator('#one').inputValue(),'');assert.equal(await app.page.locator('#two').inputValue(),'');
+});
+
+test('a group question changed by site handlers fails final verification',async t=>{
+  const app=await fixture(`<div role="group" aria-label="Notice period" id="question"><textarea id="notice" required></textarea></div>
+    <script>document.querySelector('#notice').oninput=()=>document.querySelector('#question').setAttribute('aria-label','Unrelated question');</script>`);
+  t.after(()=>app.browser.close());await app.transport.protect(app.page);
+  await assert.rejects(fillKnownApplicationFields(app.page,{...input,answers:{...input.answers,application:{url:origin+'/apply',noticePeriod:'Two weeks.'}}}),/ASSIST_STALE_FORM/);
+});
+
+
+test('a same-origin job change during filling stops before reusing the scoped salary',async t=>{
+  const app=await fixture(`<label>Email<input id="email"></label><label>Salary expectations<input id="salary" required></label>
+    <script>document.querySelector('#email').oninput=()=>history.replaceState(null,'','/another-job');</script>`);
+  t.after(()=>app.browser.close());await app.transport.protect(app.page);
+  await assert.rejects(fillKnownApplicationFields(app.page,{...input,answers:{...input.answers,application:{url:origin+'/apply',salaryExpectation:'1600'}}}),/ASSIST_APPLICATION_CHANGED/);
+  assert.equal(await app.page.locator('#salary').inputValue(),'');assert.equal(app.writes(),0);
+});
