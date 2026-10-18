@@ -883,11 +883,62 @@ accounted cost is saved and shown. Provider uncertainty retains the existing led
 reservation; the panel does not convert a failed request into a zero score or a free call.
 Demo mode rejects `--enable-model` and `--profile`.
 
-Scope: this delivery does not launch the form assistant, attach CVs, submit
-applications or automatically fetch arbitrary posting sites. Paste the posting
-when adding a job. Existing standalone CLI assistance remains available separately.
+The panel can launch supervised form assistance (see below), but does not
+attach CVs, submit applications or fetch arbitrary posting sites. Paste the posting
+when adding a job. The existing standalone CLI remains unchanged.
 
 Verification uses fictional data and injected/mocked analyzers. Browser checks
 covered add, search/filter, status update, reload persistence, importing reviewed
 analysis, empty-filter display and desktop/narrow layouts. No real profile was
 sent to a model and no real application was submitted for panel verification.
+
+
+### Form assistance from the local hub
+
+The hub Form Assistant section opens a fresh, headed Chromium session after the
+human approves the named recipient and data categories. Opening never fills fields;
+the user opens the form and explicitly clicks Boş alanları doldur. The panel uses
+`fillKnownApplicationFields` and `assistTransport`; no second model/filling engine
+or new site adapter was added. Standalone `assist` keeps its terminal-command flow.
+
+- Boş alanları doldur: fills known empty visible fields, verifies the result and
+  leaves network/submission guards in place for review.
+- Tarayıcıda devam et: restores normal site traffic for manual navigation, login,
+  CAPTCHA, CV selection and consent. A later fill requires another explicit click.
+  Blocked autosaves are not replayed automatically.
+- Kontrolü devral: ends automation permanently in that session; no subsequent fill,
+  tab selection or origin approval is accepted. The human finishes the application.
+- Oturumu kapat: closes only this assistant's browser; the private log is retained.
+- Form sekmesini seç: selects a stable opaque tab ID. Popups do not automatically
+  become filling targets.
+- Bu adreste doldurmaya izin ver: requires fresh approval for the exact selected
+  origin. Unsupported recipients remain manual; webpage content cannot grant permission.
+
+Panel APIs retain Host/Origin and session-token checks. Only one assistant browser
+may be active per hub. Opening/filling/handoff never marks a job submitted; outcome
+remains unknown. Refresh reconnects to a live in-memory session. Restart does not
+restore cookies or windows. Stopping the hub closes its owned assistant browser.
+
+Normal hub mode accepts --answers <private-json> or the existing optional
+.careerpilot/lever-answers.json. Optional first/last names in the confirmation must
+reconstruct the profile's full name; the shared engine does not guess name parts.
+URL-scoped salary/notice answers keep their exact application scope. CV upload
+remains manual in this common panel flow; the separate approved Lever upload CLI
+is preserved. Legal consent and final submission remain human actions.
+
+Start links match existing LinkedIn, Indeed, Kariyer.net, Lever and Greenhouse URL
+formats; this does not establish native live-account compatibility. Workday remains
+unsupported for automatic filling. Users can open unsupported sources normally.
+
+Demo mode starts an owned loopback mock and uses only the fictional profile. External
+example job URLs are not visited. The mock tests filling/control, not live matching.
+No arbitrary loopback URL can be supplied through the public API. Session logs in
+assist-reviews/<uuid>/session.json contain origin, counts/reasons and command metadata,
+not contact values, cookies, passwords or raw HTML. Remaining questions are shown in
+the panel. Known iframe/custom-widget limits remain unchanged.
+
+Verification uses fictional forms for consent-before-launch, single-session gating,
+verified filling, blocked side effects, manual continuation, stable tabs, exact
+recipient rejection/approval, failed verification and permanent handoff. The panel
+itself was exercised against the owned local mock. No paid calls or real applications
+were made; real signed-in site compatibility remains unverified.

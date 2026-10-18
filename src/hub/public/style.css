@@ -578,3 +578,19 @@ font-size:12px}
   h1{
   font-size:25px}
 }
+
+.assistant-box {
+  margin-top: 20px;
+  padding: 18px;
+  border: 1px solid #d8e6df;
+  border-radius: 7px;
+  background: #f8fbf9;
+}
+.assistant-box select { margin: 10px 0; }
+.assistant-state { font-size: 12px; color: #356b5b; }
+.assistant-controls { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.text-button { border: 0; background: transparent; text-decoration: underline; padding: 10px 0; font-size: 11px; color: #6c7b80; }
+.remaining-fields { font-size: 11px; color: #6f7d82; margin: 12px 0; }
+.remaining-fields summary { cursor: pointer; }
+.remaining-fields ul { padding-left: 18px; }
+#assistant-names[hidden] { display: none; }

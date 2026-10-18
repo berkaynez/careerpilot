@@ -4,6 +4,15 @@ const states = { saved: 'Kaydedildi', ready: 'Analizi hazır', review: 'İncelem
 const levels = { documented: 'Doğrudan dayanak', related: 'Kısmi dayanak', not_documented: 'Profilde belgelenmiyor' };
 const priorities = { essential: 'Temel şart', preferred: 'Tercih edilen', responsibility: 'Görev' };
 const errors = {
+  ASSIST_CONTACT_CONSENT_REQUIRED: 'Form bilgilerini bu siteye yazmak için paylaşım onayı gerekiyor.',
+  ASSIST_SESSION_BUSY: 'Bir form işlemi veya açık oturum var. Önce onu tamamla ya da kapat.',
+  ASSIST_SESSION_CLOSED: 'Form penceresi kapalı. Yeni bir oturum açabilirsin.',
+  ASSIST_CONTROL_TRANSFERRED: 'Kontrol tamamen sende; bu oturumda yeniden otomatik doldurma yapılmaz.',
+  ASSIST_ORIGIN_NOT_APPROVED: 'Bu adreste doldurma izni yok veya site henüz desteklenmiyor.',
+  ASSIST_CONTINUE_REQUIRED: 'Önce “Tarayıcıda devam et” ile mevcut kontrol adımını bitir.',
+  ASSIST_TAB_CLOSED: 'Seçili sekme kapandı. Panelden açık bir sekme seç.',
+  ASSIST_NAME_PARTS_NOT_VERIFIED: 'Ad ve soyad profilindeki tam adla eşleşmiyor. Yazımı kontrol et.',
+  JOB_PLATFORM_UNSUPPORTED: 'Bu sitede otomatik doldurma henüz hazır değil. İlanı açıp elle devam edebilirsin.',
   HUB_INPUT_INVALID: 'Bilgileri kontrol et. Bağlantı https ile başlamalı; ilan metni en az 20 karakter olmalı.',
   HUB_SESSION_REQUIRED: 'Oturum yenilenmeli. Sayfayı yeniden açıp tekrar dene.',
   HUB_ANALYSIS_REQUIRED: 'Bu ilan için önce bir analiz oluştur veya hazır analizi içe aktar.',
@@ -15,7 +24,7 @@ const errors = {
   BUDGET_RUN_STOP: 'Bu analizin koşu bütçesi sınırına ulaşıldı.',
   BUDGET_MONTHLY_STOP: 'Aylık analiz bütçesi sınırına ulaşıldı.',
 };
-let session, records = [], selectedId = null, poll, detailSequence = 0;
+let session, records = [], selectedId = null, poll, detailSequence = 0, assistantRequestPending = false, assistantIntent = null, detailSignature = '';
 function node(tag, className, text) { const element = document.createElement(tag); if (className) element.className = className; if (text !== undefined) element.textContent = text; return element; }
 function friendly(code) { return errors[code] || 'İşlem tamamlanamadı. Kaydın korunuyor; bilgileri ve bağlantını kontrol edip tekrar deneyebilirsin.'; }
 async function api(path, data) {
@@ -37,13 +46,13 @@ async function refresh(preferred) {
   const wanted = visible.find(item => item.id === (preferred || selectedId)) || visible[0];
   if (wanted) await showDetail(wanted.id); else clearDetail();
   clearTimeout(poll);
-  if (records.some(item => item.analyzing)) poll = setTimeout(() => refresh().catch(error => notify(error.message, true)), 2000);
+  if (!assistantRequestPending && records.some(item => item.analyzing || item.assistantActive)) poll = setTimeout(() => refresh().catch(error => notify(error.message, true)), 2000);
 }
 function visibleRecords() {
   const query = $('#search').value.toLocaleLowerCase('tr'), state = $('#filter').value;
   return records.filter(item => (state === 'all' || item.state === state) && (item.company + ' ' + item.title).toLocaleLowerCase('tr').includes(query));
 }
-function clearDetail() { selectedId = null; detailSequence++; const empty = node('div', 'empty'); empty.append(node('h2', '', 'Görüntülenecek ilan seçilmedi.'), node('p', '', 'Aramayı veya filtreyi değiştirerek bir ilan seçebilirsin.')); $('#detail').replaceChildren(empty); }
+function clearDetail() { selectedId = null; detailSignature = '';  detailSequence++; const empty = node('div', 'empty'); empty.append(node('h2', '', 'Görüntülenecek ilan seçilmedi.'), node('p', '', 'Aramayı veya filtreyi değiştirerek bir ilan seçebilirsin.')); $('#detail').replaceChildren(empty); }
 async function applyFilters() {
   const visible = visibleRecords();
   $('#nav-all').classList.toggle('active', $('#filter').value === 'all');
@@ -73,7 +82,10 @@ function renderList() {
 }
 async function showDetail(id) {
   const sequence = ++detailSequence;
-  const record = await api('/api/jobs/' + id); if (sequence !== detailSequence) return; selectedId = id; renderList();
+  const record = await api('/api/jobs/' + id); if (sequence !== detailSequence) return;
+  const signature = JSON.stringify(record);
+  if (selectedId === id && signature === detailSignature) return;
+  detailSignature = signature; selectedId = id; renderList();
   const pane = $('#detail'); pane.replaceChildren();
   const head = node('div', 'detail-head'); head.append(node('div', 'eyebrow', record.posting.company), node('h2', '', record.posting.title));
   const meta = node('div', 'detail-meta'); meta.append(badge(record.state), node('span', 'muted', record.posting.country + ' · ' + (record.posting.language === 'en' ? 'İngilizce ilan' : 'Türkçe ilan'))); head.append(meta); pane.append(head);
@@ -81,6 +93,7 @@ async function showDetail(id) {
   const analyze = node('button', 'primary', record.analyzing ? 'Analiz sürüyor…' : record.analysis ? 'Yeniden analiz et' : 'Uyumunu analiz et');
   analyze.disabled = !session.modelEnabled || record.analyzing; analyze.addEventListener('click', () => { $('#analyze-form').reset(); $('#model-details').textContent = session.model ? 'Model: ' + session.model.name + ' · Sağlayıcı: ' + session.model.destination + ' · Analiz sınırı: $' + session.model.perRunLimitUsd.toFixed(4) + ' · Aylık sınır: $' + session.model.monthlyLimitUsd.toFixed(2) : ''; openDialog('#analyze-dialog'); }); actions.append(analyze); pane.append(actions);
   if (!session.modelEnabled) pane.append(node('p', 'small muted', 'Model bu oturumda kapalı. Mevcut analizini “Analiz içe aktar” ile ücretsiz görüntüleyebilirsin.'));
+  renderAssistant(pane, record);
   if (record.lastError) pane.append(node('p', 'notice error', 'Son analiz tamamlanamadı: ' + friendly(record.lastError) + (record.analysis ? ' Önceki analiz aşağıda korunuyor.' : '')));
   if (record.analysis) renderAnalysis(pane, record);
   else { const box = node('div', 'analysis-empty'); box.append(node('span', 'eyebrow', 'SIRADAKİ ADIM'), node('h3', '', 'Bu fırsat sana ne kadar yakın?'), node('p', 'muted', 'Analiz eklendiğinde güçlü yönlerin, belgelenmeyen şartlar ve puanın dayanakları burada görünecek.')); pane.append(box); }
@@ -91,6 +104,78 @@ async function showDetail(id) {
   select.addEventListener('change', async () => { select.disabled = true; try { await api('/api/jobs/' + id + '/status', { state: select.value }); notify('Başvuru durumu kaydedildi.'); await refresh(id); } catch (error) { select.value = record.state; select.disabled = false; notify(error.message, true); } });
   tracking.append(select, node('p', 'small muted', '“Başvuruldu” senin kaydındır; işverenden doğrulama alındığı anlamına gelmez.')); pane.append(tracking);
   const source = node('details', 'source'); source.append(node('summary', '', record.analysis?.origin === 'imported_review' ? 'İçe aktarılan gereksinimleri göster' : 'İlan metnini göster'), node('pre', '', record.posting.text)); pane.append(source);
+}
+function assistantConsent(record, action = 'start') {
+  assistantIntent = { jobId: record.id, action, origin: action === 'approve' ? record.assistant.session.currentOrigin : record.assistant.recipientOrigin };
+  $('#assistant-form').reset();
+  $('#assistant-first').value = session.assistantDefaults.firstName;
+  $('#assistant-last').value = session.assistantDefaults.lastName;
+  $('#assistant-names').hidden = action === 'approve';
+  $('#assistant-recipient').textContent = (record.assistant.demo ? 'Kurgusal yerel deneme · ' : 'Bilgilerin yazılabileceği site: ') + assistantIntent.origin;
+  $('#assistant-form [type="submit"]').textContent = action === 'approve' ? 'Bu adrese izin ver' : 'Onayla ve aç';
+  openDialog('#assistant-dialog');
+}
+async function assistantRequest(id, command) {
+  if (assistantRequestPending) throw new Error('Bir form işlemi sürüyor; tamamlanmasını bekle.');
+  assistantRequestPending = true; clearTimeout(poll);
+  try { return await api('/api/jobs/' + id + '/assistant', command); }
+  finally { assistantRequestPending = false; }
+}
+async function assistantAction(id, command) {
+  try { await assistantRequest(id, command); notify(command.action === 'handoff' ? 'Kontrol sende. Program artık bu oturuma müdahale etmeyecek.' : command.action === 'close' ? 'Form oturumu kapatıldı. Başvuru sonucu otomatik olarak işaretlenmedi.' : 'Form oturumu güncellendi.'); }
+  catch (error) { notify(error.message, true); }
+  try { await refresh(id); } catch (error) { notify(error.message, true); }
+}
+function renderAssistant(pane, record) {
+  const info = record.assistant, current = info.session;
+  const box = node('section', 'assistant-box'); box.append(node('h3', '', 'Form yardımcısı'));
+  if (!current || current.status === 'closed') {
+    box.append(node('p', 'small muted', info.available ? 'Tarayıcıda girişini yap, formu aç; bilinen boş alanları panelden doldur. Ücretli model çağrısı yapılmaz.' : 'Bu sitede otomatik doldurma henüz hazır değil. “İlanı aç” ile kendin devam edebilirsin.'));
+    const start = node('button', 'secondary', info.demo ? 'Örnek formu aç' : 'Form yardımcısını aç');
+    start.disabled = !info.available || info.occupiedByOther || info.opening || assistantRequestPending;
+    start.addEventListener('click', () => assistantConsent(record)); box.append(start);
+    if (info.opening) box.append(node('p', 'small muted', 'Form penceresi açılıyor…'));
+    if (info.occupiedByOther) box.append(node('p', 'small muted', 'Başka bir ilanın form oturumu açık. Yeni pencere için önce onu kapat.'));
+    pane.append(box); return;
+  }
+  const labels = { manual: 'Tarayıcı sende · formu açıp doldurabilirsin', guarded: 'Alanlar kontrol için hazır · site bağlantıları bekletiliyor', released: 'Kontrol tamamen sende', closed: 'Oturum kapalı' };
+  box.append(node('p', 'assistant-state', labels[current.status]));
+  if (current.lastError) box.append(node('p', 'notice error', 'Son doldurma doğrulanamadı. ' + friendly(current.lastError)));
+  if (current.lastResult) {
+    box.append(node('p', 'small', 'Son doldurma: ' + current.lastResult.filled + ' alan dolduruldu, ' + current.lastResult.alreadyCorrect + ' alan zaten doğruydu.'));
+    if (current.lastResult.status === 'login_required') box.append(node('p', 'small', 'Giriş ekranı var. “Tarayıcıda devam et” ile girişini kendin tamamla.'));
+    if (current.lastResult.remaining.length) {
+      const details = node('details', 'remaining-fields'); details.open = true;
+      details.append(node('summary', '', 'Sana kalan alanlar · ' + current.lastResult.remaining.length));
+      const list = node('ul');
+      const reasons = { human_decision_required: 'kararı/onayı sen ver', manual_answer_required: 'cevabı sen doldur', ambiguous_field: 'eşleşme belirsiz', interactive_widget_requires_human: 'listeden kendin seç', option_not_unique: 'uygun seçenek kesinleşmedi', existing_value_preserved: 'mevcut cevap korundu', site_validation_requires_human: 'site doğrulamasını kontrol et', manual_file_selection_required: 'CV/dosyayı kendin seç', no_matching_fields: 'önce formu aç' };
+      for (const field of current.lastResult.remaining.slice(0, 20)) list.append(node('li', '', (field.label || 'İsimsiz alan') + ' · ' + (reasons[field.reason] || 'kendin kontrol et')));
+      details.append(list); box.append(details);
+    }
+  }
+  if (current.status !== 'released') {
+    const tabs = node('select'); tabs.setAttribute('aria-label', 'Form sekmesini seç');
+    current.tabs.forEach((tab, index) => { const option = node('option', '', 'Sekme ' + (index + 1) + ' · ' + tab.origin); option.value = tab.id; option.selected = tab.selected; tabs.append(option); });
+    tabs.disabled = current.status === 'guarded' || current.busy || assistantRequestPending;
+    tabs.addEventListener('change', () => { void assistantAction(record.id, { action: 'select', tabId: tabs.value }); }); box.append(tabs);
+    if (!current.approved && current.supported) {
+      const approve = node('button', 'secondary', 'Bu adreste doldurmaya izin ver'); approve.disabled = current.status === 'guarded';
+      approve.addEventListener('click', () => assistantConsent(record, 'approve')); box.append(approve);
+    }
+    if (!current.supported) box.append(node('p', 'small muted', 'Seçili adres için otomatik doldurma desteklenmiyor. Kontrolü devralarak elle devam edebilirsin.'));
+    const controls = node('div', 'assistant-controls');
+    for (const [action, label] of [['fill', 'Boş alanları doldur'], ['continue', 'Tarayıcıda devam et'], ['handoff', 'Kontrolü devral']]) {
+      const button = node('button', action === 'fill' ? 'primary' : 'secondary', label);
+      button.disabled = current.busy || assistantRequestPending || action === 'fill' && (current.status === 'guarded' || !current.supported || !current.approved);
+      button.addEventListener('click', () => { button.disabled = true; void assistantAction(record.id, { action }); }); controls.append(button);
+    }
+    box.append(controls);
+    if (current.status === 'guarded') box.append(node('p', 'small muted', 'CV seçmek, formda ilerlemek veya onay vermek için önce “Tarayıcıda devam et”e bas. Doldurma sırasında ağ istekleri durduruldu; alanların siteye kaydedildiğini ayrıca kontrol et.'));
+  }
+  const close = node('button', 'text-button', 'Oturumu kapat'); close.disabled = current.busy || assistantRequestPending;
+  close.addEventListener('click', () => { close.disabled = true; void assistantAction(record.id, { action: 'close' }); }); box.append(close);
+  box.append(node('p', 'small muted', 'CV yükleme, giriş/CAPTCHA, hukuki onaylar ve son gönderim sende. Program başvuru sonucunu otomatik işaretlemez.'));
+  pane.append(box);
 }
 function renderAnalysis(pane, record) {
   const analysis = record.analysis, match = analysis.match;
@@ -127,6 +212,16 @@ function formHandler(selector, action) {
     try { await action(form); } catch (error) { form.querySelector('.form-error').textContent = error.message; } finally { button.disabled = false; button.textContent = original; }
   });
 }
+formHandler('#assistant-form', async form => {
+  const intent = assistantIntent; if (!intent) return;
+  const firstName = $('#assistant-first').value.trim(), lastName = $('#assistant-last').value.trim();
+  if (intent.action === 'start' && Boolean(firstName) !== Boolean(lastName)) throw new Error('Ad ve soyadın ikisini de yaz veya ikisini de boş bırak.');
+  const command = intent.action === 'approve' ? { action: 'approve', origin: intent.origin, contactApproved: $('#assistant-consent').checked }
+    : { action: 'start', contactApproved: $('#assistant-consent').checked, ...(firstName ? { firstName, lastName } : {}) };
+  const result = await assistantRequest(intent.jobId, command);
+  form.closest('dialog').close(); await refresh(result.id);
+  notify(intent.action === 'start' ? 'Form penceresi açıldı. Girişini tamamlayıp panelden doldurabilirsin.' : 'Bu adres için paylaşım izni verildi.');
+});
 formHandler('#new-form', async form => { const data = Object.fromEntries(new FormData(form)); const result = await api('/api/jobs', data); form.closest('dialog').close(); form.reset(); resetFilters(); await refresh(result.id); notify('İlan kaydedildi. Henüz model çağrısı yapılmadı.'); });
 formHandler('#import-form', async form => {
   const jobFile = $('#import-job').files[0], planFile = $('#import-plan').files[0]; if (!jobFile || !planFile || jobFile.size > 200000 || planFile.size > 200000) throw new Error('İki JSON dosyasını da seç; dosyalar 200 KB altında olmalı.');

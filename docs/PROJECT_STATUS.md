@@ -1,6 +1,6 @@
 # CareerPilot — güncel durum ve devam planı
 
-Son düzenleme: 18 Ekim 2026. Bu dosya güncel kapsamın ve sıradaki işin tek kaynağıdır.
+Son düzenleme: 19 Ekim 2026. Bu dosya güncel kapsamın ve sıradaki işin tek kaynağıdır.
 Bir iş tamamlandığında buradaki durum değiştirilir; yeni bir paralel plan eklenmez.
 
 ## Ürün hedefi
@@ -14,7 +14,7 @@ Onaylanan teslim sırası ve teknik kararlar [hibrit mimari](HYBRID_ARCHITECTURE
 belgesindedir. Aşağıdaki aktif iş listesi uygulamanın tek güncel devam kaydıdır.
 0–100 uyum puanı ve dayanak raporu mevcut hazırlık akışına eklendi.
 Yerel panelde ilan kaydı, analiz görüntüleme ve durum takibi eklendi.
-Panelden form asistanı başlatma henüz uygulanmadı.
+Panelden form yardımı açma, doldurma, sekme/izin seçimi ve kullanıcı devri eklendi.
 
 ## Mevcut parçalar ve kanıtları
 
@@ -52,34 +52,42 @@ sonra yerel main üzerinde doğrulandı. Ortak yardımcı ve hibrit mimari plan�
 Bu commit henüz ayrıca main'e birleştirilmedi; aşağıdaki panel dalı onu da içerir.
 Skor gerçek işe alınma/ATS tahmini değil, değerlendirilmiş gereksinimlerdeki dayanak kapsamıdır.
 
-## Tek aktif iş: yerel panel
+## Tamamlanan panel teslimi
 
-Çalışma dalı: `feature/local-hub`, `feature/explainable-match-score` üzerinden açıldı.
-Eski skor dalı için ayrıca PR açılmadıysa skor + panel aynı PR'de main'e incelenebilir.
+31c05d5 yerel panel, kalıcı kayıtlar ve analiz ekranlarını ekledi. TypeScript ve
+116 çevrimdışı test geçti. Skor + panel commit'leri feature/local-hub dalındadır;
+main'e ayrıca birleştirildikleri doğrulanmadı.
 
-- [x] Yeni bağımlılık eklemeden Node/TypeScript + yerel HTML/CSS/JavaScript paneli.
-- [x] İlan metni, şirket/rol, kaynak URL, ülke ve dil kaydı; arama ve durum filtreleri.
-- [x] Mevcut profil/analiz/skor kodunu kullanan ayrıntı ekranı ve kanıt bazlı gereksinimler.
-- [x] Özel kayıtlar, atomik yazma ve yeniden açıldığında kalıcılık.
-- [x] Önceki hazırlık paketinden ücretsiz analiz içe aktarma; mevcut profil ile yeniden doğrulama.
-- [x] Gerçek/örnek dizinlerini ayıran, model çağrısına izin vermeyen kurgusal demo.
-- [x] Model varsayılan kapalı; etkinleştirilirse her analizde iki ayrı onay ve mevcut bütçe kontrolü.
-- [x] Yenilemede çağrı yapmama, çift analizi engelleme, hata kodu ve başarılı çağrı maliyeti kaydı.
-- [x] Başvuruldu durumunun kullanıcı beyanı olduğunu ve CV'nin yüklenmediğini açık gösterme.
-- [x] Tarayıcı: ekleme, arama, filtre, durum değiştirme, yeniden yükleme, içe aktarma, masaüstü/dar görünüm.
-- [x] TypeScript, 116 çevrimdışı test, arayüz JavaScript sözdizimi ve whitespace kontrolü geçti.
+## Tamamlanan form bağlantısı
 
-Bu teslim panelden form asistanını başlatmaz, CV yüklemez veya gerçek başvuru
-olasılığını test etmez. UI model sonuçlarını taklit ederek canlı kalite kanıtı
-oluşturmaz. Doğrulama kurgusal aday/ilanlarla yapıldı; ücretli model çağrısı yok.
-Kullanıcıya ait `.vscode/` dosyaları korunur ve commit'e eklenmez.
+Aynı feature/local-hub dalında mevcut doldurma ve trafik koruma motoru kullanılıyor.
+Yeni sağlayıcı veya siteye özel adaptör yok. Dal skor + panel + form bağlantısını
+tek PR'de incelemeye uygundur. Kullanıcıya ait .vscode/ dosyaları dahil edilmez.
 
-## Sonraki teslimler
+- [x] Alıcı/veri paylaşımı onayıyla ayrı tarayıcı oturumu açma.
+- [x] Panelden doldur / tarayıcıda devam et / kontrolü devral / kapat.
+- [x] Kararlı sekme seçimi ve yeni adreste ayrıca paylaşım izni.
+- [x] Mevcut değerleri koruma, bilinmeyen sorular ve belgeleri kullanıcıya bırakma.
+- [x] Doldurmada ağ/gönderim koruması; kontrol devrinden sonra otomasyonu bitirme.
+- [x] Yenilemede canlı oturumu gösterme ve aynı anda ikinci oturumu engelleme.
+- [x] Gereksiz yeniden çizmeden durum izleme ve özel metadata kaydı.
+- [x] Örnek modda yalnızca sahip olunan yerel formda açma/doldurma.
+- [x] Kurgusal testler: onay, doldurma, yan etkiler, sekme/alıcı sınırları ve kullanıcı devri.
+- [x] TypeScript, 120 çevrimdışı test ve whitespace kontrolü geçti.
+- [x] Panelde doldur/devam/devral/kapat adımları yerel tarayıcıda doğrulandı.
 
-1. **Form asistanı bağlantısı:** mevcut doldur/devam/devral akışını panelden erişilir
-   yap; onaylı CV yüklemesini desteklenen yerde kullan, diğer yerde kullanıcıya bırak.
-2. **Gerçek pilot ve ölçüm:** programın hibrit akışıyla bir hazırlığı doğrula;
-   gerçek/manuel/taklit işlemleri ayır, toplam süreyi ve kalan manuel adımları kaydet.
+İlk panel denemesinde program yerel mock formdaki iki alanı doldurdu ve kalan beş
+alan/onayı kullanıcıya bıraktı. Bu bir gerçek site testi veya tam başvuru değildir.
+Ortak panel akışında CV yükleme, giriş/CAPTCHA, hukuki onay ve son gönderim kullanıcıdadır.
+Ayrı Lever yükleme akışı korunuyor; Workday otomatik doldurma desteği eklenmedi.
+AGENTS.md değiştirilmedi; CLI'nın terminal akışı ve mevcut korumaları korunuyor.
+
+## Tek aktif sonraki iş: gerçek pilot ve ölçüm
+
+Gerçek pilot ve ölçüm: bu hibrit akışla uygun bir ilanda hazırlığı doğrula.
+Her gerçek profil paylaşımı/CV yüklemesi için o işlem ve hedefe özel kullanıcı
+onayı gerekir. Programın yaptığı, elle yapılan ve taklit edilen işleri ayır;
+toplam süreyi ve kalan manuel adımları kaydet. Ücretli analiz ayrıca onay gerektirir.
 
 Ayrıntılı kabul ölçütleri mimari belgede. Yeni UI yönü açıkça onaylandığı için
 önceki “CLI pilotu bitmeden UI ekleme” kuralı yürürlükten kaldırıldı.
@@ -88,7 +96,7 @@ entegrasyonu MVP kapsamına alınmadı.
 
 ## Harcama ve veri sınırları
 
-Bu yerel panel geliştirmesinde ücretli API çağrısı veya gerçek başvuru yapılmaz.
+Bu form bağlantısı geliştirmesinde ücretli API çağrısı veya gerçek başvuru yapılmaz.
 `job`, yerel `prepare` ve `assist` ücretli model kullanmaz. `agent` ve açıkça
 onaylanan model incelemeleri farklıdır. Kod varsayılanları aylık 5 USD ve koşu
 başına 0,10 USD'dir; özel `.env` farklı olabilir. Bu limitler ödeme hesabının

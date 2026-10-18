@@ -6,7 +6,8 @@ hazırlamak ve form doldurmayı insan gözetiminde hızlandırmak.
 
 Bugünkü sürüm yerelde çalışan bir prototiptir. İlan–profil analizinden açıklanabilir
 0–100 uyum puanı hesaplanır. Yerel panelde ilan ekleme, analiz görüntüleme ve
-başvuru takibi vardır; panelden form yardımcısı başlatma sıradaki teslimdir.
+başvuru takibi vardır. Panelden form yardımı açılır, bilinen alanlar hazırlanır
+ve kontrol kullanıcıya bırakılır.
 
 ## Nereden devam ediyoruz?
 
@@ -26,8 +27,9 @@ npm run hub -- --demo
 ```
 
 Kurgusal örneklerle paneli `http://127.0.0.1:3210` adresinde açar. Gerçek profil
-kullanılmaz, ücretli çağrı yapılamaz. İlan ekleme, arama/filtreleme, analiz
-ayrıntıları ve durum takibi çalışır; kayıtlar yeniden açıldığında korunur.
+kullanılmaz, ücretli çağrı yapılamaz. “Örnek formu aç” yalnızca bilgisayardaki
+kurgusal forma gider. İlan ekleme, arama/filtreleme, analiz ayrıntıları, form yardımı
+ve durum takibi çalışır; kayıtlar yeniden açıldığında korunur.
 
 Özel profilinle kullanmak için `npm run hub` çalıştır. Panel varsayılan olarak
 model çağrısı yapmaz; mevcut hazırlık paketlerinden `job.json` ve
@@ -36,7 +38,7 @@ model çağrısı yapmaz; mevcut hazırlık paketlerinden `job.json` ve
 
 ## Şu an neler var?
 
-- `hub`: yerel ilan listesi, analiz ayrıntıları ve kullanıcı beyanına dayalı durum takibi.
+- `hub`: yerel ilan listesi, analiz ayrıntıları, form yardımı ve kullanıcı beyanına dayalı durum takibi.
 - `job`: desteklenen bir ilan bağlantısından yerel hazırlık paketi oluşturur.
   İlan okuyamamak, giriş/CAPTCHA veya belirsiz işveren bağlantısı akışı durdurabilir.
 - `assist`: kullanıcının açtığı başvuru sayfasındaki bilinen boş alanları doldurur.

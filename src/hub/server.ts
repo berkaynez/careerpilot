@@ -1,6 +1,13 @@
 import { createServer } from 'node:http';
 import type { IncomingMessage } from 'node:http';
 import { randomBytes, randomUUID } from 'node:crypto';
+import { dirname, join } from 'node:path';
+import type { Browser } from 'playwright';
+import { jobLink } from '../jobs/links.js';
+import { openAssistSession } from '../applications/session.js';
+import type { AssistSession } from '../applications/session.js';
+import { assistAnswersSchema } from '../applications/fields.js';
+import type { AssistAnswers } from '../applications/fields.js';
 import { readFile } from 'node:fs/promises';
 import { z } from 'zod';
 import { postingSchema } from '../preparation/posting.js';
@@ -11,8 +18,15 @@ import { openHubStore, stateSchema } from './store.js';
 import type { HubRecord } from './store.js';
 
 export type HubAnalyzer = (posting: Posting, signal: AbortSignal) => Promise<{ job: Job; plan: Plan; costMicroUsd: number }>;
+const assistantCommand = z.discriminatedUnion('action', [
+  z.strictObject({ action: z.literal('start'), contactApproved: z.boolean(), firstName: assistAnswersSchema.shape.firstName, lastName: assistAnswersSchema.shape.lastName }),
+  z.strictObject({ action: z.literal('fill') }), z.strictObject({ action: z.literal('continue') }),
+  z.strictObject({ action: z.literal('handoff') }), z.strictObject({ action: z.literal('close') }),
+  z.strictObject({ action: z.literal('select'), tabId: z.uuid() }),
+  z.strictObject({ action: z.literal('approve'), origin: z.string().max(500), contactApproved: z.boolean() }),
+]);
 const inputSchema = postingSchema.omit({ version: true, id: true, checkedOn: true });
-const safeCode = (error: unknown) => error instanceof Error && /^(HUB|PREP|CONFIG|BUDGET|PROVIDER)_[A-Z_]+$/.test(error.message) ? error.message : 'HUB_REQUEST_FAILED';
+const safeCode = (error: unknown) => error instanceof Error && /^(HUB|PREP|CONFIG|BUDGET|PROVIDER|ASSIST|JOB)_[A-Z_]+$/.test(error.message) ? error.message : 'HUB_REQUEST_FAILED';
 async function body(request: IncomingMessage): Promise<unknown> {
   if (!request.headers['content-type']?.startsWith('application/json')) throw new Error('HUB_JSON_REQUIRED');
   const chunks: Buffer[] = []; let length = 0;
@@ -25,23 +39,36 @@ async function body(request: IncomingMessage): Promise<unknown> {
 }
 
 export async function startHub(options: { directory: string; profile: Profile; demo?: boolean;
-  seed?: HubRecord[]; analyze?: HubAnalyzer; modelInfo?: { name: string; destination: string; monthlyLimitUsd: number; perRunLimitUsd: number }; port?: number }) {
+  seed?: HubRecord[]; analyze?: HubAnalyzer; answers?: AssistAnswers; demoFormUrl?: string; launchAssistantBrowser?: () => Promise<Browser>; modelInfo?: { name: string; destination: string; monthlyLimitUsd: number; perRunLimitUsd: number }; port?: number }) {
   const profile = profileSchema.parse(options.profile), store = await openHubStore(options.directory, profile);
   if (options.seed && !store.list().length) for (const record of options.seed) await store.add(record);
   const token = randomBytes(32).toString('hex'), busy = new Set<string>();
   const controller = new AbortController();
   let origin = '';
+  const answers = assistAnswersSchema.parse(options.answers ?? {});
+  let assistant: { jobId: string; session: AssistSession } | null = null;
+  let opening: Promise<AssistSession> | null = null;
+  let openingJobId: string | null = null;
+  const assistantInfo = (record: HubRecord) => {
+    let available = Boolean(options.demo && options.demoFormUrl), recipientOrigin: string | null = null;
+    try { recipientOrigin = new URL(available ? options.demoFormUrl! : jobLink(record.posting.sourceUrl).url).origin; available = true; } catch { /* User can still open the unsupported site manually. */ }
+    const snapshot = assistant?.session.snapshot();
+    return { available, recipientOrigin, opening: Boolean(opening), demo: options.demo === true,
+      occupiedByOther: Boolean(assistant && assistant.jobId !== record.id && snapshot?.status !== 'closed'),
+      session: assistant?.jobId === record.id ? snapshot : null };
+  };
   const summaries = (record: HubRecord) => ({ id: record.id, company: record.posting.company, title: record.posting.title,
     country: record.posting.country, state: record.state, updatedAt: record.updatedAt, analyzing: busy.has(record.id),
     score: record.analysis ? buildMatchAnalysis(profile, record.analysis.job, record.analysis.plan).score : null,
-    analysisOrigin: record.analysis?.origin ?? null, lastError: record.lastError });
+    analysisOrigin: record.analysis?.origin ?? null, lastError: record.lastError,
+    assistantActive: openingJobId === record.id || assistant?.jobId === record.id && assistant.session.snapshot().status !== 'closed' });
   const detail = (record: HubRecord) => {
     const analysis = record.analysis;
     let cv: { id: string; language: string; photo: boolean } | null = null;
     let cvError: string | null = null;
     try { const asset = selectCV(profile, record.posting); cv = { id: asset.id, language: asset.language, photo: asset.photo }; }
     catch { cvError = 'Uygun CV seçimi profilinde netleşmeli.'; }
-    return { ...summaries(record), posting: record.posting, cv, cvError,
+    return { ...summaries(record), posting: record.posting, cv, cvError, assistant: assistantInfo(record),
       analysis: analysis ? { origin: analysis.origin, at: analysis.at, costMicroUsd: analysis.costMicroUsd, job: analysis.job,
         match: buildMatchAnalysis(profile, analysis.job, analysis.plan),
         facts: profile.facts.map(fact => ({ id: fact.id, text: fact.text[record.posting.documentLanguage ?? record.posting.language] })) } : null };
@@ -62,6 +89,7 @@ export async function startHub(options: { directory: string; profile: Profile; d
       if (asset && request.method === 'GET') { response.writeHead(200, { 'Content-Type': asset.type + '; charset=utf-8' }); response.end(asset.data); return; }
       if (path === '/api/session' && request.method === 'GET') {
         json(200, { token, demo: options.demo === true, modelEnabled: Boolean(options.analyze), model: options.modelInfo ?? null,
+          assistantDefaults: { firstName: answers.firstName ?? '', lastName: answers.lastName ?? '' },
           profile: { facts: profile.facts.length, cvs: profile.cvs.length } }); return;
       }
       if (request.headers['x-hub-token'] !== token) { json(403, { code: 'HUB_SESSION_REQUIRED' }); return; }
@@ -82,10 +110,41 @@ export async function startHub(options: { directory: string; profile: Profile; d
           analysis: { job, plan, origin: 'imported_review', at: now, costMicroUsd: null }, lastError: null });
         json(201, detail(record)); return;
       }
-      const match = /^\/api\/jobs\/([a-f0-9-]{36})(?:\/(status|analyze))?$/.exec(path);
+      const match = /^\/api\/jobs\/([a-f0-9-]{36})(?:\/(status|analyze|assistant))?$/.exec(path);
       if (!match) { json(404, { code: 'HUB_NOT_FOUND' }); return; }
       const id = z.uuid().parse(match[1]), action = match[2], record = store.get(id);
       if (!action && request.method === 'GET') { json(200, detail(record)); return; }
+      if (action === 'assistant' && request.method === 'POST') {
+        const command = assistantCommand.parse(await body(request));
+        if (command.action === 'start') {
+          if (!command.contactApproved) { json(403, { code: 'ASSIST_CONTACT_CONSENT_REQUIRED' }); return; }
+          if (opening || assistant && assistant.session.snapshot().status !== 'closed') { json(409, { code: 'ASSIST_SESSION_BUSY' }); return; }
+          const info = assistantInfo(record);
+          if (!info.available) { json(409, { code: 'JOB_PLATFORM_UNSUPPORTED' }); return; }
+          openingJobId = id;
+          opening = openAssistSession({ url: record.posting.sourceUrl, profile,
+            answers: { ...answers, ...(command.firstName ? { firstName: command.firstName } : {}), ...(command.lastName ? { lastName: command.lastName } : {}) },
+            directory: join(dirname(options.directory), 'assist-reviews', randomUUID()), contactApproved: true,
+            ...(options.demo && options.demoFormUrl ? { demoUrl: options.demoFormUrl } : {}),
+          }, options.launchAssistantBrowser);
+          try {
+            const session = await opening;
+            assistant = { jobId: id, session };
+            if (controller.signal.aborted) { await session.shutdown(); throw new Error('HUB_SHUTTING_DOWN'); }
+            await store.update(id, current => ({ ...current, state: ['saved', 'ready'].includes(current.state) ? 'review' : current.state }));
+          } finally { opening = null; openingJobId = null; }
+        } else {
+          if (!assistant || assistant.jobId !== id) { json(409, { code: 'ASSIST_SESSION_CLOSED' }); return; }
+          const session = assistant.session;
+          if (command.action === 'fill') await session.fill();
+          else if (command.action === 'continue') await session.continueManually();
+          else if (command.action === 'handoff') await session.handoff();
+          else if (command.action === 'close') await session.close();
+          else if (command.action === 'select') await session.selectTab(command.tabId);
+          else await session.approveOrigin(command.origin, command.contactApproved);
+        }
+        json(200, detail(store.get(id))); return;
+      }
       if (action === 'status' && request.method === 'POST') {
         const { state } = z.strictObject({ state: stateSchema }).parse(await body(request));
         if (state === 'ready' && !record.analysis) throw new Error('HUB_ANALYSIS_REQUIRED');
@@ -115,12 +174,15 @@ export async function startHub(options: { directory: string; profile: Profile; d
       json(405, { code: 'HUB_METHOD_NOT_ALLOWED' });
     } catch (error) {
       const code = error instanceof z.ZodError ? 'HUB_INPUT_INVALID' : safeCode(error);
-      json(code === 'HUB_NOT_FOUND' ? 404 : code.startsWith('HUB_') || code === 'PREP_PLAN_INVALID' ? 400 : 502, { code });
+      json(code === 'HUB_NOT_FOUND' ? 404 : code.startsWith('HUB_') || code.startsWith('ASSIST_') || code.startsWith('JOB_') || code === 'PREP_PLAN_INVALID' ? 400 : 502, { code });
     }
   });
   server.requestTimeout = 180_000; server.headersTimeout = 10_000;
   await new Promise<void>((resolve, reject) => { server.once('error', reject); server.listen(options.port ?? 0, '127.0.0.1', resolve); });
   const address = server.address(); if (!address || typeof address === 'string') throw new Error('HUB_BIND_FAILED');
   origin = 'http://127.0.0.1:' + address.port;
-  return { origin, async close() { controller.abort(); await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve())); } };
+  return { origin, async close() { controller.abort();
+    if (opening) await opening.catch(() => {});
+    if (assistant) await assistant.session.shutdown();
+    await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve())); } };
 }
