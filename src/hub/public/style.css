@@ -596,7 +596,12 @@ font-size:12px}
 #assistant-names[hidden] { display: none; }
 
 @media(max-width:780px){
-  .sidebar { display:flex; flex-wrap:wrap; gap:8px; }
+  .sidebar { display:flex; flex-direction:row; flex-wrap:wrap; gap:8px; }
   .brand { width:100%; margin-bottom:8px; }
   .sidebar .nav { display:inline-flex; align-items:center; gap:8px; width:auto; margin:0; padding:10px 12px; }
 }
+
+.discovery-source { display:flex; flex-wrap:wrap; gap:8px; margin:14px 0; }
+.discovery-source input { flex:1; min-width:130px; width:140px; }
+.discovery-source select { width:140px; }
+#discovery-result { margin-top:16px; }
