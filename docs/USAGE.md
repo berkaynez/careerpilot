@@ -183,8 +183,8 @@ paths are not an integrated autonomous production agent.
 - `src/events.ts`: metadata-only JSONL event sink.
 - `tests/`: offline tests of the above boundaries and failure cases.
 
-Automatic vacancy discovery, CV generation, email follow-up, dashboards and additional
-provider adapters are not implemented. Public user-supplied job-link intake and
+Automatic vacancy discovery, CV generation, email follow-up and additional
+provider adapters are not implemented. The local dashboard is described under Local hub dashboard. Public user-supplied job-link intake and
 selection/copying of existing CVs are implemented in `src/jobs` and `src/preparation`.
 Provider configuration slots do not constitute working provider integrations.
 
@@ -795,3 +795,150 @@ On 2026-10-18 a separate, supervised browser session reached an Infobip Workday
 application receipt after the user submitted it. That session used the chat's browser
 tools, not the shared `assist` CLI; it does not establish native Workday automation.
 No paid model call was made for that browser session.
+
+
+### Explainable match score
+
+`prepare` now includes `matchScore` (0–100 or `null`) in its CLI result and a
+`match` object in the private `preparation.json`. The readable `review.txt` shows
+the score, formula, each requirement's earned/possible points and existing profile
+evidence. This also applies after the existing consented model-posting analysis;
+scoring adds no second model call. `job` link packets without a reviewed requirement
+assessment still do not have a qualification score.
+
+Policy `evidence-coverage-v1` uses essential weight 3, preferred weight 1 and
+responsibility weight 0. Evidence credit is 1 for documented, 0.5 for related and
+0 for not documented. The rounded score is `100 * earned / possible`. It measures
+coverage of extracted requirements, not hiring probability or an external ATS score.
+Extraction and semantic matching require human review; valid references alone do
+not prove relevance or that every requirement was extracted.
+
+All missing evidence can produce a genuine zero without inventing letter facts
+(`coverLetterFactIds` may be empty). Responsibility-only postings produce `null`
+with `no_scorable_requirements`. Invalid or incomplete analyses fail validation;
+there is no default score on error. Work authorisation and sponsorship conflicts
+are recorded separately and cannot be overridden by a high score.
+
+The existing offline reviewed-plan command now also produces the score:
+
+```sh
+npm run prepare -- --profile .careerpilot/profile.json --job .careerpilot/job.json --review .careerpilot/review.json
+```
+
+All three inputs must already exist and match the documented schemas. This command
+uses the supplied local review, makes no paid call and submits no application.
+Model analysis remains a separate explicitly approved operation with the existing
+budget/privacy controls. Live-model scoring quality has not been evaluated in this change.
+
+
+### Local hub dashboard
+
+The local panel reuses the existing profile schema, posting analysis, match scoring
+and persistent model budget. It has no new dependency or provider abstraction.
+
+```sh
+npm run hub -- --demo
+npm run hub
+npm run hub -- --profile .careerpilot/profile.json --port 3211
+```
+
+The first command uses fictional profile/jobs and `.careerpilot/hub-demo/jobs`;
+it cannot enable the model or load a real profile. Normal mode loads the private
+`.careerpilot/profile.json` (or the explicit CLI profile) and stores records in
+`.careerpilot/hub/jobs`. `CAREERPILOT_STATE_DIR` changes the state directory.
+Only one hub process may write a given directory. Each record is schema-checked,
+private (0600 in a 0700 directory) and atomically replaced. Profile fact IDs must
+remain consistent with imported and previously saved analyses.
+
+The panel runs on `127.0.0.1:3210` by default, with a configurable port. It binds
+only loopback, checks Host/Origin and uses a per-process session token. It serves
+only its fixed local assets, never a general filesystem or arbitrary URL proxy.
+Job text is displayed as text, not HTML. No external CDN is required.
+
+Implemented UI actions:
+
+- Save a company, role, HTTPS source URL, verified country, language and pasted posting text.
+- Search/filter jobs; open source links manually; view per-requirement evidence,
+  match calculation and work-authorisation/sponsorship separately.
+- Import a private `job.json` and `preparation.json` pair from existing preparation.
+  References are checked against the active profile and the score is recomputed.
+  Imported requirements are labelled as imported, not the complete original posting.
+- Change tracking status. `submitted` is explicitly the user's record, not an
+  independently verified employer receipt. A record with no analysis cannot be marked analysis-ready.
+- Display the profile-selected CV language/photo policy; files are not sent or uploaded.
+
+The normal hub has no model access by default. To enable the existing model path:
+
+```sh
+npm run hub -- --enable-model
+```
+
+This explicitly loads the project's `.env` if present and validates the same model,
+verified pricing and budget configuration as `prepare`. It does not make a call at
+startup. Each Analyze action separately requires paid-call and professional-profile
+sharing approval. Contact values and CV paths/files are excluded using the existing
+preparation projection. There is no automatic model retry or refresh-triggered call.
+One analysis can run at a time; repeated concurrent requests are rejected. Successful
+accounted cost is saved and shown. Provider uncertainty retains the existing ledger
+reservation; the panel does not convert a failed request into a zero score or a free call.
+Demo mode rejects `--enable-model` and `--profile`.
+
+The panel can launch supervised form assistance (see below), but does not
+attach CVs, submit applications or fetch arbitrary posting sites. Paste the posting
+when adding a job. The existing standalone CLI remains unchanged.
+
+Verification uses fictional data and injected/mocked analyzers. Browser checks
+covered add, search/filter, status update, reload persistence, importing reviewed
+analysis, empty-filter display and desktop/narrow layouts. No real profile was
+sent to a model and no real application was submitted for panel verification.
+
+
+### Form assistance from the local hub
+
+The hub Form Assistant section opens a fresh, headed Chromium session after the
+human approves the named recipient and data categories. Opening never fills fields;
+the user opens the form and explicitly clicks Boş alanları doldur. The panel uses
+`fillKnownApplicationFields` and `assistTransport`; no second model/filling engine
+or new site adapter was added. Standalone `assist` keeps its terminal-command flow.
+
+- Boş alanları doldur: fills known empty visible fields, verifies the result and
+  leaves network/submission guards in place for review.
+- Tarayıcıda devam et: restores normal site traffic for manual navigation, login,
+  CAPTCHA, CV selection and consent. A later fill requires another explicit click.
+  Blocked autosaves are not replayed automatically.
+- Kontrolü devral: ends automation permanently in that session; no subsequent fill,
+  tab selection or origin approval is accepted. The human finishes the application.
+- Oturumu kapat: closes only this assistant's browser; the private log is retained.
+- Form sekmesini seç: selects a stable opaque tab ID. Popups do not automatically
+  become filling targets.
+- Bu adreste doldurmaya izin ver: requires fresh approval for the exact selected
+  origin. Unsupported recipients remain manual; webpage content cannot grant permission.
+
+Panel APIs retain Host/Origin and session-token checks. Only one assistant browser
+may be active per hub. Opening/filling/handoff never marks a job submitted; outcome
+remains unknown. Refresh reconnects to a live in-memory session. Restart does not
+restore cookies or windows. Stopping the hub closes its owned assistant browser.
+
+Normal hub mode accepts --answers <private-json> or the existing optional
+.careerpilot/lever-answers.json. Optional first/last names in the confirmation must
+reconstruct the profile's full name; the shared engine does not guess name parts.
+URL-scoped salary/notice answers keep their exact application scope. CV upload
+remains manual in this common panel flow; the separate approved Lever upload CLI
+is preserved. Legal consent and final submission remain human actions.
+
+Start links match existing LinkedIn, Indeed, Kariyer.net, Lever and Greenhouse URL
+formats; this does not establish native live-account compatibility. Workday remains
+unsupported for automatic filling. Users can open unsupported sources normally.
+
+Demo mode starts an owned loopback mock and uses only the fictional profile. External
+example job URLs are not visited. The mock tests filling/control, not live matching.
+No arbitrary loopback URL can be supplied through the public API. Session logs in
+assist-reviews/<uuid>/session.json contain origin, counts/reasons and command metadata,
+not contact values, cookies, passwords or raw HTML. Remaining questions are shown in
+the panel. Known iframe/custom-widget limits remain unchanged.
+
+Verification uses fictional forms for consent-before-launch, single-session gating,
+verified filling, blocked side effects, manual continuation, stable tabs, exact
+recipient rejection/approval, failed verification and permanent handoff. The panel
+itself was exercised against the owned local mock. No paid calls or real applications
+were made; real signed-in site compatibility remains unverified.

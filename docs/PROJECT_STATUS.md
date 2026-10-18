@@ -1,6 +1,6 @@
 # CareerPilot — güncel durum ve devam planı
 
-Son düzenleme: 18 Ekim 2026. Bu dosya güncel kapsamın ve sıradaki işin tek kaynağıdır.
+Son düzenleme: 19 Ekim 2026. Bu dosya güncel kapsamın ve sıradaki işin tek kaynağıdır.
 Bir iş tamamlandığında buradaki durum değiştirilir; yeni bir paralel plan eklenmez.
 
 ## Ürün hedefi
@@ -12,7 +12,9 @@ Hedef başvuru hazırlama süresini %80 azaltmaktır; henüz ölçülmüş bir s
 
 Onaylanan teslim sırası ve teknik kararlar [hibrit mimari](HYBRID_ARCHITECTURE.md)
 belgesindedir. Aşağıdaki aktif iş listesi uygulamanın tek güncel devam kaydıdır.
-Yerel panel, 0–100 puan ve panelden asistan başlatma henüz uygulanmadı.
+0–100 uyum puanı ve dayanak raporu mevcut hazırlık akışına eklendi.
+Yerel panelde ilan kaydı, analiz görüntüleme ve durum takibi eklendi.
+Panelden form yardımı açma, doldurma, sekme/izin seçimi ve kullanıcı devri eklendi.
 
 ## Mevcut parçalar ve kanıtları
 
@@ -38,56 +40,54 @@ Yerel panel, 0–100 puan ve panelden asistan başlatma henüz uygulanmadı.
   18 Ekim'deki Infobip formunu sohbetin tarayıcı aracı hazırladı, kullanıcı gönderdi;
   başarı ekranı gözlendi. Bu, CareerPilot CLI testi değildir.
 
-## Tek aktif iş: ortak yardımcı dalını kapatmak
+## Önceki dal kapandı
 
-Yerel çalışma dalı: `feature/multi-platform-assist`.
-Yerel `main` kaydı: PR #7 birleşimi. Bu kayıt uzaktan güncellenmeden GitHub'daki
-son durum veya açık PR durumu hakkında kesin hüküm verilmez.
+PR #8, `f1f656e` ile main'e birleştirildi; kullanıcının switch/pull işleminden
+sonra yerel main üzerinde doğrulandı. Ortak yardımcı ve hibrit mimari planı korundu.
+Önceki terminal GitHub erişim sorunu bu yerel birleşim doğrulamasını değiştirmez.
 
-Dalın mevcut kapsamı:
+## Tamamlanan analiz teslimi
 
-- Ortak gözetimli form yardımı ve Indeed/Kariyer.net bağlantı tanıma.
-- E-posta ile başlayan giriş ekranında durma.
-- Tek alanlı erişilebilir soru grupları ve metin alanlarını tanıma.
-- Kullanıcının sağladığı maaş/ihbar cevabını yalnızca aynı tam sayfa adresinde kullanma.
-- Mevcut cevapları koruma ve sayfa/ilan değişince eski cevabı yazmadan durma.
-- Kapsamı ve kullanım bilgisini tek yerde toplama.
+`6e78f63` açıklanabilir skor ve raporu ekledi; TypeScript ve 110 çevrimdışı test geçti.
+Bu commit henüz ayrıca main'e birleştirilmedi; aşağıdaki panel dalı onu da içerir.
+Skor gerçek işe alınma/ATS tahmini değil, değerlendirilmiş gereksinimlerdeki dayanak kapsamıdır.
 
-Bu dal mevcut form desteği, doküman toparlaması ve onaylanan hibrit yönün planıyla kapanır.
-Panel veya yeni adaptör uygulaması bu dala eklenmez.
-Önceden yapılmış değişiklikler korunur. Kullanıcıya ait `.vscode/` dosyaları
-bu çalışmanın parçası değildir. Kullanıcı 18 Ekim 2026 tarihinde bu dal için
-commit/PR/birleşim işlemlerini onayladı. Gerçekleşmeyen push/merge tamamlandı diye yazılmaz.
+## Tamamlanan panel teslimi
 
-Dalın kapanış ölçütleri:
+31c05d5 yerel panel, kalıcı kayıtlar ve analiz ekranlarını ekledi. TypeScript ve
+116 çevrimdışı test geçti. Skor + panel commit'leri feature/local-hub dalındadır;
+main'e ayrıca birleştirildikleri doğrulanmadı.
 
-- [x] Yeni özelliklerin kapsamı ve gerçek-site sınırları belgeli.
-- [x] TypeScript ve 106 çevrimdışı test, önceki işlevsel değişikliklerden sonra geçti.
-- [x] Kurgusal testler: eksik cevap, farklı ilan, çok alanlı grup ve değişen soru/adres.
-- [x] Son doküman düzenlemesinden sonra TypeScript, 106 çevrimdışı test ve whitespace kontrolü geçti.
-- [x] Yeni ürün yönü, teslim sırası ve güvenlik sınırları mimari belgede toplandı.
-- [x] Kapanış kodu TypeScript ve 106 çevrimdışı testten geçti; `4cc9a37` ile commit edildi.
-- [x] Mimari plan ve güncel kullanım belgeleri ayrı doküman commit paketine hazırlandı.
-- [ ] GitHub erişimi sağlanınca mevcut PR varsa güncelle ve birleştir; yoksa tek PR aç.
+## Tamamlanan form bağlantısı
 
-GitHub erişim durumu (18 Ekim 2026): `git fetch origin` kimlik doğrulaması
-olmadığı için başarısız. Sohbet tarayıcısında GitHub oturumu açık değil ve özel
-repo görünmüyor. Güncel uzak dal/PR durumu doğrulanamadı; uzakta birleşim yapılmadı.
+Aynı feature/local-hub dalında mevcut doldurma ve trafik koruma motoru kullanılıyor.
+Yeni sağlayıcı veya siteye özel adaptör yok. Dal skor + panel + form bağlantısını
+tek PR'de incelemeye uygundur. Kullanıcıya ait .vscode/ dosyaları dahil edilmez.
 
-Test sayısı başarı ölçütü değildir. Kontroller alanların doğru doldurulduğunu,
-yanlış cevabın taşınmadığını ve gizlilik/onay sınırlarının korunduğunu göstermelidir.
+- [x] Alıcı/veri paylaşımı onayıyla ayrı tarayıcı oturumu açma.
+- [x] Panelden doldur / tarayıcıda devam et / kontrolü devral / kapat.
+- [x] Kararlı sekme seçimi ve yeni adreste ayrıca paylaşım izni.
+- [x] Mevcut değerleri koruma, bilinmeyen sorular ve belgeleri kullanıcıya bırakma.
+- [x] Doldurmada ağ/gönderim koruması; kontrol devrinden sonra otomasyonu bitirme.
+- [x] Yenilemede canlı oturumu gösterme ve aynı anda ikinci oturumu engelleme.
+- [x] Gereksiz yeniden çizmeden durum izleme ve özel metadata kaydı.
+- [x] Örnek modda yalnızca sahip olunan yerel formda açma/doldurma.
+- [x] Kurgusal testler: onay, doldurma, yan etkiler, sekme/alıcı sınırları ve kullanıcı devri.
+- [x] TypeScript, 120 çevrimdışı test ve whitespace kontrolü geçti.
+- [x] Panelde doldur/devam/devral/kapat adımları yerel tarayıcıda doğrulandı.
 
-## Dal kapandıktan sonraki işler
+İlk panel denemesinde program yerel mock formdaki iki alanı doldurdu ve kalan beş
+alan/onayı kullanıcıya bıraktı. Bu bir gerçek site testi veya tam başvuru değildir.
+Ortak panel akışında CV yükleme, giriş/CAPTCHA, hukuki onay ve son gönderim kullanıcıdadır.
+Ayrı Lever yükleme akışı korunuyor; Workday otomatik doldurma desteği eklenmedi.
+AGENTS.md değiştirilmedi; CLI'nın terminal akışı ve mevcut korumaları korunuyor.
 
-1. **Analiz ve açıklanabilir puan:** mevcut `preparePostingWithModel` ve doğrulanmış
-   `Plan` yapısını kullan. Skor formülü kodda hesaplanır, gereksinim/faktör katkıları
-   görünürdür. Belgesiz bilgi, eksik analiz ve çalışma hakkı puandan ayrı gösterilir.
-2. **Yerel panel:** hafif HTML/CSS/JavaScript + mevcut Node/TypeScript. İlan ekle,
-   analiz görüntüle, başvuru durumunu takip et. Kayıtlar özel yerel dizinde kalır.
-3. **Form asistanı bağlantısı:** mevcut doldur/devam/devral akışını panelden erişilir
-   yap; onaylı CV yüklemesini desteklenen yerde kullan, diğer yerde kullanıcıya bırak.
-4. **Gerçek pilot ve ölçüm:** programın hibrit akışıyla bir hazırlığı doğrula;
-   gerçek/manuel/taklit işlemleri ayır, toplam süreyi ve kalan manuel adımları kaydet.
+## Tek aktif sonraki iş: gerçek pilot ve ölçüm
+
+Gerçek pilot ve ölçüm: bu hibrit akışla uygun bir ilanda hazırlığı doğrula.
+Her gerçek profil paylaşımı/CV yüklemesi için o işlem ve hedefe özel kullanıcı
+onayı gerekir. Programın yaptığı, elle yapılan ve taklit edilen işleri ayır;
+toplam süreyi ve kalan manuel adımları kaydet. Ücretli analiz ayrıca onay gerektirir.
 
 Ayrıntılı kabul ölçütleri mimari belgede. Yeni UI yönü açıkça onaylandığı için
 önceki “CLI pilotu bitmeden UI ekleme” kuralı yürürlükten kaldırıldı.
@@ -96,7 +96,7 @@ entegrasyonu MVP kapsamına alınmadı.
 
 ## Harcama ve veri sınırları
 
-Bu dal kapanışı ve mimari planlama çalışmasında ücretli API çağrısı veya gerçek başvuru yapılmaz.
+Bu form bağlantısı geliştirmesinde ücretli API çağrısı veya gerçek başvuru yapılmaz.
 `job`, yerel `prepare` ve `assist` ücretli model kullanmaz. `agent` ve açıkça
 onaylanan model incelemeleri farklıdır. Kod varsayılanları aylık 5 USD ve koşu
 başına 0,10 USD'dir; özel `.env` farklı olabilir. Bu limitler ödeme hesabının

@@ -4,8 +4,10 @@ CareerPilot, **Yarı-Otonom İş Başvuru Komuta Merkezi** (Hybrid Job Applicati
 olarak geliştiriliyor: ilanları ve AI analizini tek yerde görmek, doğru belgeleri
 hazırlamak ve form doldurmayı insan gözetiminde hızlandırmak.
 
-Bugünkü sürüm CLI tabanlı bir prototiptir. Yerel panel ve 0–100 uyum puanı
-henüz uygulanmadı; bunlar yeni mimarinin sıradaki teslimleridir.
+Bugünkü sürüm yerelde çalışan bir prototiptir. İlan–profil analizinden açıklanabilir
+0–100 uyum puanı hesaplanır. Yerel panelde ilan ekleme, analiz görüntüleme ve
+başvuru takibi vardır. Panelden form yardımı açılır, bilinen alanlar hazırlanır
+ve kontrol kullanıcıya bırakılır.
 
 ## Nereden devam ediyoruz?
 
@@ -18,14 +20,32 @@ Hedef akış: **ilan ekle → dayanaklı uyum analizini incele → formu hazırl
 kendin kontrol edip gönder → durumunu takip et.** Öncelik Türkiye'deki uygun
 başvurular; uluslararası başvurularda konum ve çalışma hakkı ayrıca doğrulanır.
 
+## Yerel panel
+
+```sh
+npm run hub -- --demo
+```
+
+Kurgusal örneklerle paneli `http://127.0.0.1:3210` adresinde açar. Gerçek profil
+kullanılmaz, ücretli çağrı yapılamaz. “Örnek formu aç” yalnızca bilgisayardaki
+kurgusal forma gider. İlan ekleme, arama/filtreleme, analiz ayrıntıları, form yardımı
+ve durum takibi çalışır; kayıtlar yeniden açıldığında korunur.
+
+Özel profilinle kullanmak için `npm run hub` çalıştır. Panel varsayılan olarak
+model çağrısı yapmaz; mevcut hazırlık paketlerinden `job.json` ve
+`preparation.json` dosyalarını içe aktarabilir. Model analizini etkinleştirme,
+özel profil ve kayıt dizinleri [kullanım referansında](docs/USAGE.md#local-hub-dashboard) açıklanır.
+
 ## Şu an neler var?
 
+- `hub`: yerel ilan listesi, analiz ayrıntıları, form yardımı ve kullanıcı beyanına dayalı durum takibi.
 - `job`: desteklenen bir ilan bağlantısından yerel hazırlık paketi oluşturur.
   İlan okuyamamak, giriş/CAPTCHA veya belirsiz işveren bağlantısı akışı durdurabilir.
 - `assist`: kullanıcının açtığı başvuru sayfasındaki bilinen boş alanları doldurur.
   Kullanıcı giriş yapar, adımları ilerletir ve sonucu kontrol eder. Ücretli model kullanmaz.
 - `lever:review`: ayrı onaylarla Lever formunu ve CV yüklemesini hazırlayıp kullanıcıya bırakır.
-- `prepare`: sağlanan ilan ve profil bilgilerinden yerel CV/ön yazı paketi hazırlar.
+- `prepare`: sağlanan ilan, profil ve doğrulanmış değerlendirmeden açıklanabilir
+  uyum puanı, gereksinim bazlı dayanaklar ve yerel CV/ön yazı paketi hazırlar.
 - `agent`: yalnızca yerel kurgusal formlarda modelin karar verdiği deneysel akıştır.
   Etkinleştirilirse ücretli API kullanabilir; gerçek iş sitelerinin otomasyonu değildir.
 
