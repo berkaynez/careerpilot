@@ -1,4 +1,7 @@
 import { resolve, join } from 'node:path';
+import { access } from 'node:fs/promises';
+import { assistAnswersSchema } from '../applications/fields.js';
+import { startMockServer } from '../mocks/server.js';
 import { randomUUID } from 'node:crypto';
 import { parseArgs } from 'node:util';
 import { readLocalJSON } from '../preparation/files.js';
@@ -13,9 +16,9 @@ import { demoProfile, demoRecords } from './demo.js';
 
 async function main() {
   const { values } = parseArgs({ strict: true, options: { demo: { type: 'boolean' }, profile: { type: 'string' },
-    'enable-model': { type: 'boolean' }, port: { type: 'string', default: '3210' }, help: { type: 'boolean' } } });
+    answers: { type: 'string' }, 'enable-model': { type: 'boolean' }, port: { type: 'string', default: '3210' }, help: { type: 'boolean' } } });
   if (values.help) { console.log('npm run hub -- [--demo] [--profile <özel-profil.json>] [--port 3210] [--enable-model]\nÖrnek mod tamamen kurgusaldır. Model varsayılan olarak kapalıdır; etkinleştirilse bile her analiz panelde ayrıca onay ister.'); return; }
-  if (values.demo && (values.profile || values['enable-model'])) throw new Error('HUB_DEMO_FLAGS_INVALID');
+  if (values.demo && (values.profile || values.answers || values['enable-model'])) throw new Error('HUB_DEMO_FLAGS_INVALID');
   const port = Number(values.port);
   if (!Number.isInteger(port) || port < 0 || port > 65535) throw new Error('HUB_PORT_INVALID');
   if (values['enable-model']) {
@@ -36,15 +39,25 @@ async function main() {
       return { ...result, costMicroUsd: budget.runAccounting(runId).costMicroUsd };
     };
   }
-  const hub = await startHub({ directory: join(state, values.demo ? 'hub-demo' : 'hub', 'jobs'), profile, port,
+  let answers = values.demo ? assistAnswersSchema.parse({ firstName: 'Örnek', lastName: 'Aday' }) : assistAnswersSchema.parse({});
+  if (!values.demo) {
+    const answerPath = resolve(values.answers ?? '.careerpilot/lever-answers.json');
+    let exists = false; try { await access(answerPath); exists = true; } catch { if (values.answers) throw new Error('ASSIST_ANSWERS_UNAVAILABLE'); }
+    if (exists) answers = assistAnswersSchema.parse(await readLocalJSON(answerPath));
+  }
+  const mock = values.demo ? await startMockServer() : undefined;
+  let hub;
+  try { hub = await startHub({ directory: join(state, values.demo ? 'hub-demo' : 'hub', 'jobs'), profile, port,
+    answers, ...(mock ? { demoFormUrl: mock.origin + '/applications/single' } : {}),
     ...(analyze ? { analyze } : {}), ...(modelInfo ? { modelInfo } : {}), ...(values.demo ? { demo: true, seed: demoRecords() } : {}) });
+  } catch (error) { await mock?.close(); throw error; }
   console.log('CareerPilot paneli: ' + hub.origin + (values.demo ? ' — kurgusal örnek modu' : ' — yerel kayıtlar'));
   console.log('Model ' + (analyze ? 'hazır; her çağrı panelden ayrıca onaylanmalı.' : 'kapalı. İlan kaydı ve analiz içe aktarma ücretsizdir.'));
   let closing = false;
-  const stop = () => { if (!closing) { closing = true; void hub.close().catch(() => { process.exitCode = 1; }); } };
+  const stop = () => { if (!closing) { closing = true; void hub.close().then(() => mock?.close()).catch(() => { process.exitCode = 1; }); } };
   process.once('SIGINT', stop); process.once('SIGTERM', stop);
 }
 void main().catch(error => {
-  const code = error instanceof Error && /^(HUB|CONFIG|PREP)_[A-Z_]+$/.test(error.message) ? error.message : 'HUB_START_FAILED';
+  const code = error instanceof Error && /^(HUB|CONFIG|PREP|ASSIST)_[A-Z_]+$/.test(error.message) ? error.message : 'HUB_START_FAILED';
   console.error(code + ': Panel açılamadı; profil dosyasını, portu ve seçtiysen model ayarlarını kontrol et.'); process.exitCode = 1;
 });
