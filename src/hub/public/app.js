@@ -153,7 +153,7 @@ function renderAssistant(pane, record) {
       const details = node('details', 'remaining-fields'); details.open = true;
       details.append(node('summary', '', 'Sana kalan alanlar · ' + current.lastResult.remaining.length));
       const list = node('ul');
-      const reasons = { human_decision_required: 'kararı/onayı sen ver', manual_answer_required: 'cevabı sen doldur', ambiguous_field: 'eşleşme belirsiz', interactive_widget_requires_human: 'listeden kendin seç', option_not_unique: 'uygun seçenek kesinleşmedi', existing_value_preserved: 'mevcut cevap korundu', site_validation_requires_human: 'site doğrulamasını kontrol et', manual_file_selection_required: 'CV/dosyayı kendin seç', no_matching_fields: 'önce formu aç' };
+      const reasons = { phone_country_requires_human: 'önce ülke telefon kodunu doğrula; numarayı kendin gir', human_decision_required: 'kararı/onayı sen ver', manual_answer_required: 'cevabı sen doldur', ambiguous_field: 'eşleşme belirsiz', interactive_widget_requires_human: 'listeden kendin seç', option_not_unique: 'uygun seçenek kesinleşmedi', existing_value_preserved: 'mevcut cevap korundu', site_validation_requires_human: 'site doğrulamasını kontrol et', manual_file_selection_required: 'CV/dosyayı kendin seç', no_matching_fields: 'önce formu aç' };
       for (const field of current.lastResult.remaining.slice(0, 20)) list.append(node('li', '', (field.label || 'İsimsiz alan') + ' · ' + (reasons[field.reason] || 'kendin kontrol et')));
       details.append(list); box.append(details);
     }

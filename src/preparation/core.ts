@@ -139,6 +139,7 @@ Return exactly one prepare_application call. Assess EVERY requirement once. Use 
 Use 'related' for partial evidence, equivalent-degree uncertainty, or only academic/project exposure.
 Use 'not_documented' with no fact IDs when evidence is missing. Never infer Java from JavaScript,
 Spring Boot from Node.js, NoSQL from SQL, or production-scale experience from an academic prototype.
+Project-level LLM/tool orchestration may support related agent experience, but not professional Python or multimodal experience. A prototype alone does not support a production integration requirement without explicit relevant deployment evidence.
 Choose up to 4 relevant fact IDs for the letter, from the assessments; use an empty list when none have evidence. Do not invent candidate claims,
 company facts, eligibility, scores, experience years, salary, or credentials. No browser or submission actions.` },
     { role: 'user', content: JSON.stringify({ company: clean(job.company), title: clean(job.title),
