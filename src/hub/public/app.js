@@ -55,19 +55,24 @@ function visibleRecords() {
 function clearDetail() { selectedId = null; detailSignature = '';  detailSequence++; const empty = node('div', 'empty'); empty.append(node('h2', '', 'Görüntülenecek ilan seçilmedi.'), node('p', '', 'Aramayı veya filtreyi değiştirerek bir ilan seçebilirsin.')); $('#detail').replaceChildren(empty); }
 async function applyFilters() {
   const visible = visibleRecords();
-  $('#nav-all').classList.toggle('active', $('#filter').value === 'all');
-  $('#nav-review').classList.toggle('active', $('#filter').value === 'review');
   if (!visible.some(item => item.id === selectedId)) {
     if (visible[0]) await showDetail(visible[0].id); else clearDetail();
   }
   renderList();
 }
-function resetFilters() { $('#search').value = ''; $('#filter').value = 'all'; $('#nav-all').classList.add('active'); $('#nav-review').classList.remove('active'); }
+function resetFilters() { $('#search').value = ''; $('#filter').value = 'all'; }
 function renderList() {
+  const view = $('#filter').value;
+  for (const button of document.querySelectorAll('[data-view]')) {
+    const active = button.dataset.view === view;
+    button.classList.toggle('active', active); button.setAttribute('aria-pressed', String(active));
+  }
+  $('#nav-submitted-count').textContent = records.filter(item => item.state === 'submitted').length;
+  $('#list-title').textContent = view === 'submitted' ? 'Başvurulanlar' : view === 'review' ? 'İnceleme bekleyenler' : 'İlanların';
   const filtered = visibleRecords();
   $('#list-count').textContent = filtered.length + ' ilan'; $('#jobs').replaceChildren();
   if (!filtered.length) {
-    const empty = node('div', 'empty'); empty.append(node('h3', '', records.length ? 'Bu filtrede ilan yok.' : 'İlk fırsatını ekle.'), node('p', '', records.length ? 'Aramayı veya durum filtresini değiştirebilirsin.' : 'İlan metnini kaydet; başvurunun bütün adımlarını buradan takip et.'));
+    const empty = node('div', 'empty'); empty.append(node('h3', '', view === 'submitted' ? 'Henüz başvurulan ilan yok.' : records.length ? 'Bu filtrede ilan yok.' : 'İlk fırsatını ekle.'), node('p', '', view === 'submitted' ? 'Tamamladığın ilanın durumunu “Başvuruldu” olarak değiştir; burada takip edebilirsin. Arama yaptıysan aramayı da kontrol et.' : records.length ? 'Aramayı veya durum filtresini değiştirebilirsin.' : 'İlan metnini kaydet; başvurunun bütün adımlarını buradan takip et.'));
     $('#jobs').append(empty); return;
   }
   for (const item of filtered) {
@@ -205,8 +210,10 @@ $('#new-open').addEventListener('click', () => openDialog('#new-dialog'));
 $('#import-open').addEventListener('click', () => openDialog('#import-dialog'));
 for (const button of document.querySelectorAll('.close-dialog')) button.addEventListener('click', () => button.closest('dialog').close());
 $('#search').addEventListener('input', () => applyFilters().catch(error => notify(error.message, true))); $('#filter').addEventListener('change', () => applyFilters().catch(error => notify(error.message, true)));
-$('#nav-all').addEventListener('click', () => { $('#filter').value = 'all'; void applyFilters().catch(error => notify(error.message, true)); });
-$('#nav-review').addEventListener('click', () => { $('#filter').value = 'review'; void applyFilters().catch(error => notify(error.message, true)); });
+for (const button of document.querySelectorAll('[data-view]')) button.addEventListener('click', () => {
+  $('#search').value = ''; $('#filter').value = button.dataset.view;
+  void applyFilters().catch(error => notify(error.message, true));
+});
 function formHandler(selector, action) {
   const form = $(selector); form.addEventListener('submit', async event => { event.preventDefault(); const button = form.querySelector('[type="submit"]'), original = button.textContent; button.disabled = true; button.textContent = 'İşleniyor…'; form.querySelector('.form-error').textContent = '';
     try { await action(form); } catch (error) { form.querySelector('.form-error').textContent = error.message; } finally { button.disabled = false; button.textContent = original; }

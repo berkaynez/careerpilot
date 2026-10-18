@@ -594,3 +594,9 @@ font-size:12px}
 .remaining-fields summary { cursor: pointer; }
 .remaining-fields ul { padding-left: 18px; }
 #assistant-names[hidden] { display: none; }
+
+@media(max-width:780px){
+  .sidebar { display:flex; flex-wrap:wrap; gap:8px; }
+  .brand { width:100%; margin-bottom:8px; }
+  .sidebar .nav { display:inline-flex; align-items:center; gap:8px; width:auto; margin:0; padding:10px 12px; }
+}
