@@ -83,6 +83,8 @@ test('mocked raw-posting flow extracts, assesses, selects CV and writes an inspe
   const dest = join(dir, 'packet');
   await writePreparation(dest, local, prepared.job, prepared.plan, 'model', posting.text);
   assert.equal(calls, 1); assert.equal(budget.runAccounting('posting').costMicroUsd, 40);
+  const manifest = JSON.parse(await readFile(join(dest, 'preparation.json'), 'utf8'));
+  assert.equal(manifest.match.score, 25);assert.equal(manifest.match.workAuthorization.status, 'authorized');
   assert.equal((await stat(join(dest, 'job.json'))).mode & 0o777, 0o600);
   assert.equal((await stat(join(dest, 'posting.txt'))).mode & 0o777, 0o600);
   assert.equal(await readFile(join(dest, 'posting.txt'), 'utf8'), posting.text);
