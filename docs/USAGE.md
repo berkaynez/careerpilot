@@ -183,8 +183,8 @@ paths are not an integrated autonomous production agent.
 - `src/events.ts`: metadata-only JSONL event sink.
 - `tests/`: offline tests of the above boundaries and failure cases.
 
-Automatic vacancy discovery, CV generation, email follow-up, dashboards and additional
-provider adapters are not implemented. Public user-supplied job-link intake and
+Automatic vacancy discovery, CV generation, email follow-up and additional
+provider adapters are not implemented. The local dashboard is described under Local hub dashboard. Public user-supplied job-link intake and
 selection/copying of existing CVs are implemented in `src/jobs` and `src/preparation`.
 Provider configuration slots do not constitute working provider integrations.
 
@@ -829,3 +829,65 @@ All three inputs must already exist and match the documented schemas. This comma
 uses the supplied local review, makes no paid call and submits no application.
 Model analysis remains a separate explicitly approved operation with the existing
 budget/privacy controls. Live-model scoring quality has not been evaluated in this change.
+
+
+### Local hub dashboard
+
+The local panel reuses the existing profile schema, posting analysis, match scoring
+and persistent model budget. It has no new dependency or provider abstraction.
+
+```sh
+npm run hub -- --demo
+npm run hub
+npm run hub -- --profile .careerpilot/profile.json --port 3211
+```
+
+The first command uses fictional profile/jobs and `.careerpilot/hub-demo/jobs`;
+it cannot enable the model or load a real profile. Normal mode loads the private
+`.careerpilot/profile.json` (or the explicit CLI profile) and stores records in
+`.careerpilot/hub/jobs`. `CAREERPILOT_STATE_DIR` changes the state directory.
+Only one hub process may write a given directory. Each record is schema-checked,
+private (0600 in a 0700 directory) and atomically replaced. Profile fact IDs must
+remain consistent with imported and previously saved analyses.
+
+The panel runs on `127.0.0.1:3210` by default, with a configurable port. It binds
+only loopback, checks Host/Origin and uses a per-process session token. It serves
+only its fixed local assets, never a general filesystem or arbitrary URL proxy.
+Job text is displayed as text, not HTML. No external CDN is required.
+
+Implemented UI actions:
+
+- Save a company, role, HTTPS source URL, verified country, language and pasted posting text.
+- Search/filter jobs; open source links manually; view per-requirement evidence,
+  match calculation and work-authorisation/sponsorship separately.
+- Import a private `job.json` and `preparation.json` pair from existing preparation.
+  References are checked against the active profile and the score is recomputed.
+  Imported requirements are labelled as imported, not the complete original posting.
+- Change tracking status. `submitted` is explicitly the user's record, not an
+  independently verified employer receipt. A record with no analysis cannot be marked analysis-ready.
+- Display the profile-selected CV language/photo policy; files are not sent or uploaded.
+
+The normal hub has no model access by default. To enable the existing model path:
+
+```sh
+npm run hub -- --enable-model
+```
+
+This explicitly loads the project's `.env` if present and validates the same model,
+verified pricing and budget configuration as `prepare`. It does not make a call at
+startup. Each Analyze action separately requires paid-call and professional-profile
+sharing approval. Contact values and CV paths/files are excluded using the existing
+preparation projection. There is no automatic model retry or refresh-triggered call.
+One analysis can run at a time; repeated concurrent requests are rejected. Successful
+accounted cost is saved and shown. Provider uncertainty retains the existing ledger
+reservation; the panel does not convert a failed request into a zero score or a free call.
+Demo mode rejects `--enable-model` and `--profile`.
+
+Scope: this delivery does not launch the form assistant, attach CVs, submit
+applications or automatically fetch arbitrary posting sites. Paste the posting
+when adding a job. Existing standalone CLI assistance remains available separately.
+
+Verification uses fictional data and injected/mocked analyzers. Browser checks
+covered add, search/filter, status update, reload persistence, importing reviewed
+analysis, empty-filter display and desktop/narrow layouts. No real profile was
+sent to a model and no real application was submitted for panel verification.

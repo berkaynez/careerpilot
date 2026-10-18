@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Local-first, AI-led job application agent foundations",
+  "description": "Local-first hybrid job application hub with evidence-based analysis and supervised form assistance",
   "engines": {
     "node": ">=22"
   },
@@ -20,7 +20,8 @@
     "lever:upload-draft": "node --import tsx src/lever/upload-cli.ts",
     "lever:review": "node --import tsx src/lever/upload-cli.ts --keep-open",
     "job": "node --import tsx src/jobs/cli.ts",
-    "assist": "node --import tsx src/applications/cli.ts"
+    "assist": "node --import tsx src/applications/cli.ts",
+    "hub": "node --import tsx src/hub/cli.ts"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
