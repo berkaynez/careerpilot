@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { execFile } from 'node:child_process';
-import { profileSchema, jobSchema, validatePlan, selectCV, renderPreparation, buildPreparationRequest, planWithModel } from '../src/preparation/core.js';
+import { profileSchema, jobSchema, validatePlan, buildMatchAnalysis, selectCV, renderPreparation, buildPreparationRequest, planWithModel } from '../src/preparation/core.js';
 import { readLocalJSON, writePreparation } from '../src/preparation/files.js';
 import { FileBudgetManager } from '../src/persistent-budget.js';
 import { InMemoryBudgetManager } from '../src/budget.js';
@@ -73,6 +73,8 @@ test('preparation keeps documented gaps and uses only selected profile statement
   const result = renderPreparation(profile, job, plan, 'local_review');
   assert.equal(result.status, 'draft_requires_review');
   assert.match(result.report, /Spring Boot experience.*Profilde belgelenmiyor/);
+  assert.equal(result.match.score, 25);assert.match(result.report, /uyum puanı: 25\/100/);
+  assert.match(result.report, /Puan katkısı: 1.5\/3/);assert.match(result.report, /becerinin bulunmadığının kanıtı değildir/);
   assert.match(result.coverLetter, /academic Node.js project/);
   assert.doesNotMatch(result.coverLetter, /Spring Boot/);
   assert.equal(result.requiresSponsorship, false);
@@ -80,6 +82,59 @@ test('preparation keeps documented gaps and uses only selected profile statement
   assert.equal(abroad.requiresSponsorship, true);
   assert.match(abroad.report, /İlan sponsorluğu dışlıyor/);
   assert.equal(abroad.cv.id, 'en-plain');
+});
+
+test('match score explains weighted evidence, excludes responsibilities and is deterministic', () => {
+  const weightedJob = { ...job, requirements: job.requirements.map(item => item.id === 'backend' ? { ...item, priority: 'preferred' as const } : item) };
+  const weightedPlan = { ...plan, assessments: [
+    { requirementId: 'degree', evidenceLevel: 'documented', factIds: ['education'] },
+    { requirementId: 'spring', evidenceLevel: 'related', factIds: ['project'] },
+    { requirementId: 'backend', evidenceLevel: 'not_documented', factIds: [] },
+  ] };
+  const result = buildMatchAnalysis(profile, weightedJob, weightedPlan);
+  assert.equal(result.score, 64);assert.deepEqual(result.totals, { earned: 4.5, possible: 7 });
+  assert.equal(result.policyVersion, 'evidence-coverage-v1');
+  assert.deepEqual(result.strengths, ['degree']);assert.deepEqual(result.partialEvidence, ['spring']);
+  assert.deepEqual(result.notDocumented, ['backend']);assert.deepEqual(result.essentialReview, ['spring']);
+  assert.deepEqual(result.requirements.map(item => item.earned), [3, 1.5, 0]);
+  assert.deepEqual(buildMatchAnalysis(profile, weightedJob, { ...weightedPlan, assessments: [...weightedPlan.assessments].reverse() }), result);
+  const original = buildMatchAnalysis(profile, job, plan);
+  assert.equal(original.score, 25);assert.equal(original.requirements[2]?.weight, 0);
+  assert.deepEqual(original.requirements[0]?.factIds, ['education']);
+  const output = JSON.stringify(original);
+  for (const value of [...Object.values(profile.contact), '/fictional/', 'fictional fixture']) assert.ok(!output.includes(value));
+});
+
+test('no evidence yields a valid zero; only responsibilities yield no score rather than a fake zero', () => {
+  const emptyPlan = { ...plan, assessments: job.requirements.map(item => ({ requirementId: item.id, evidenceLevel: 'not_documented', factIds: [] })), coverLetterFactIds: [] };
+  const result = buildMatchAnalysis(profile, job, emptyPlan);
+  assert.equal(result.status, 'scored');assert.equal(result.score, 0);
+  assert.deepEqual(result.essentialReview, ['degree', 'spring']);
+  assert.doesNotThrow(() => renderPreparation(profile, job, emptyPlan, 'local_review'));
+  const tasksOnly = { ...job, requirements: job.requirements.map(item => ({ ...item, priority: 'responsibility' as const })) };
+  const missingScore = buildMatchAnalysis(profile, tasksOnly, plan);
+  assert.equal(missingScore.status, 'not_scored');assert.equal(missingScore.score, null);
+  assert.equal(missingScore.reason, 'no_scorable_requirements');
+  assert.match(renderPreparation(profile, tasksOnly, plan, 'local_review').report, /Uyum puanı hesaplanmadı/);
+});
+
+test('a full evidence score never hides sponsorship conflicts or implies work authorisation', () => {
+  const complete = { ...plan, coverLetterFactIds: ['education'], assessments: plan.assessments.map(item => ({ ...item, evidenceLevel: 'documented', factIds: ['education'] })) };
+  const domestic = buildMatchAnalysis(profile, job, complete);
+  assert.equal(domestic.score, 100);assert.equal(domestic.workAuthorization.status, 'authorized');
+  const abroad = buildMatchAnalysis(profile, { ...job, country: 'GB', sponsorship: 'unavailable' }, complete);
+  assert.equal(abroad.score, 100);assert.equal(abroad.workAuthorization.status, 'sponsorship_required');
+  assert.equal(abroad.workAuthorization.sponsorshipConflict, true);
+  const unconfirmed = buildMatchAnalysis({ ...profile, preferences: { ...profile.preferences, sponsorshipRequiredElsewhere: false } }, { ...job, country: 'GB' }, complete);
+  assert.equal(unconfirmed.workAuthorization.status, 'unconfirmed');
+});
+
+test('incomplete or invented assessments fail analysis instead of producing a fallback score', () => {
+  for (const invalid of [
+    { ...plan, assessments: plan.assessments.slice(1) },
+    { ...plan, score: 100 },
+    { ...plan, assessments: [{ ...plan.assessments[0], factIds: ['invented'] }, ...plan.assessments.slice(1)] },
+  ]) assert.throws(() => buildMatchAnalysis(profile, job, invalid), /PREP_PLAN_INVALID/);
 });
 
 test('cloud context excludes contact details, local CV paths and evidence source paths', () => {
@@ -154,6 +209,10 @@ test('CLI runs a complete local review without API configuration and refuses imp
   const result = await exec(process.execPath, [...args, '--review', join(dir, 'review.json')], { env });
   const metadata = JSON.parse(result.stdout);
   assert.equal(metadata.status, 'draft_requires_review');
+  assert.equal(metadata.matchScore, 25);
+  const saved = JSON.parse(await readFile(join(metadata.directory, 'preparation.json'), 'utf8'));
+  assert.equal(saved.match.score, 25);assert.equal(saved.match.policyVersion, 'evidence-coverage-v1');
+  assert.deepEqual(saved.match.essentialReview, ['degree', 'spring']);
   assert.match(await readFile(join(metadata.directory, 'review.txt'), 'utf8'), /bu işlemde model çağrısı yok/);
   await assert.rejects(exec(process.execPath, [...args, '--model'], { env }), error => {
     assert.match(String((error as { stderr?: string }).stderr), /PREP_MODEL_CONSENT_REQUIRED/); return true;

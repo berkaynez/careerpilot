@@ -4,8 +4,8 @@ CareerPilot, **Yarı-Otonom İş Başvuru Komuta Merkezi** (Hybrid Job Applicati
 olarak geliştiriliyor: ilanları ve AI analizini tek yerde görmek, doğru belgeleri
 hazırlamak ve form doldurmayı insan gözetiminde hızlandırmak.
 
-Bugünkü sürüm CLI tabanlı bir prototiptir. Yerel panel ve 0–100 uyum puanı
-henüz uygulanmadı; bunlar yeni mimarinin sıradaki teslimleridir.
+Bugünkü sürüm CLI tabanlı bir prototiptir. İlan–profil analizinden açıklanabilir
+0–100 uyum puanı hesaplanır; yerel panel sıradaki teslimdir.
 
 ## Nereden devam ediyoruz?
 
@@ -25,7 +25,8 @@ başvurular; uluslararası başvurularda konum ve çalışma hakkı ayrıca doğ
 - `assist`: kullanıcının açtığı başvuru sayfasındaki bilinen boş alanları doldurur.
   Kullanıcı giriş yapar, adımları ilerletir ve sonucu kontrol eder. Ücretli model kullanmaz.
 - `lever:review`: ayrı onaylarla Lever formunu ve CV yüklemesini hazırlayıp kullanıcıya bırakır.
-- `prepare`: sağlanan ilan ve profil bilgilerinden yerel CV/ön yazı paketi hazırlar.
+- `prepare`: sağlanan ilan, profil ve doğrulanmış değerlendirmeden açıklanabilir
+  uyum puanı, gereksinim bazlı dayanaklar ve yerel CV/ön yazı paketi hazırlar.
 - `agent`: yalnızca yerel kurgusal formlarda modelin karar verdiği deneysel akıştır.
   Etkinleştirilirse ücretli API kullanabilir; gerçek iş sitelerinin otomasyonu değildir.
 
