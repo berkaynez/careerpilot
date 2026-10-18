@@ -49,14 +49,14 @@ sonra yerel main üzerinde doğrulandı. Ortak yardımcı ve hibrit mimari plan�
 ## Tamamlanan analiz teslimi
 
 `6e78f63` açıklanabilir skor ve raporu ekledi; TypeScript ve 110 çevrimdışı test geçti.
-Bu commit henüz ayrıca main'e birleştirilmedi; aşağıdaki panel dalı onu da içerir.
+Skor, panel ve form bağlantısı PR #9 ile main'e birleşti; yerel a8aeb09 üzerinde doğrulandı.
 Skor gerçek işe alınma/ATS tahmini değil, değerlendirilmiş gereksinimlerdeki dayanak kapsamıdır.
 
 ## Tamamlanan panel teslimi
 
 31c05d5 yerel panel, kalıcı kayıtlar ve analiz ekranlarını ekledi. TypeScript ve
 116 çevrimdışı test geçti. Skor + panel commit'leri feature/local-hub dalındadır;
-main'e ayrıca birleştirildikleri doğrulanmadı.
+PR #9 ile a8aeb09 üzerinde main'e birleştirildikleri doğrulandı.
 
 ## Tamamlanan form bağlantısı
 
@@ -101,3 +101,10 @@ Bu form bağlantısı geliştirmesinde ücretli API çağrısı veya gerçek ba�
 onaylanan model incelemeleri farklıdır. Kod varsayılanları aylık 5 USD ve koşu
 başına 0,10 USD'dir; özel `.env` farklı olabilir. Bu limitler ödeme hesabının
 otomatik yükleme ayarını değiştirmez. Bütçe korumaları korunur.
+
+## Pilot sırasında istenen takip iyileştirmesi
+
+feature/submitted-applications dalında Başvurulanlar görünümü ve kayıt sayacı
+eklendi; mevcut durum filtresi ve özel kayıtlar kullanılıyor. Dar ekranlarda da
+gezinme düğmeleri görünür. Başvuruldu durumu kullanıcı beyanıdır, otomatik
+şirket doğrulaması değildir. Bu değişiklik yeni site veya model desteği eklemez.
