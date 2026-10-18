@@ -950,3 +950,11 @@ olarak değiştir. Masaüstü ve dar ekranlarda görünen **Başvurulanlar** dü
 yalnızca bu kayıtları gösterir; yanındaki sayı kayıt adedidir. Bu seçim ve mevcut
 durum filtresi aynı listeyi kullanır. Kayıt yerel diskte korunur; şirketten otomatik
 başvuru doğrulaması veya e-posta takibi yapılmaz.
+
+### Telefon alanının sınırları
+
+Ortak yardımcı “Mobile phone number” etiketini de tanır. Ayrı ülke kodu varsa
+yalnızca profilde açıkça +90 ve on rakamlı numara bulunması, kodun standart
+select alanında tekil +90 seçeneğiyle doğrulanması halinde ulusal numarayı yazar.
+Başka ülke kodlarını, özel liste widgetlarını veya belirsiz seçenekleri tahmin etmez;
+mevcut farklı kodu değiştirmez. Gerçek sitelerdeki uyumluluk ayrıca doğrulanmalıdır.

@@ -22,7 +22,8 @@ const aliases={
   firstName:['first name','given name','ad','adınız','isim'],
   lastName:['last name','surname','family name','soyad','soyadınız','soyisim'],
   email:['email','email address','e mail','e posta','e posta adresi','eposta'],
-  phone:['phone','phone number','mobile phone','mobile number','telefon','telefon numarası','cep telefonu'],
+  phone:['phone','phone number','mobile phone','mobile phone number','mobile number','telefon','telefon numarası','cep telefonu'],
+  phoneCountryCode:['country code','ülke kodu','country phone code','phone country code','country calling code','dialing code','dialling code','ülke telefon kodu','telefon ülke kodu'],
   linkedin:['linkedin','linkedin url','linkedin profile','linkedin profiliniz','linkedin profil bağlantısı'],
   github:['github','github url','github profile','github profil bağlantısı'],
   portfolio:['portfolio','portfolio url','portfolio website','portfolyo','portfolyo bağlantısı'],
@@ -95,12 +96,17 @@ export async function fillKnownApplicationFields(page:Page, input:{profile:Profi
   if(login){result.status='login_required';return result;}
   const id='assist-'+randomUUID(), observation=await inspectApplication(page,id);
   const application=answers.application?.url===page.url()?answers.application:undefined;
+  // Split only the verified +90 / ten-digit Turkish format; never infer a code from residence.
+  const turkishPhone=/^\+90(\d{10})$/.exec(profile.contact.phone.replace(/[\s().-]/g,''));
   const values:Partial<Record<FieldKey,string | undefined>>={fullName:profile.contact.name,firstName:answers.firstName,lastName:answers.lastName,
     noticePeriod:application?.noticePeriod,salaryExpectation:application?.salaryExpectation,
-    email:profile.contact.email,phone:profile.contact.phone,linkedin:answers.linkedin,github:answers.github,portfolio:answers.portfolio,university:answers.university};
+    email:profile.contact.email,phone:profile.contact.phone,phoneCountryCode:turkishPhone?'+90':undefined,linkedin:answers.linkedin,github:answers.github,portfolio:answers.portfolio,university:answers.university};
   const proposed=observation.controls.map(control=>({control,key:keyFor(control)}));
   const counts=new Map<FieldKey,number>();
   for(const {control,key} of proposed)if(key && ['text','textarea','select'].includes(control.kind))counts.set(key,(counts.get(key) ?? 0)+1);
+  const countryFields=proposed.filter(item=>item.key==='phoneCountryCode');
+  // Confirm the dialing code before filling the subscriber number, regardless of DOM order.
+  proposed.sort((a,b)=>Number(b.key==='phoneCountryCode')-Number(a.key==='phoneCountryCode'));
   const expected:{control:FormControl;value:string}[]=[];
   for(const {control,key} of proposed){
     if(application && page.url()!==application.url)throw new Error('ASSIST_APPLICATION_CHANGED');
@@ -116,8 +122,17 @@ export async function fillKnownApplicationFields(page:Page, input:{profile:Profi
       result.remaining.push({label:control.label,reason:'interactive_widget_requires_human'});continue;
     }
     let value=values[key]!;
+    if(key==='phone' && countryFields.length){
+      const country=countryFields[0]!.control;
+      const countryTarget=page.locator(`[data-careerpilot-id=${JSON.stringify(country.id)}]`);
+      const verified=countryFields.length===1 && turkishPhone && country.kind==='select'
+        && await countryTarget.evaluate(element=>element instanceof HTMLSelectElement && /(?:^|\s|\()\+90(?:\s|\)|$)/.test(element.selectedOptions[0]?.textContent?.trim() ?? ''));
+      if(!verified){result.remaining.push({label:control.label,reason:'phone_country_requires_human'});continue;}
+      value=turkishPhone![1]!;
+    }
+    if(key==='phoneCountryCode' && control.kind!=='select'){result.remaining.push({label:control.label,reason:'phone_country_requires_human'});continue;}
     if(control.kind==='select'){
-      const matching=control.options.filter(option=>normal(option.label)===normal(value));
+      const matching=control.options.filter(option=>key==='phoneCountryCode' ? /(?:^|\s|\()\+90(?:\s|\)|$)/.test(option.label.trim()) : normal(option.label)===normal(value));
       if(matching.length!==1){result.remaining.push({label:control.label,reason:'option_not_unique'});continue;}
       const index=control.options.findIndex(option=>option.id===matching[0]!.id);
       const native=await target.locator('option').filter({hasText:new RegExp('^'+matching[0]!.label.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'$')}).all();

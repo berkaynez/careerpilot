@@ -38,7 +38,10 @@ Do not select only favourable requirements. Assign essential, preferred or respo
 Then assess EVERY extracted requirement exactly once using only supplied fact IDs.
 Use related for partial, academic/project evidence or uncertain degree equivalence; documented for direct relevant evidence;
 not_documented with no facts where evidence is missing. JavaScript is not Java; Node.js is not Spring Boot;
-SQL is not NoSQL; an academic prototype is not production experience. Select up to 4 relevant letter facts; use an empty list when no assessment has evidence.
+SQL is not NoSQL; an academic prototype is not production experience.
+Evaluate components of compound requirements separately when choosing the overall evidence level: project-level LLM/tool orchestration can support related evidence for agent experience, but does not establish professional Python, multimodal generation or deployment.
+A prototype alone is not evidence of production integration; use not_documented for a production requirement unless a supplied fact explicitly describes relevant production integration. Never inflate evidence to improve the score.
+Select up to 4 relevant letter facts; use an empty list when no assessment has evidence.
 Do not invent experience years, qualifications, company facts, candidate claims or an ATS score.
 There are no browsing, network, submission or file tools. Output still requires human review.` },
     { role: 'user', content: JSON.stringify({ company: redactPreparationText(profile, posting.company),

@@ -108,3 +108,24 @@ feature/submitted-applications dalında Başvurulanlar görünümü ve kayıt sa
 eklendi; mevcut durum filtresi ve özel kayıtlar kullanılıyor. Dar ekranlarda da
 gezinme düğmeleri görünür. Başvuruldu durumu kullanıcı beyanıdır, otomatik
 şirket doğrulaması değildir. Bu değişiklik yeni site veya model desteği eklemez.
+
+## Pilot düzeltmeleri — 19 Ekim
+
+- Özel profilin CareerPilot proje bilgisi mevcut AI döngüsü, panel ve gözetimli
+  form desteğini anlatacak şekilde güncellendi; AI desteği/prototip sınırı korundu.
+  Kişisel profil ignored alanda, Git'e eklenmez.
+- Değerlendirme talimatları proje düzeyinde agent deneyimi ile profesyonel Python,
+  multimodal üretim ve üretim entegrasyonunu ayırıyor. Bu talimat değişikliği yeni
+  ücretli model çağrısıyla doğrulanmadı; önceki skor elle değiştirilmedi.
+- Mobile phone number etiketi ve doğrulanmış +90 kodu/ulusal numara ayrımı eklendi.
+  Belirsiz/özel kod listeleri ve mevcut farklı kod kullanıcıya bırakılır.
+- TypeScript ve 121 çevrimdışı test geçti. Telefon testleri gerçek sitenin aynası
+  değildir; authored formlar kullanır. Gerçek yeni pilot için ilan bağlantısı bekleniyor.
+
+## Kullanıcının belirlediği sonraki hedef: otomatik ilan keşfi
+
+Yukarıdaki pilot kapandıktan sonra roller/kriterlere göre ilan keşfi ve İnceleme
+Bekleyenler görünümüne aktarım için kısa mimari öneri sunulacak ve kullanıcıyla
+kararlaştırılacak. Şu anda bir keşif sistemi veya zamanlanmış görev eklenmedi.
+Kişisel hesapları riske atmama ve basit/sürdürülebilir yöntem önceliklidir;
+mevcut toplu başvuru, CAPTCHA aşma ve gözetimsiz gönderim sınırları korunur.

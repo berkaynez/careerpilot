@@ -158,3 +158,26 @@ test('a same-origin job change during filling stops before reusing the scoped sa
   await assert.rejects(fillKnownApplicationFields(app.page,{...input,answers:{...input.answers,application:{url:origin+'/apply',salaryExpectation:'1600'}}}),/ASSIST_APPLICATION_CHANGED/);
   assert.equal(await app.page.locator('#salary').inputValue(),'');assert.equal(app.writes(),0);
 });
+
+
+test('mobile phone labels fill international numbers; split Turkish fields verify the selected code before national digits',async t=>{
+  const cases=[
+    {html:'<label>Mobile phone number*<input id="phone" type="tel" required></label>',phone:profile.contact.phone,filled:1},
+    // Phone precedes the code: planning must still resolve the code first.
+    {html:'<label>Mobile phone number*<input id="phone" type="tel" required></label><label>Ülke telefon kodu*<select id="code"><option value="">Seçiniz</option><option value="TR">Türkiye (+90)</option><option value="US">United States (+1)</option></select></label>',phone:'5550000000',filled:2},
+    {html:'<label>Country phone code<select id="code"><option value="US" selected>United States (+1)</option><option value="TR">Türkiye (+90)</option></select></label><label>Mobile phone number<input id="phone" required></label>',phone:'',filled:0},
+    {html:'<label>Country phone code<input id="code" role="combobox" required></label><label>Mobile phone number<input id="phone" required></label>',phone:'',filled:0},
+    {html:'<label>Country phone code<select id="code"><option value="">Choose</option><option value="TR">Türkiye (+90)</option><option value="other">Other (+90)</option></select></label><label>Mobile phone number<input id="phone" required></label>',phone:'',filled:0},
+  ];
+  for(const example of cases){
+    const app=await fixture('<form>'+example.html+'<label>Accept terms<input type="checkbox" id="terms" required></label><input type="file" id="cv"><button type="submit">Apply</button></form>');
+    try{
+      await app.transport.protect(app.page);
+      const result=await fillKnownApplicationFields(app.page,input);
+      assert.equal(result.filled,example.filled);assert.equal(await app.page.locator('#phone').inputValue(),example.phone);
+      if(!example.phone)assert.ok(result.remaining.some(item=>item.reason==='phone_country_requires_human'));
+      assert.equal(await app.page.locator('#terms').isChecked(),false);assert.equal(app.writes(),0);
+      assert.equal(result.agentSubmitted,false);assert.equal(result.cvUploadedByAgent,false);
+    }finally{await app.browser.close();}
+  }
+});
