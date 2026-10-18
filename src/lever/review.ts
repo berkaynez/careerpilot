@@ -11,17 +11,17 @@ export interface LeverReviewSession {
 }
 
 /** Guard only the current prepared document; future manual navigation is not instrumented. */
-export async function guardSubmission(page: Page) {
-  const controller = await page.evaluateHandle(() => {
+export async function guardSubmission(page: Page, blockNavigation=false) {
+  const controller = await page.evaluateHandle(blockNavigation => {
     const controller = new AbortController();
     window.addEventListener('submit', event => { event.preventDefault(); event.stopImmediatePropagation(); }, {capture:true,signal:controller.signal});
     window.addEventListener('click', event => {
-      if (event.target instanceof Element && event.target.closest('button[type="submit"],input[type="submit"],#btn-submit,#hcaptchaSubmitBtn,input[type="checkbox"],input[type="radio"]')) {
+      if (event.target instanceof Element && event.target.closest(blockNavigation ? 'button,a[href],input[type="submit"],input[type="button"],input[type="checkbox"],input[type="radio"]' : 'button[type="submit"],input[type="submit"],#btn-submit,#hcaptchaSubmitBtn,input[type="checkbox"],input[type="radio"]')) {
         event.preventDefault(); event.stopImmediatePropagation();
       }
     }, {capture:true,signal:controller.signal});
     return controller;
-  });
+  },blockNavigation);
   return async () => { await controller.evaluate(controller => controller.abort()); await controller.dispose(); };
 }
 
