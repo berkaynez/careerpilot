@@ -22,7 +22,7 @@ async function fixture(html:string){
   await context.route('**/*',async route=>{
     requests++;
     if(route.request().method()!=='GET'){writes++;await route.fulfill({status:200,body:'fictional only'});return;}
-    await route.fulfill({status:200,contentType:'text/html; charset=utf-8',body:html});
+    await route.fulfill({status:200,contentType:'text/html; charset=utf-8',body:route.request().frame().parentFrame()?'<body>Fictional sign-in frame</body>':html});
   });
   const transport=await assistTransport(context), page=await context.newPage();
   await page.goto(origin+'/apply');
@@ -99,4 +99,24 @@ test('Indeed keeps its posting key and Kariyer.net links enter the common intake
     const result=await resolveJobLink(url,async(link)=>({url:link.url,title:'Fictional analyst',company:'Example',text:'Analyse fictional data and write reports with a team.',links:[]}));
     assert.equal(result.status,'resolved');assert.equal(result.employer.url,url);
   }
+});
+
+test('email-only sign-in headings and visible login iframes stop without filling contact details',async t=>{
+  for(const html of [
+    '<h1>Sign in</h1><label>Email<input id="email" type="email"></label><button>Continue</button>',
+    '<h2>Hesap oluştur veya giriş yap</h2><label>E-posta<input id="email"></label>',
+    '<h1>GİRİŞ YAP</h1><label>E-posta<input id="email"></label>',
+    '<label>Email<input id="email"></label><iframe title="Login window" src="https://secure.indeed.com/auth?branding=fixture"></iframe>',
+  ]){
+    const app=await fixture(html);t.after(()=>app.browser.close());await app.transport.protect(app.page);
+    const result=await fillKnownApplicationFields(app.page,input);
+    assert.equal(result.status,'login_required');assert.equal(result.filled,0);
+    assert.equal(await app.page.locator('#email').inputValue(),'');assert.equal(app.writes(),0);
+  }
+});
+test('ordinary sign-in header links and hidden auth iframes do not block the actual application form',async t=>{
+  const app=await fixture(english+'<a href="/login">Sign in</a><iframe hidden title="Login window" src="about:blank"></iframe>');
+  t.after(()=>app.browser.close());await app.transport.protect(app.page);
+  const result=await fillKnownApplicationFields(app.page,input);
+  assert.equal(result.filled,3);assert.notEqual(result.status,'login_required');
 });

@@ -41,7 +41,31 @@ export async function fillKnownApplicationFields(page:Page, input:{profile:Profi
   const profile=profileSchema.parse(input.profile), answers=assistAnswersSchema.parse(input.answers);
   if((answers.firstName || answers.lastName) && (!answers.firstName || !answers.lastName || normal(answers.firstName+' '+answers.lastName)!==normal(profile.contact.name))) throw new Error('ASSIST_NAME_PARTS_NOT_VERIFIED');
   const result:AssistPassResult={status:'review_required',filled:0,alreadyCorrect:0,remaining:[],modelCalls:0,agentSubmitted:false,cvUploadedByAgent:false};
-  const login=await page.locator('input[type="password"],input[autocomplete="one-time-code"]').evaluateAll(elements=>elements.some(element=>element.getClientRects().length>0 && getComputedStyle(element).visibility!=='hidden'));
+  const login=await page.evaluate(()=>{
+    const helpers={
+      visible(element:Element){
+        if(!element.getClientRects().length || element.closest('[hidden],[inert],[aria-hidden="true"]'))return false;
+        for(let ancestor:Element|null=element;ancestor;ancestor=ancestor.parentElement){
+          const style=getComputedStyle(ancestor);
+          if(style.display==='none' || style.visibility==='hidden' || style.visibility==='collapse' || style.opacity==='0')return false;
+        }
+        return true;
+      },
+      authPath(path:string){return /\/(?:auth|login|log-in|signin|sign-in|uye-girisi|giris)(?:\/|$)/i.test(path);},
+      authText(text:string){
+        const value=text.toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g,'').replace(/ı/g,'i');
+        return /\b(?:sign\s*in|log\s*in|create\s+(?:an?\s+)?account|giris\s+yap|hesap\s+olustur|oturum\s+ac)\b/.test(value);
+      },
+    };
+    if(helpers.authPath(location.pathname))return true;
+    if(Array.from(document.querySelectorAll('input[type="password"],input[autocomplete="one-time-code"]')).some(helpers.visible))return true;
+    if(Array.from(document.querySelectorAll('h1,h2,[role="heading"],[role="dialog"]')).some(element=>helpers.visible(element) && helpers.authText(element.getAttribute('aria-label') ?? element.textContent ?? '')))return true;
+    return Array.from(document.querySelectorAll<HTMLIFrameElement>('iframe')).some(frame=>{
+      if(!helpers.visible(frame))return false;
+      if(helpers.authText(frame.title+' '+(frame.getAttribute('aria-label') ?? '')))return true;
+      try{return helpers.authPath(new URL(frame.src,location.href).pathname);}catch{return false;}
+    });
+  });
   if(login){result.status='login_required';return result;}
   const id='assist-'+randomUUID(), observation=await inspectPage(page,id);
   const values:Partial<Record<FieldKey,string | undefined>>={fullName:profile.contact.name,firstName:answers.firstName,lastName:answers.lastName,
