@@ -942,3 +942,11 @@ verified filling, blocked side effects, manual continuation, stable tabs, exact
 recipient rejection/approval, failed verification and permanent handoff. The panel
 itself was exercised against the owned local mock. No paid calls or real applications
 were made; real signed-in site compatibility remains unverified.
+
+### Başvurulanları takip etme
+
+Başvuruyu kendin tamamladığında ilanın “Başvuru durumun” alanını “Başvuruldu”
+olarak değiştir. Masaüstü ve dar ekranlarda görünen **Başvurulanlar** düğmesi
+yalnızca bu kayıtları gösterir; yanındaki sayı kayıt adedidir. Bu seçim ve mevcut
+durum filtresi aynı listeyi kullanır. Kayıt yerel diskte korunur; şirketten otomatik
+başvuru doğrulaması veya e-posta takibi yapılmaz.
