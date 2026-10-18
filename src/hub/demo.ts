@@ -36,7 +36,7 @@ export function demoRecords(): HubRecord[] {
     sourceUrl: 'https://example.invalid/jobs/analyst', text: 'SQL sorguları hazırlamak, veri raporlarını incelemek ve ekiplerle çalışmak.' });
   return [
     { version: 1, id: posting.id, posting, state: 'ready', createdAt: now, updatedAt: now,
-      analysis: { job, plan, origin: 'demo', at: now, costMicroUsd: null }, lastError: null },
-    { version: 1, id: second.id, posting: second, state: 'saved', createdAt: now, updatedAt: now, analysis: null, lastError: null },
+      analysis: { job, plan, origin: 'demo', at: now, costMicroUsd: null }, lastError: null, discovery: null },
+    { version: 1, id: second.id, posting: second, state: 'saved', createdAt: now, updatedAt: now, analysis: null, lastError: null, discovery: null },
   ];
 }

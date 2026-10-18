@@ -82,9 +82,9 @@ Ortak panel akışında CV yükleme, giriş/CAPTCHA, hukuki onay ve son gönderi
 Ayrı Lever yükleme akışı korunuyor; Workday otomatik doldurma desteği eklenmedi.
 AGENTS.md değiştirilmedi; CLI'nın terminal akışı ve mevcut korumaları korunuyor.
 
-## Tek aktif sonraki iş: gerçek pilot ve ölçüm
+## Pilotun sonucu ve kalan doğrulama
 
-Gerçek pilot ve ölçüm: bu hibrit akışla uygun bir ilanda hazırlığı doğrula.
+Kullanıcı iki gerçek başvuruyu tamamladı. İkinci denemede ön yazıyı sohbetin tarayıcı aracı ekledi; CareerPilot otomatik doldurma başarısı olarak sayılmaz. Telefon düzeltmesinin gerçek site doğrulaması ve zaman kazancı ölçümü açık.
 Her gerçek profil paylaşımı/CV yüklemesi için o işlem ve hedefe özel kullanıcı
 onayı gerekir. Programın yaptığı, elle yapılan ve taklit edilen işleri ayır;
 toplam süreyi ve kalan manuel adımları kaydet. Ücretli analiz ayrıca onay gerektirir.
@@ -120,12 +120,28 @@ gezinme düğmeleri görünür. Başvuruldu durumu kullanıcı beyanıdır, otom
 - Mobile phone number etiketi ve doğrulanmış +90 kodu/ulusal numara ayrımı eklendi.
   Belirsiz/özel kod listeleri ve mevcut farklı kod kullanıcıya bırakılır.
 - TypeScript ve 121 çevrimdışı test geçti. Telefon testleri gerçek sitenin aynası
-  değildir; authored formlar kullanır. Gerçek yeni pilot için ilan bağlantısı bekleniyor.
+  değildir; authored formlar kullanır. Gerçek site telefon doğrulaması hâlâ açık.
 
-## Kullanıcının belirlediği sonraki hedef: otomatik ilan keşfi
+## Tamamlanan ilk keşif teslimi
 
-Yukarıdaki pilot kapandıktan sonra roller/kriterlere göre ilan keşfi ve İnceleme
-Bekleyenler görünümüne aktarım için kısa mimari öneri sunulacak ve kullanıcıyla
-kararlaştırılacak. Şu anda bir keşif sistemi veya zamanlanmış görev eklenmedi.
+Kullanıcı Greenhouse + Lever ilk sürümünü açıkça onayladı. Düzeltme dalı yerel
+main üzerine fast-forward birleştirildi (d51e33d); GitHub’a push/merge yapılmadı.
+İlk keşif teslimi feature/job-discovery dalında tamamlandı; henüz push/merge yapılmadı.
 Kişisel hesapları riske atmama ve basit/sürdürülebilir yöntem önceliklidir;
 mevcut toplu başvuru, CAPTCHA aşma ve gözetimsiz gönderim sınırları korunur.
+
+
+### Keşif kabul kaydı
+
+- Resmî Greenhouse/Lever global GET okuyucuları, ücretsiz filtre ve mevcut review
+  kayıtlarına aktarım eklendi. Şirket kaynakları tek tek yapılandırılır.
+- Kimlik/URL tekrarları atlanır; mevcut başvuru/analiz korunur. Kaynak hataları
+  ayrı raporlanır. Kalıcı 15 dakika bekleme, yanıt/süre/sayfa/aktarım sınırları var.
+- Ülke/dil belirsizliği CV, analiz ve form başlatma öncesi açıkça doğrulanır.
+- TypeScript ve 128 çevrimdışı test geçti. Bunlar authored/mocked kaynaklardır.
+- Gerçek uç nokta kontrolü: Peak Lever kaynağı 18 ve GitLab Greenhouse kaynağı
+  232 ilan okundu. Panel taraması 1 kelime eşleşmesini review listesine ekledi;
+  bu ilan ara seviyedir, aday için uygunluk veya Türkiye’den çalışma izni kanıtı değildir.
+- İlk teslim kullanıcı düğmesiyle çalışır. Arka plan/periyodik tarama yoktur.
+  Sonraki aday iş, kaynak/kriter iyileştirmesinden sonra açılıp kapatılabilir
+  periyodik kontrolü değerlendirmektir. Henüz zamanlanmış görev oluşturulmadı.

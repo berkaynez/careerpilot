@@ -6,7 +6,9 @@ hazırlamak ve form doldurmayı insan gözetiminde hızlandırmak.
 
 Bugünkü sürüm yerelde çalışan bir prototiptir. İlan–profil analizinden açıklanabilir
 0–100 uyum puanı hesaplanır. Yerel panelde ilan ekleme, analiz görüntüleme ve
-başvuru takibi vardır. Panelden form yardımı açılır, bilinen alanlar hazırlanır
+başvuru takibi vardır. “İlan keşfet” ile eklenen şirketlerin resmî Greenhouse/Lever
+ilanları ücretsiz filtrelenip inceleme listesine aktarılır. İlk sürüm düğmeyle
+çalışır; arka planda zamanlanmış tarama yoktur. Panelden form yardımı açılır, bilinen alanlar hazırlanır
 ve kontrol kullanıcıya bırakılır.
 
 ## Nereden devam ediyoruz?
