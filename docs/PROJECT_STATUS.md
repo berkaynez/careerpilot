@@ -168,14 +168,43 @@ birleşmiş durumda. Yeni çalışma feature/early-career-discovery dalındadır
 - İş analizi/BT denetimi ve Türkçe rol karşılıkları varsayılanlara eklendi.
 - Kaydedilmiş kriterlerden sorgu taslağı ve toplu kariyer URL'sinden kaynak adayı
   çıkarma eklendi. Bunlar ağ/LLM çağrısı yapmaz.
-- Otomatik kaynak arama servisi henüz bağlanmadı. Harici servis API erişimi,
-  sonuç saklama yetkisi ve ayrı maliyet/kota onayı gerekiyor. Kullanıcının
-  OpenAI API anahtarı arama servisi için kullanılamaz.
+- SerpAPI kaynak arama bağlantısı uygulandı; varsayılan kapalıdır ve canlı
+  sağlayıcı doğrulaması henüz yapılmadı. Ayrı ücretsiz hesap/anahtar gerekir;
+  OpenAI anahtarı/bütçesi arama servisini kapsamaz.
 - Telefon düzeltmesinin gerçek site doğrulaması hâlâ açık; sohbet tarayıcısıyla
   tamamlanan başvurular native program doldurma testi diye raporlanmaz.
 - Bu işte ücretli çağrı, hesap oluşturma veya yeni başvuru gönderimi yapılmadı.
 
-Doğrulama: TypeScript ve 132 çevrimdışı test geçti. Ayrı kurgusal panelde
+Önceki hazırlık doğrulaması: TypeScript ve 132 çevrimdışı test geçti. Ayrı kurgusal panelde
 başlangıç seviyesi seçeneği, arama taslağı ve tekrarlı URL’lerden iki şirket
 kaynağı çıkarılması doğrulandı. Gerçek panelde açık form oturumu olduğundan
 o süreç yeniden başlatılmadı; yeni sürüm henüz gerçek panele yüklenmedi.
+
+
+### Kaynak arama bağlantısı — SerpAPI
+
+- Resmî belgelerde Serper 2.500 ücretsiz başlangıç sorgusu, SerpAPI ayda 250
+  ücretsiz sorgu sunuyor. Serper şartları B2B kullanım diyor; kişisel iş arama
+  kullanımımız ve aylık yenilenme için SerpAPI seçildi. Gemini arama kotası modele
+  bağlı; bu adımda ikinci LLM eklenmedi. Tüm internetteki ilanları bulma garantisi yok.
+- Panelde SerpAPI ile kaynak bulma eklendi. Kaydedilmiş rol/konum sorguları açık
+  onayla gider; aday profili/CV/iletişim gitmez. Kaynak adayları taslak listeye
+  eklenir; kullanıcı kontrol edip kaydeder ve mevcut resmî ilan taramasını başlatır.
+  Arama sonucu tek başına geçerli şirket, açık ilan veya aday uygunluğu kanıtı değildir.
+- Her canlı aramadan önce ücretsiz Account API ile etkin 0 USD plan ve kalan kota
+  kontrol edilir. Bilinmeyen/ücretli plan engellenir. En çok 4 sorgu/işlem,
+  8/gün, 200/UTC takvim ayı; 15 dakika bekleme ve 24 saat aynı sorgu önbelleği var.
+  Arama öncesi kalıcı rezervasyon, süreçler arası kilit ve sınırlı yanıt okuma var.
+  Belirsiz/başarısız çağrılar geri verilmez; otomatik tekrar/yükseltme/satın alma yok.
+- Bu sınırlar bu yerel durum klasörüne aittir. Başka araçların aynı hesabı
+  kullanması sağlayıcı kotasını azaltabilir. Sağlayıcı planı/kotası her koşuda
+  yeniden okunur; yerel UTC ayı sağlayıcının fatura yenileme tarihi sayılmaz.
+- Kayıtlı adaylar en fazla 20 kaynak; arama ilk sonuçlarla sınırlı. SerpAPI veya
+  arama motoru tamlık/güncellik garantisi vermez. LinkedIn/Indeed hesabı kullanılmaz;
+  başvuru sitelerinde login/CAPTCHA ihtiyacı devam edebilir. Periyodik tarama yoktur.
+- TypeScript ve 137 çevrimdışı test geçti; kota, başarısız rezervasyon, önbellek,
+  özel hostlar, ücretli plan engeli ve panel izinleri sahte servislerle doğrulandı.
+  Ayrı kurgusal panelde onaysız aramanın engellenmesi ve bir kaynak adayı çıkarma
+  doğrulandı. Gerçek SerpAPI çağrısı, ödeme veya yeni başvuru yapılmadı.
+- Gerçek panelde açık form oturumuna dokunulmadı. Sıradaki adım: ücretsiz SerpAPI
+  hesabı ve özel .env anahtarıyla ilk kullanıcı onaylı canlı aramayı doğrulamak.

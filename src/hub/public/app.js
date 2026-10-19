@@ -4,6 +4,18 @@ const states = { saved: 'Kaydedildi', ready: 'Analizi hazır', review: 'İncelem
 const levels = { documented: 'Doğrudan dayanak', related: 'Kısmi dayanak', not_documented: 'Profilde belgelenmiyor' };
 const priorities = { essential: 'Temel şart', preferred: 'Tercih edilen', responsibility: 'Görev' };
 const errors = {
+  DISCOVERY_SEARCH_NOT_ENABLED: 'Kaynak araması kapalı. SerpAPI anahtarını özel ayar dosyana ekleyip paneli --enable-search ile aç.',
+  DISCOVERY_SEARCH_APPROVAL_REQUIRED: 'Rol ve konum paylaşımı ile ücretsiz kota kullanımı onayı gerekiyor.',
+  DISCOVERY_SEARCH_FREE_PLAN_REQUIRED: 'Ücretsiz ve etkin SerpAPI planı doğrulanamadı. Arama yapılmadı; hesabındaki planı kontrol et.',
+  DISCOVERY_SEARCH_QUOTA_STOP: 'Ücretsiz kota veya yerel sınır doldu. Arama durduruldu; ücretli plana geçilmedi.',
+  DISCOVERY_SEARCH_COOLDOWN: 'Yeni sorgular için en az 15 dakika bekle. Aynı başarılı arama 24 saat kayıtlı sonuçları kullanır.',
+  DISCOVERY_SEARCH_BUSY: 'Bir arama devam ediyor veya önceki işlem yarıda kaldı. Yeniden başlatmadan önce çalışan paneli kontrol et.',
+  DISCOVERY_SEARCH_NETWORK: 'Arama bağlantısı tamamlanamadı. Tekrar denenmedi; başlamış sorgu kota kaydında tutulur.',
+  DISCOVERY_SEARCH_HTTP: 'SerpAPI isteği reddetti. Anahtarı ve hesabını kontrol et; tekrar denenmedi.',
+  DISCOVERY_SEARCH_RATE_LIMITED: 'SerpAPI hız sınırına ulaşıldı. Arama durduruldu.',
+  DISCOVERY_SEARCH_FORMAT: 'Arama sonucu doğrulanamadı. Aday kaynak eklenmedi.',
+  DISCOVERY_SEARCH_RESPONSE_TOO_LARGE: 'Arama yanıtı boyut sınırını aştı. İşlem durduruldu.',
+
   DISCOVERY_SEARCH_QUERY_TOO_LONG: 'Arama sorgusu çok uzun. Rol veya konum ifadelerini kısaltıp ayarları kaydet.',
   DISCOVERY_BUSY: 'Bir keşif işlemi devam ediyor. Bitmesini bekle.',
   DISCOVERY_SOURCES_REQUIRED: 'En az bir şirket kaynağı ekle.',
@@ -290,6 +302,7 @@ $('#discovery-open').addEventListener('click', async () => {
   try { const data = await api('/api/discovery'); $('#discovery-sources').replaceChildren(); for (const source of data.config.sources) sourceRow(source);
     for (const [id, key] of [['roles','roles'], ['locations','locations'], ['keywords','keywords'], ['excluded','excludedTitles']]) $('#discovery-' + id).value = data.config[key].join(', ');
     $('#discovery-early-career').checked = data.config.earlyCareer;
+    $('#discovery-search-approval').checked = false; $('#discovery-auto-result').textContent = '';
     discoveryReport(data.lastReport); openDialog('#discovery-dialog');
   } catch (error) { notify(error.message, true); }
 });
@@ -314,4 +327,22 @@ $('#discovery-extract').addEventListener('click', async () => {
     }
     $('#discovery-search-note').textContent = added + ' kaynak adayı eklendi. Şirket adlarını/kodlarını kontrol et ve kaydet. Ağ isteği yapılmadı; uygunluk henüz doğrulanmadı.';
   } catch (error) { $('#discovery-form .form-error').textContent = error.message; }
+});
+
+$('#discovery-auto-search').addEventListener('click', async event => {
+  const button = event.currentTarget, output = $('#discovery-auto-result');
+  if (!$('#discovery-search-approval').checked) { output.textContent = errors.DISCOVERY_SEARCH_APPROVAL_REQUIRED; return; }
+  button.disabled = true; output.textContent = 'Kaydedilmiş kriterlerle şirket kaynakları aranıyor…';
+  try {
+    const data = await api('/api/discovery/source-search', { approved: true });
+    const known = new Set(Array.from($('#discovery-sources').children).map(row => row.children[0].value + ':' + row.children[1].value.trim().toLowerCase()));
+    let added = 0, skipped = 0, duplicates = 0;
+    for (const source of data.sources) { const key = source.provider + ':' + source.board.toLowerCase();
+      if (known.has(key)) { duplicates++; continue; }
+      if ($('#discovery-sources').children.length >= 20) { skipped++; continue; }
+      sourceRow(source); known.add(key); added++;
+    }
+    output.textContent = added + ' yeni kaynak adayı · ' + duplicates + ' zaten listede · ' + skipped + ' kaynak sınırı nedeniyle eklenmedi. ' + (data.cached ? 'Kayıtlı sonuçlar; yeni sorgu tüketilmedi.' : data.requests + ' arama sorgusu kullanıldı.') + ' Kaynakları kontrol edip kaydet; resmî ilanları toplama adımı henüz çalıştırılmadı.';
+  } catch (error) { output.textContent = error.message; }
+  finally { button.disabled = false; $('#discovery-search-approval').checked = false; }
 });

@@ -1052,3 +1052,48 @@ ayrı istek/maliyet sınırı gerekir. Mevcut OpenAI bütçesi arama servisini k
 İncelenen belgeler: [Brave Search API](https://brave.com/search/api/),
 [fiyatlandırma](https://api-dashboard.search.brave.com/documentation/pricing).
 Bu teslimde harici arama hesabı açılmadı veya ücretli servis çağrısı yapılmadı.
+
+
+## SerpAPI ile şirket kaynağı bulma (isteğe bağlı)
+
+[SerpAPI Free](https://serpapi.com/pricing) hesabı ayda 250 sorgu sunuyor
+(19 Ekim 2026 kontrolü). Hesabındaki güncel planı/kotayı doğrula; ücretli plan,
+kart veya ek kredi satın alma gerekmez. Anahtarını sohbet, ekran görüntüsü veya
+Git dosyasına koyma. Mevcut özel `.env` dosyana `SERPAPI_API_KEY` ekle.
+OpenAI anahtarı farklıdır; bu arama OpenAI modelini açmaz veya bütçesini kullanmaz.
+
+Açık form oturumlarını tamamladıktan sonra paneli arama seçeneğiyle başlat:
+
+```bash
+npm run hub -- --port 3211 --enable-search
+```
+
+Panelde **İlan keşfet** → rol/konum ayarlarını kaydet → sorgu planını incele →
+rol/konum paylaşımı ve ücretsiz kota onayını işaretle → **SerpAPI ile şirket
+kaynaklarını bul**. Gelen kaynak adaylarını kontrol et; şirket adları yalnızca
+kaynak kodundan etiketlenir. **Kaydet ve ilanları bul** resmî Greenhouse/Lever
+okuyucusunu çalıştırır ve filtre eşleşmelerini inceleme listesine aktarır.
+İlanın ülke/dil doğrulaması ve sonraki analiz/başvuru izinleri devam eder.
+
+Arama en çok 4 sorgu/işlem, 8/gün, 200/UTC takvim ayıdır. Aynı sorguların başarılı
+sonuçları 24 saat yerel kayıttan döner; yeni sorgular arasında 15 dakika beklenir.
+Her koşu önce [ücretsiz Account API](https://serpapi.com/account-api) ile etkin
+0 USD planı ve yeterli kalan kotayı doğrular. Hata, kota yetersizliği veya ücretli/
+bilinmeyen plan aramayı durdurur; otomatik tekrar, plan yükseltme veya ödeme yoktur.
+Yerel sayaç sağlayıcının gerçek bakiyesi değildir; başka uygulamaların tüketimi
+sağlayıcı kontrolünde görülür. Sorgu rezervasyonları hata durumunda geri verilmez.
+Arama yanıtları sınırlı okunur, sonuç hostları filtrelenir; CV veya kişisel profil
+arama servisine gönderilmez. Yalnızca kaynak kodları ve yerel sayaç/önbellek saklanır.
+
+Süreç çökerse `source-search.lock` kalabilir; çalışan panelleri kontrol edip
+kapattıktan sonra yalnızca bu kilit klasörünü kaldır. Sayaç dosyasını silme.
+Bu sürüm otomatik zamanlama yapmaz, internetteki tüm şirketleri kapsamaz; liste
+20 kaynak ve her sorgunun ilk 10 organik bağlantısıyla sınırlıdır. Arama
+servisindeki CAPTCHA yönetimi, başvuru sitelerindeki CAPTCHA'ları kaldırmaz.
+
+Karar kaynakları: [Serper kota ve fiyatları](https://serper.dev/),
+[Serper B2B şartı](https://serper.dev/terms),
+[SerpAPI arama belgeleri](https://serpapi.com/search-api),
+[SerpAPI şartları](https://serpapi.com/legal),
+[Gemini model bazlı fiyatlar](https://ai.google.dev/gemini-api/docs/pricing).
+Ücretsiz kotanın değişmeyeceği veya sonuçların eksiksiz olduğu garanti edilmez.
