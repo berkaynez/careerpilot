@@ -1,4 +1,4 @@
-export type JobPlatform = 'linkedin' | 'lever' | 'greenhouse' | 'indeed' | 'kariyer';
+export type JobPlatform = 'linkedin' | 'lever' | 'greenhouse' | 'indeed' | 'kariyer' | 'freehire';
 export interface JobLink { platform: JobPlatform; url: string }
 
 /** Normalise known posting URLs, never navigate arbitrary redirect targets or private hosts. */
@@ -18,6 +18,7 @@ export function jobLink(value: string): JobLink {
     && ['/viewjob','/m/viewjob'].includes(url.pathname) && /^[a-f0-9]{16}$/.test(url.searchParams.get('jk') ?? '')
     && url.searchParams.getAll('jk').length === 1) { platform='indeed'; jobKey=url.searchParams.get('jk'); }
   else if (['www.kariyer.net','kariyer.net'].includes(url.hostname) && /^\/is-ilani\/[a-zA-Z0-9%_-]+-\d+$/.test(url.pathname)) platform='kariyer';
+  else if (url.hostname === 'freehire.me' && /^\/jobs\/[a-z0-9][a-z0-9-]{0,199}$/.test(url.pathname)) platform='freehire';
   else throw new Error('JOB_PLATFORM_UNSUPPORTED');
   // Keep tracking and applicant information out of requests and recorded source URLs.
   url.search = ''; if (jobKey) url.searchParams.set('jk',jobKey); url.pathname = url.pathname.replace(/\/$/, '');

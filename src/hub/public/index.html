@@ -26,6 +26,10 @@
 <label>Ek anahtar kelimeler · isteğe bağlı, virgülle ayır<input id="discovery-keywords" maxlength="2400"></label>
 <label>Başlıkta hariç tutulacaklar · virgülle ayır<input id="discovery-excluded" maxlength="2400"></label>
 <p class="small muted">Arama sonucu ilan metninin tamamı değildir; ilan kapanmış olabilir. Remote, Türkiye'den çalışma hakkı anlamına gelmez. Analiz öncesi tam metin, şirket, ülke ve dil doğrulanır.</p>
+<section class="source"><h3>FreeHire · ücretsiz ilan keşfi</h3><p class="small muted">Son 30 gündeki ilanlar, sayfa başına en çok 30 kayıt. SerpAPI kotası kullanılmaz. Kişisel profil/CV gönderilmez; toplayıcı kayıtları kontrol etmen gerekir.</p>
+<label class="check"><input type="checkbox" id="freehire-approval"> Seçtiğim bölge ve seviye filtrelerini FreeHire'a göndermeyi onaylıyorum.</label>
+<button type="button" class="primary" id="freehire-search">FreeHire ile ilan bul</button><button type="button" class="secondary" id="freehire-next" hidden>Sonraki 30 kaydı getir</button><p id="freehire-result" role="status" class="small"></p></section>
+<h3>SerpAPI · web araması</h3>
 <section id="discovery-job-summary" class="source" aria-label="Son arama özeti" hidden></section>
 <p id="discovery-search-status" role="status" class="small muted"></p>
 <label class="check"><input type="checkbox" id="discovery-job-approval"> Rol ve arama bölgesini SerpAPI'ye göndermeyi ve ücretsiz kotamdan kullanmayı onaylıyorum.</label>

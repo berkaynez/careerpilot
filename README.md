@@ -89,3 +89,6 @@ yeni adres ayrıca desteklenmeli ve paylaşım izni verilmelidir. Ayrıntılar i
 Gerçek profiller ve belgeler `.careerpilot/` gibi Git dışında tutulan özel dizinde
 kalır. `.env` ve API anahtarları paylaşılmaz. Bu proje, kullanıcı onayı olmadan
 ücretli çağrı veya gerçek başvuru gönderimi yapmaz.
+
+İlan keşfet ekranında FreeHire ile anahtarsız Türkiye/remote ilan araması ve
+SerpAPI ile web araması bulunur. Kullanım ve kaynak sınırları: [USAGE](docs/USAGE.md).

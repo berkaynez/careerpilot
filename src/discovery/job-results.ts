@@ -41,19 +41,21 @@ export function searchHits(rows: { link: string; title?: string | undefined; sni
   }
   return { hits, rejected, rejectionReasons };
 }
+export function searchFilterReason(title:string, text:string, config:DiscoveryConfig): 'role'|'excludedTitle'|'keyword'|'experience'|null {
+  return !roleTerms(config.roles).some(role=>contains(title,role)) ? 'role'
+    : config.excludedTitles.some(term=>contains(title,term)) ? 'excludedTitle'
+    : config.keywords.length && !config.keywords.some(term=>contains(title+' '+text,term)) ? 'keyword'
+    : config.earlyCareer && careerLevel({title,text}).level==='experienced' ? 'experience' : null;
+}
 /** Import unverified search evidence, never crawl an account or present a snippet as a full job description. */
 export async function importSearchJobs(store: Awaited<ReturnType<typeof openHubStore>>, raw: SearchHit[], config: DiscoveryConfig, now = () => new Date()) {
-  const hits = z.array(searchHitSchema).max(40).parse(raw), known = new Set(store.list().map(record => { try { return jobLink(record.posting.sourceUrl).url; } catch { return record.posting.sourceUrl; } }));
+  const hits = z.array(searchHitSchema).max(40).parse(raw), known = new Set(store.list().flatMap(record => { let url=record.posting.sourceUrl; try { url=jobLink(url).url; } catch {} return [url,...(record.discovery?.search?.originalURL?[record.discovery.search.originalURL]:[])]; }));
   const filterReasons = { role: 0, excludedTitle: 0, keyword: 0, experience: 0 };
-  const roles = roleTerms(config.roles);
   const report = { added: 0, duplicates: 0, filtered: 0, rejected: 0, modelCalls: 0, filterReasons };
   for (const hit of hits) {
     let link; try { link = jobLink(hit.url); if (link.platform !== hit.platform) throw new Error('invalid'); } catch { report.rejected++; continue; }
     if (known.has(link.url)) { report.duplicates++; continue; }
-    const reason = !roles.some(role => contains(hit.title, role)) ? 'role'
-      : config.excludedTitles.some(term => contains(hit.title, term)) ? 'excludedTitle'
-      : config.keywords.length && !config.keywords.some(term => contains(hit.title + ' ' + hit.snippet, term)) ? 'keyword'
-      : config.earlyCareer && careerLevel({title:hit.title,text:hit.snippet}).level === 'experienced' ? 'experience' : null;
+    const reason = searchFilterReason(hit.title, hit.snippet, config);
     if (reason) { report.filtered++; filterReasons[reason]++; continue; }
     const id = randomUUID(), at = now().toISOString();
     await store.add({ version: 1, id, posting: { version: 1, id, company: 'Şirket doğrulanmalı', title: hit.title,
