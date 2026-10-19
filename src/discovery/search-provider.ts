@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { sourceSchema } from './sources.js';
 import { sourceSearchQueries, sourcesFromSearchURLs } from './source-search.js';
 
-const cacheSchema = z.strictObject({ key: z.string(), at: z.iso.datetime(), sources: z.array(sourceSchema).max(20) });
+const cacheSchema = z.strictObject({ key: z.string(), at: z.iso.datetime(), sources: z.array(sourceSchema).max(20), partial: z.boolean().default(false), failureCode: z.string().nullable().default(null) });
 const stateSchema = z.strictObject({ version: z.literal(1), attempts: z.array(z.iso.datetime()).max(1000), cache: cacheSchema.nullable() });
 const accountSchema = z.object({ account_status: z.literal('Active'), plan_monthly_price: z.literal(0),
   total_searches_left: z.number().int().nonnegative(), account_rate_limit_per_hour: z.number().int().positive(), this_hour_searches: z.number().int().nonnegative() });
@@ -29,8 +29,8 @@ export async function openSourceSearch(directory: string, apiKey: string, reques
     const url = new URL(path, 'https://serpapi.com');
     url.search = new URLSearchParams({ ...params, api_key: apiKey }).toString();
     let response: Response;
-    try { response = await request(url, { redirect: 'error', credentials: 'omit', headers: { Accept: 'application/json' }, signal: AbortSignal.any([signal, AbortSignal.timeout(15_000)]) }); }
-    catch { throw new Error('DISCOVERY_SEARCH_NETWORK'); }
+    try { response = await request(url, { redirect: 'error', credentials: 'omit', headers: { Accept: 'application/json' }, signal: AbortSignal.any([signal, AbortSignal.timeout(path === '/search.json' ? 60_000 : 15_000)]) }); }
+    catch (error) { throw new Error(error instanceof Error && error.name === 'TimeoutError' ? 'DISCOVERY_SEARCH_TIMEOUT' : 'DISCOVERY_SEARCH_NETWORK'); }
     if (!response.ok) { await response.body?.cancel(); throw new Error(response.status === 429 ? 'DISCOVERY_SEARCH_RATE_LIMITED' : 'DISCOVERY_SEARCH_HTTP'); }
     if (!response.headers.get('content-type')?.includes('application/json') || !response.body) { await response.body?.cancel(); throw new Error('DISCOVERY_SEARCH_FORMAT'); }
     const reader = response.body.getReader(); let size = 0; const chunks: Uint8Array[] = [];
@@ -49,7 +49,7 @@ export async function openSourceSearch(directory: string, apiKey: string, reques
       try {
         const state = await read(), timestamp = now().toISOString(), time = Date.parse(timestamp);
         if (state.cache?.key === key && time >= Date.parse(state.cache.at) && time - Date.parse(state.cache.at) < 24 * 3600_000)
-          return { sources: state.cache.sources, requests: 0, cached: true, modelCalls: 0 };
+          return { sources: state.cache.sources, requests: 0, cached: true, modelCalls: 0, partial: state.cache.partial, failureCode: state.cache.failureCode };
         if (state.attempts.some(at => Date.parse(at) > time)) throw new Error('DISCOVERY_SEARCH_CLOCK_INVALID');
         const monthly = state.attempts.filter(at => at.slice(0, 7) === timestamp.slice(0, 7)).length;
         const daily = state.attempts.filter(at => at.slice(0, 10) === timestamp.slice(0, 10)).length;
@@ -61,20 +61,29 @@ export async function openSourceSearch(directory: string, apiKey: string, reques
         if (!account.success) throw new Error('DISCOVERY_SEARCH_FREE_PLAN_REQUIRED');
         if (account.data.total_searches_left < queries.length || account.data.account_rate_limit_per_hour - account.data.this_hour_searches < queries.length)
           throw new Error('DISCOVERY_SEARCH_QUOTA_STOP');
-        const urls: string[] = [];
+        const urls: string[] = []; let attempted = 0;
         for (const q of queries) {
           signal.throwIfAborted();
           // Reserve before every search. Errors, process crashes and uncertain billing are never refunded locally.
           state.attempts = state.attempts.filter(at => at.slice(0, 7) === timestamp.slice(0, 7));
-          state.attempts.push(timestamp); await save(state);
-          const result = z.object({ error: z.string().optional(), search_metadata: z.object({ status: z.literal('Success') }),
-            organic_results: z.array(z.object({ link: z.string().max(2000) })).max(100).default([]) }).safeParse(await get('/search.json', { engine: 'google', q }, signal));
-          if (!result.success || result.data.error) throw new Error('DISCOVERY_SEARCH_FORMAT');
-          urls.push(...result.data.organic_results.slice(0, 10).map(item => item.link));
+          state.attempts.push(timestamp); await save(state); attempted++;
+          try {
+            const result = z.object({ error: z.string().optional(), search_metadata: z.object({ status: z.literal('Success') }),
+              organic_results: z.array(z.object({ link: z.string().max(2000) })).max(100).default([]) }).safeParse(await get('/search.json', { engine: 'google', q }, signal));
+            if (!result.success || result.data.error) throw new Error('DISCOVERY_SEARCH_FORMAT');
+            urls.push(...result.data.organic_results.slice(0, 10).map(item => item.link));
+            // Keep completed sources even if a later query fails or this process exits.
+            state.cache = { key, at: timestamp, sources: sourcesFromSearchURLs(urls), partial: true, failureCode: null }; await save(state);
+          } catch (error) {
+            if (!state.cache || state.cache.key !== key) throw error;
+            const failureCode = error instanceof Error && /^DISCOVERY_SEARCH_[A-Z_]+$/.test(error.message) ? error.message : 'DISCOVERY_SEARCH_NETWORK';
+            state.cache = { ...state.cache, partial: true, failureCode }; await save(state);
+            return { sources: state.cache.sources, requests: attempted, cached: false, modelCalls: 0, partial: true, failureCode };
+          }
         }
         const sources = sourcesFromSearchURLs(urls);
-        state.cache = { key, at: timestamp, sources }; await save(state);
-        return { sources, requests: queries.length, cached: false, modelCalls: 0 };
+        state.cache = { key, at: timestamp, sources, partial: false, failureCode: null }; await save(state);
+        return { sources, requests: queries.length, cached: false, modelCalls: 0, partial: false, failureCode: null };
       } finally { await rm(lock, { recursive: true }); }
     },
   };

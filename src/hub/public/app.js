@@ -10,6 +10,7 @@ const errors = {
   DISCOVERY_SEARCH_QUOTA_STOP: 'Ücretsiz kota veya yerel sınır doldu. Arama durduruldu; ücretli plana geçilmedi.',
   DISCOVERY_SEARCH_COOLDOWN: 'Yeni sorgular için en az 15 dakika bekle. Aynı başarılı arama 24 saat kayıtlı sonuçları kullanır.',
   DISCOVERY_SEARCH_BUSY: 'Bir arama devam ediyor veya önceki işlem yarıda kaldı. Yeniden başlatmadan önce çalışan paneli kontrol et.',
+  DISCOVERY_SEARCH_TIMEOUT: 'Arama servisi süre sınırında yanıt vermedi. Otomatik tekrar yapılmadı.',
   DISCOVERY_SEARCH_NETWORK: 'Arama bağlantısı tamamlanamadı. Tekrar denenmedi; başlamış sorgu kota kaydında tutulur.',
   DISCOVERY_SEARCH_HTTP: 'SerpAPI isteği reddetti. Anahtarı ve hesabını kontrol et; tekrar denenmedi.',
   DISCOVERY_SEARCH_RATE_LIMITED: 'SerpAPI hız sınırına ulaşıldı. Arama durduruldu.',
@@ -342,7 +343,7 @@ $('#discovery-auto-search').addEventListener('click', async event => {
       if ($('#discovery-sources').children.length >= 20) { skipped++; continue; }
       sourceRow(source); known.add(key); added++;
     }
-    output.textContent = added + ' yeni kaynak adayı · ' + duplicates + ' zaten listede · ' + skipped + ' kaynak sınırı nedeniyle eklenmedi. ' + (data.cached ? 'Kayıtlı sonuçlar; yeni sorgu tüketilmedi.' : data.requests + ' arama sorgusu kullanıldı.') + ' Kaynakları kontrol edip kaydet; resmî ilanları toplama adımı henüz çalıştırılmadı.';
+    output.textContent = (data.partial ? 'Kısmi sonuç: aramanın tamamı bitmedi. ' : '') + added + ' yeni kaynak adayı · ' + duplicates + ' zaten listede · ' + skipped + ' kaynak sınırı nedeniyle eklenmedi. ' + (data.cached ? 'Kayıtlı sonuçlar; yeni sorgu tüketilmedi.' : data.requests + ' arama isteği başlatıldı (başarısız istekler dahil).') + ' Kaynakları kontrol edip kaydet; resmî ilanları toplama adımı henüz çalıştırılmadı.' + (data.failureCode ? ' ' + friendly(data.failureCode) : '');
   } catch (error) { output.textContent = error.message; }
   finally { button.disabled = false; $('#discovery-search-approval').checked = false; }
 });
