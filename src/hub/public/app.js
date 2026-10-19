@@ -267,13 +267,14 @@ function renderDiscovery(record, pane) {
   pane.append(box);
 }
 const discoveryMessages = { DISCOVERY_IMPORT_LIMIT: '100 yeni ilan sınırına ulaşıldı; kalan kayıtlar aktarılmadı', DISCOVERY_COOLDOWN: '15 dakikalık bekleme süresi dolmadı', DISCOVERY_RATE_LIMITED: 'kaynak hız sınırı; tekrar denenmedi', DISCOVERY_SOURCE_HTTP: 'kaynak yanıt vermedi / bulunamadı', DISCOVERY_SOURCE_FORMAT: 'beklenen veri biçimi gelmedi', DISCOVERY_SOURCE_FAILED: 'kaynak okunamadı', DISCOVERY_RESPONSE_TOO_LARGE: 'yanıt boyutu sınırı', DISCOVERY_PAGE_LIMIT: 'sayfa sınırı aşıldı; kaynak aktarılmadı' };
-function sourceRow(source = { provider: 'lever', board: '', company: '' }) {
+function sourceRow(source = { provider: 'lever', board: '', company: '', locationFallback: '' }) {
   const row = node('div', 'discovery-source');
   const provider = node('select'); provider.setAttribute('aria-label', 'Kaynak sağlayıcı'); provider.append(new Option('Lever', 'lever'), new Option('Greenhouse', 'greenhouse')); provider.value = source.provider;
   const board = node('input'); board.setAttribute('aria-label', 'Şirket kaynak kodu'); board.placeholder = 'Kaynak kodu'; board.value = source.board; board.required = true; board.maxLength = 80;
   const company = node('input'); company.setAttribute('aria-label', 'Kaynak şirket adı'); company.placeholder = 'Şirket adı'; company.value = source.company; company.required = true; company.maxLength = 120;
+  const fallback = node('input'); fallback.setAttribute('aria-label', 'Eksik konum için şirket varsayılanı'); fallback.placeholder = 'Varsayılan konum (isteğe bağlı)'; fallback.value = source.locationFallback || ''; fallback.maxLength = 120;
   const remove = node('button', 'secondary', 'Kaldır'); remove.type = 'button'; remove.addEventListener('click', () => row.remove());
-  row.append(provider, board, company, remove); $('#discovery-sources').append(row);
+  row.append(provider, board, company, fallback, remove); $('#discovery-sources').append(row);
 }
 function discoveryReport(report) {
   const box = $('#discovery-result'); box.replaceChildren(); if (!report) return;
@@ -289,7 +290,7 @@ $('#discovery-open').addEventListener('click', async () => {
 });
 formHandler('#discovery-form', async (form, event) => {
   const terms = id => $('#discovery-' + id).value.split(',').map(value => value.trim()).filter(Boolean);
-  const sources = Array.from($('#discovery-sources').children).map(row => ({ provider: row.children[0].value, board: row.children[1].value.trim(), company: row.children[2].value.trim() }));
+  const sources = Array.from($('#discovery-sources').children).map(row => ({ provider: row.children[0].value, board: row.children[1].value.trim(), company: row.children[2].value.trim(), locationFallback: row.children[3].value.trim() }));
   await api('/api/discovery/config', { version: 1, sources, roles: terms('roles'), locations: terms('locations'), keywords: terms('keywords'), excludedTitles: terms('excluded') });
   if (event.submitter?.value === 'run') { const report = await api('/api/discovery/run', {}); discoveryReport(report); $('#filter').value = 'review'; $('#search').value = ''; await refresh(); notify(report.added + ' yeni ilan inceleme listesine eklendi.'); }
   else notify('Keşif ayarları kaydedildi.');

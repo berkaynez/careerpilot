@@ -2,7 +2,8 @@ import { z } from 'zod';
 import { jobLink } from '../jobs/links.js';
 
 export const sourceSchema = z.strictObject({ provider: z.enum(['greenhouse', 'lever']),
-  board: z.string().trim().regex(/^[a-zA-Z0-9_-]{1,80}$/), company: z.string().trim().min(1).max(120) });
+  board: z.string().trim().regex(/^[a-zA-Z0-9_-]{1,80}$/), company: z.string().trim().min(1).max(120),
+  locationFallback: z.string().trim().max(120).optional() });
 export type Source = z.infer<typeof sourceSchema>;
 export interface DiscoveredJob { externalId: string; title: string; text: string; url: string; location: string; remote: boolean; }
 export type SourceReader = (source: Source, signal: AbortSignal) => Promise<{ jobs: DiscoveredJob[]; rejected: number }>;
@@ -13,6 +14,10 @@ export function sourceURL(source: Source) {
     : `https://api.lever.co/v0/postings/${board}?mode=json&limit=100&skip=0`;
 }
 const MAX_BYTES = 4_000_000;
+function cleanLocation(value: string) {
+  const parts = value.split(/[·;]/).map(part => plain(part)).filter(part => part && !/^(full[ -]?time|part[ -]?time|contract|internship|new grad|on[ -]?site|hybrid|temporary)$/i.test(part));
+  return [...new Set(parts)].join(' · ');
+}
 async function getJSON(url: string, signal: AbortSignal, request: typeof fetch) {
   const response = await request(url, { redirect: 'error', credentials: 'omit', signal: AbortSignal.any([signal, AbortSignal.timeout(12_000)]),
     headers: { Accept: 'application/json', 'User-Agent': 'CareerPilot/0.1 public-job-discovery' } });
@@ -45,7 +50,7 @@ function checkedJob(source: Source, externalId: string, title: string, url: stri
     || segments[source.provider === 'lever' ? 2 : 3] !== externalId) throw new Error('DISCOVERY_POSTING_URL_INVALID');
   const clean = plain(text).slice(0, 24_000);
   if (clean.length < 20 || !plain(title)) throw new Error('DISCOVERY_POSTING_INVALID');
-  return { externalId, title: plain(title), url: link.url, location: plain(location), text: clean, remote };
+  return { externalId, title: plain(title), url: link.url, location: cleanLocation(location), text: clean, remote };
 }
 /** Production URLs are constructed from validated board IDs only. No credentials, redirects or browser session. */
 export function createSourceReader(request: typeof fetch = fetch): SourceReader {

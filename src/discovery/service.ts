@@ -60,13 +60,17 @@ export async function openDiscovery(directory: string, store: Store, reader: Sou
           for (const job of data.jobs) {
             bounded.throwIfAborted();
             if (report.added >= 100) { row.code = 'DISCOVERY_IMPORT_LIMIT'; break; }
-            const reasons = discoveryReasons(job, config); if (!reasons.length) { row.filtered++; continue; }
+            const fallback = !job.location && source.locationFallback;
+            const effective = fallback ? { ...job, location: source.locationFallback! } : job;
+            const reasons = discoveryReasons(effective, config);
+            if (fallback && reasons.length) reasons.push('Konum kaynağı: kullanıcı tarafından tanımlanan şirket varsayılanı (' + source.locationFallback + ').');
+            if (!reasons.length) { row.filtered++; continue; }
             if (known.has(job.url) || knownIds.has(key + ':' + job.externalId)) { row.duplicates++; continue; }
             const id = randomUUID(), timestamp = now().toISOString();
             const posting = postingSchema.parse({ version: 1, id, company: source.company, title: job.title, text: job.text,
               sourceUrl: job.url, country: 'ZZ', language: 'en', documentLanguage: null, photoPolicy: 'unspecified', sponsorship: 'not_stated', checkedOn: timestamp.slice(0, 10) });
             await store.add({ version: 1, id, posting, state: 'review', createdAt: timestamp, updatedAt: timestamp, analysis: null, lastError: null,
-              discovery: { sourceKey: key, externalId: job.externalId, discoveredAt: timestamp, location: job.location, remote: job.remote, reasons, routingConfirmed: false } });
+              discovery: { sourceKey: key, externalId: job.externalId, discoveredAt: timestamp, location: effective.location, remote: job.remote, reasons, routingConfirmed: false } });
             known.add(job.url); knownIds.add(key + ':' + job.externalId); row.added++; report.added++;
           }
         }
