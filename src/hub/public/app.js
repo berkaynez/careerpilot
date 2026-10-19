@@ -137,10 +137,15 @@ async function showDetail(id) {
   const pane = $('#detail'); pane.replaceChildren();
   const head = node('div', 'detail-head'); head.append(node('div', 'eyebrow', record.posting.company), node('h2', '', record.posting.title));
   const meta = node('div', 'detail-meta'); meta.append(badge(record.state), node('span', 'muted', record.discovery && !record.discovery.routingConfirmed ? 'Ülke ve dil doğrulanmalı' : record.posting.country + ' · ' + (record.posting.language === 'en' ? 'İngilizce ilan' : 'Türkçe ilan'))); head.append(meta); pane.append(head);
-  renderApplicationTracking(pane,record);
   const actions = node('div', 'detail-actions'), link = node('a', 'secondary', 'İlanı aç ↗'); link.href = record.posting.sourceUrl; link.target = '_blank'; link.rel = 'noopener noreferrer'; actions.append(link);
   const analyze = node('button', 'primary', record.analyzing ? 'Analiz sürüyor…' : record.analysis ? 'Yeniden analiz et' : 'Uyumunu analiz et');
-  analyze.disabled = !session.modelEnabled || record.analyzing || Boolean(record.discovery && !record.discovery.routingConfirmed); analyze.addEventListener('click', () => { $('#analyze-form').reset(); $('#model-details').textContent = session.model ? 'Model: ' + session.model.name + ' · Sağlayıcı: ' + session.model.destination + ' · Analiz sınırı: $' + session.model.perRunLimitUsd.toFixed(4) + ' · Aylık sınır: $' + session.model.monthlyLimitUsd.toFixed(2) : ''; openDialog('#analyze-dialog'); }); actions.append(analyze); pane.append(actions);
+  analyze.disabled = !session.modelEnabled || record.analyzing || Boolean(record.discovery && !record.discovery.routingConfirmed); analyze.addEventListener('click', () => { $('#analyze-form').reset(); $('#model-details').textContent = session.model ? 'Model: ' + session.model.name + ' · Sağlayıcı: ' + session.model.destination + ' · Analiz sınırı: $' + session.model.perRunLimitUsd.toFixed(4) + ' · Aylık sınır: $' + session.model.monthlyLimitUsd.toFixed(2) : ''; openDialog('#analyze-dialog'); }); const remove=node('button','secondary','Listeden kaldır');remove.type='button';remove.disabled=record.analyzing || record.assistantActive || assistantRequestPending;
+  remove.addEventListener('click',async()=>{remove.disabled=true;try{
+    await api('/api/jobs/'+id+'/remove',{});await refresh();notify(record.posting.company+' ilanı listeden kaldırıldı. ');
+    const undo=node('button','secondary','Geri al');undo.type='button';undo.addEventListener('click',async()=>{undo.disabled=true;try{await api('/api/jobs/'+id+'/restore',{});await refresh(id);notify('İlan geri getirildi.');}catch(error){undo.disabled=false;notify(error.message,true);}});$('#notice').append(undo);
+  }catch(error){remove.disabled=false;notify(error.message,true);}});
+  actions.append(analyze,remove); pane.append(actions);
+  renderApplicationTracking(pane,record);
   if (!session.modelEnabled) pane.append(node('p', 'small muted', 'Model bu oturumda kapalı. Mevcut analizini “Analiz içe aktar” ile ücretsiz görüntüleyebilirsin.'));
   renderDiscovery(record, pane);
   renderAssistant(pane, record);

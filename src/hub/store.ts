@@ -67,6 +67,14 @@ export async function openHubStore(directory: string, profile: Profile) {
       if (records.has(record.id)) throw new Error('HUB_RECORD_EXISTS');
       return save(check(record));
     }),
+    trash: (id:string) => enqueue(async()=>{
+      const record=records.get(id);if(!record || record.trashedAt)throw new Error('HUB_NOT_FOUND');
+      await save({...record,trashedAt:new Date().toISOString()});return {removed:1};
+    }),
+    restore: (id:string) => enqueue(async()=>{
+      const record=records.get(id);if(!record || !record.trashedAt)throw new Error('HUB_NOT_FOUND');
+      return save({...record,trashedAt:null});
+    }),
     trashArchived: () => enqueue(async()=>{
       let removed=0;
       for(const record of records.values()) if(record.state==='archived' && !record.trashedAt){
