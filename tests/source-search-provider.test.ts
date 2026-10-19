@@ -26,7 +26,9 @@ test('search sends criteria only to fixed service, caches sources across restart
   const first = await service.run(criteria, new AbortController().signal); assert.equal(first.sources.length, 1); assert.equal(first.requests, 1); assert.equal(first.cached, false); assert.equal(calls, 2);
   const reopened = await openSourceSearch(dir, 'fictional-secret', request);
   const status = await reopened.status(criteria); assert.equal(status.cached,true); assert.equal(status.remainingToday,7); assert.ok(status.waitSeconds > 0); assert.equal(calls,2);
-  const cached = await reopened.run(criteria, new AbortController().signal); assert.equal(cached.requests, 0); assert.equal(cached.cached, true); assert.equal(calls, 2);
+  const cached = await reopened.run(criteria, new AbortController().signal);
+  assert.deepEqual(cached.rejectionReasons, first.rejectionReasons);
+  assert.equal(Object.values(first.rejectionReasons).reduce((a,b)=>a+b,0), first.rejected); assert.equal(cached.requests, 0); assert.equal(cached.cached, true); assert.equal(calls, 2);
   const disk = await readFile(join(dir, 'source-search.json'), 'utf8'); assert.ok(!disk.includes('fictional-secret')); assert.ok(!disk.includes('private@example.invalid'));
 });
 
@@ -99,4 +101,17 @@ test('a later timeout preserves completed source results across restart without 
   const cached = await (await openSourceSearch(dir, 'secret', request)).run(multiple,new AbortController().signal);
   assert.equal(cached.partial,true); assert.equal(cached.cached,true); assert.equal(cached.requests,0); assert.equal(searches,2);
   const state = JSON.parse(await readFile(join(dir,'source-search.json'),'utf8')); assert.equal(state.attempts.length,2);
+});
+
+test('legacy cached results preserve unknown rejection counts without resetting quota or calling provider', async t => {
+  const dir=await mkdtemp(join(tmpdir(),'careerpilot-legacy-search-')); t.after(()=>rm(dir,{recursive:true,force:true}));
+  const service=await openSourceSearch(dir,'secret',async input=>json(new URL(String(input)).pathname==='/account.json'?account:result));
+  await service.run(criteria,new AbortController().signal);
+  const file=join(dir,'source-search.json'), state=JSON.parse(await readFile(file,'utf8'));
+  delete state.cache.rejectionReasons; state.cache.rejected=7;
+  await writeFile(file,JSON.stringify(state));
+  const reopened=await openSourceSearch(dir,'secret',async()=>{throw new Error('must not request');});
+  const cached=await reopened.run(criteria,new AbortController().signal);
+  assert.equal(cached.rejected,7); assert.equal(Object.values(cached.rejectionReasons).reduce((a,b)=>a+b,0),0);
+  assert.equal((await reopened.status(criteria)).remainingToday,7);
 });

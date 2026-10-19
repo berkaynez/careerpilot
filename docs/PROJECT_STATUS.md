@@ -302,9 +302,35 @@ Aşağıdaki teslim bu yön değişikliğini uygular.
   tekrar alınabilir. Yeni global remote araması yapılmadı; bütçe aşılmadı.
 - OpenAI/model çağrısı, profil/CV paylaşımı, yeni başvuru gönderimi yapılmadı.
 
-Sıradaki tek iş: rol aramasının sonuç kalitesini iyileştirmek. İlk 20 sonucun
-18'i kabul edilmedi; özellikle ilan liste sayfaları ile tekil ilan URL'lerini
-ayırma nedenlerini görünür kıl ve güncellik bilgisini kaynak göstergesi olarak
-incele. Günlük kota dolduğu için yeni sorgu planını çevrimdışı geliştir; canlı
-kapsama iddiasını sonraki kullanıcı onaylı denemeye bırak. Yeni sağlayıcı,
-site adaptörleri, hesap taraması veya başvuru gönderimi ekleme.
+## Rol aramasının kalitesi — tamamlanan artım
+
+- Panelde Yazılım geliştirme, Veri ve iş analizi ve BT denetimi hazır grupları
+  var. Türkçe/İngilizce unvanlar düzenlenebilir pozisyon alanına alınır; mevcut
+  kişisel roller kendiliğinden değiştirilmez. Bu gruplar aday yetkinliği iddiası
+  değildir. Kendi rollerini yazma seçeneği devam eder.
+- Ücretsiz başlık filtresi bilinen karşılıkları eşleştirir: örneğin kayıtlı
+  software engineer hedefi, Yazılım Mühendisi başlığını kabul eder. Veri analisti
+  gibi başka bir rol bu eşleştirmeyle yazılım hedefine eklenmez.
+- Yeni aramalarda liste/şirket sayfası, desteklenmeyen site, güvensiz/hatalı adres,
+  eksik başlık ve tanınmayan ilan bağlantısı sayıları ayrılır. Rol, hariç unvan,
+  ek kelime ve deneyim filtreleri ayrı nedenler gösterir; ilk eşleşen eleme nedeni
+  sayılır. Eski cache'deki toplam reddetme sayısına neden uydurulmaz.
+- SerpAPI ayrı date alanı verirse düz metin olarak özel kayda alınır. Bu,
+  doğrulanmamış arama indeksi tarih ifadesidir; keşfedilme/yayın tarihi veya açık
+  ilan kanıtına dönüştürülmez. Tarihi belirsiz/eski adaylar otomatik silinmez.
+- Kaydetmeden rol grubu önizlemesi, seçili kriterlerin sorgu/kota/önbellek durumunu
+  yerel hesaplar. Yeni arama başlatmaz, kullanıcı ayarlarını veya sayacı değiştirmez.
+- Yeni sağlayıcı/runtime veya bağımsız ajan katmanı eklenmedi. Fikir kaynağı:
+  [ai-job-search rol bazlı arama yaklaşımı](https://github.com/MadsLorentzen/ai-job-search/blob/0f6480d32e59d7651d920a5ec6d78ede2f4113bf/.claude/skills/job-scraper/search-queries.md)
+  ve aynı revizyondaki job-scraper akışının kaynak/güncellik ayrımı. Kod özgün
+  TypeScript uygulamasıdır; dış projenin scriptleri çalıştırılmadı veya kopyalanmadı.
+- TypeScript ve 147 çevrimdışı test geçti; önceki 142 test korundu. Yeni arama
+  kalitesi canlı sağlayıcı sorgusuyla ölçülmedi. Ücretli model çağrısı veya başvuru
+  gönderimi yok; dolu günlük kota ve mevcut özel kayıtlar korunuyor.
+
+Sıradaki tek iş: kota izin verdiğinde kullanıcı onaylı bir canlı rol grubu
+aramasında eleme nedenlerini değerlendirip sorgu isabetini ölçmek. Önce yazılım
+veya veri/iş analizi grubuyla küçük deneme; toplam bulunan aday, gerçekten açık
+ilan, tekrar ve filtre nedenlerini ayır. Gerekirse site/rol sorgularını bu kanıtla
+ayarla. Sonrasında mevcut belge hazırlama akışına yerel kontrol/revizyon bağlanabilir;
+yeni ücretli değerlendirici veya site adaptörü bu artımın parçası değildir.

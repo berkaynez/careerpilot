@@ -18,6 +18,8 @@
 <p class="form-error" role="alert"></p><div class="dialog-actions"><button type="button" class="secondary close-dialog">Vazgeç</button><button class="primary" type="submit">Onayla ve aç</button></div></form></dialog>
 <dialog id="discovery-dialog"><form id="discovery-form"><div class="dialog-head"><h2>Rolüne göre ilan bul</h2><button type="button" class="icon close-dialog" aria-label="Kapat">×</button></div>
 <p>Şirket seçmeden, kayıtlı rollerinle farklı iş sitelerinde ilan ara. Sonuçlar doğrudan İnceleme Bekleyenler'e eklenir. İş sitesi hesabına giriş veya ücretli AI analizi yapılmaz.</p>
+<label>Hazır rol grubu<select id="discovery-role-profile"><option value="">Kendi pozisyonlarım</option></select></label>
+<p class="small muted">Bir grup seçersen aşağıdaki pozisyonların yerine Türkçe ve İngilizce karşılıkları gelir. Aramadan önce düzenleyebilirsin; seçmek tek başına arama başlatmaz.</p>
 <label>Pozisyonlar · virgülle ayır<input id="discovery-roles" required maxlength="2400"></label>
 <label class="check"><input type="checkbox" id="discovery-early-career" checked> Yeni mezun / başlangıç seviyesine odaklan</label>
 <label>Arama bölgesi<select id="discovery-job-scope"><option value="turkey">Türkiye</option><option value="remote">Global remote</option></select></label>
@@ -26,7 +28,7 @@
 <p class="small muted">Arama sonucu ilan metninin tamamı değildir; ilan kapanmış olabilir. Remote, Türkiye'den çalışma hakkı anlamına gelmez. Analiz öncesi tam metin, şirket, ülke ve dil doğrulanır.</p>
 <p id="discovery-search-status" role="status" class="small muted"></p>
 <label class="check"><input type="checkbox" id="discovery-job-approval"> Rol ve arama bölgesini SerpAPI'ye göndermeyi ve ücretsiz kotamdan kullanmayı onaylıyorum.</label>
-<button type="button" class="primary" id="discovery-job-search" disabled>İlanları ara ve panele ekle</button><button type="button" class="secondary" id="discovery-job-plan">Kaydedilmiş arama planını göster</button>
+<button type="button" class="primary" id="discovery-job-search" disabled>İlanları ara ve panele ekle</button><button type="button" class="secondary" id="discovery-job-plan">Arama planını göster</button>
 <pre id="discovery-job-queries" class="small" hidden></pre><p id="discovery-job-result" role="status" class="small"></p>
 <details class="source"><summary>Gelişmiş: şirket kaynaklarını takip et</summary>
 <p class="small muted">Bu bölüm mevcut Greenhouse/Lever şirket listelerini ayrıca tarar; yukarıdaki rol bazlı ilan araması şirket listesine bağlı değildir. Kaynak başına 15 dakika bekleme uygulanır. Konum varsayılanını yalnızca doğruladığın şirketlerde kullan.</p>
