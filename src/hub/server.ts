@@ -1,3 +1,5 @@
+import { openDiscovery } from '../discovery/service.js';
+import type { SourceReader } from '../discovery/sources.js';
 import { createServer } from 'node:http';
 import type { IncomingMessage } from 'node:http';
 import { randomBytes, randomUUID } from 'node:crypto';
@@ -26,7 +28,7 @@ const assistantCommand = z.discriminatedUnion('action', [
   z.strictObject({ action: z.literal('approve'), origin: z.string().max(500), contactApproved: z.boolean() }),
 ]);
 const inputSchema = postingSchema.omit({ version: true, id: true, checkedOn: true });
-const safeCode = (error: unknown) => error instanceof Error && /^(HUB|PREP|CONFIG|BUDGET|PROVIDER|ASSIST|JOB)_[A-Z_]+$/.test(error.message) ? error.message : 'HUB_REQUEST_FAILED';
+const safeCode = (error: unknown) => error instanceof Error && /^(HUB|PREP|CONFIG|BUDGET|PROVIDER|ASSIST|JOB|DISCOVERY)_[A-Z_]+$/.test(error.message) ? error.message : 'HUB_REQUEST_FAILED';
 async function body(request: IncomingMessage): Promise<unknown> {
   if (!request.headers['content-type']?.startsWith('application/json')) throw new Error('HUB_JSON_REQUIRED');
   const chunks: Buffer[] = []; let length = 0;
@@ -39,9 +41,10 @@ async function body(request: IncomingMessage): Promise<unknown> {
 }
 
 export async function startHub(options: { directory: string; profile: Profile; demo?: boolean;
-  seed?: HubRecord[]; analyze?: HubAnalyzer; answers?: AssistAnswers; demoFormUrl?: string; launchAssistantBrowser?: () => Promise<Browser>; modelInfo?: { name: string; destination: string; monthlyLimitUsd: number; perRunLimitUsd: number }; port?: number }) {
+  seed?: HubRecord[]; discoveryReader?: SourceReader; analyze?: HubAnalyzer; answers?: AssistAnswers; demoFormUrl?: string; launchAssistantBrowser?: () => Promise<Browser>; modelInfo?: { name: string; destination: string; monthlyLimitUsd: number; perRunLimitUsd: number }; port?: number }) {
   const profile = profileSchema.parse(options.profile), store = await openHubStore(options.directory, profile);
   if (options.seed && !store.list().length) for (const record of options.seed) await store.add(record);
+  const discovery = await openDiscovery(dirname(options.directory), store, options.discoveryReader);
   const token = randomBytes(32).toString('hex'), busy = new Set<string>();
   const controller = new AbortController();
   let origin = '';
@@ -52,6 +55,7 @@ export async function startHub(options: { directory: string; profile: Profile; d
   const assistantInfo = (record: HubRecord) => {
     let available = Boolean(options.demo && options.demoFormUrl), recipientOrigin: string | null = null;
     try { recipientOrigin = new URL(available ? options.demoFormUrl! : jobLink(record.posting.sourceUrl).url).origin; available = true; } catch { /* User can still open the unsupported site manually. */ }
+    if (record.discovery && !record.discovery.routingConfirmed) available = false;
     const snapshot = assistant?.session.snapshot();
     return { available, recipientOrigin, opening: Boolean(opening), demo: options.demo === true,
       occupiedByOther: Boolean(assistant && assistant.jobId !== record.id && snapshot?.status !== 'closed'),
@@ -59,6 +63,7 @@ export async function startHub(options: { directory: string; profile: Profile; d
   };
   const summaries = (record: HubRecord) => ({ id: record.id, company: record.posting.company, title: record.posting.title,
     country: record.posting.country, state: record.state, updatedAt: record.updatedAt, analyzing: busy.has(record.id),
+    discovery: record.discovery,
     score: record.analysis ? buildMatchAnalysis(profile, record.analysis.job, record.analysis.plan).score : null,
     analysisOrigin: record.analysis?.origin ?? null, lastError: record.lastError,
     assistantActive: openingJobId === record.id || assistant?.jobId === record.id && assistant.session.snapshot().status !== 'closed' });
@@ -66,8 +71,8 @@ export async function startHub(options: { directory: string; profile: Profile; d
     const analysis = record.analysis;
     let cv: { id: string; language: string; photo: boolean } | null = null;
     let cvError: string | null = null;
-    try { const asset = selectCV(profile, record.posting); cv = { id: asset.id, language: asset.language, photo: asset.photo }; }
-    catch { cvError = 'Uygun CV seçimi profilinde netleşmeli.'; }
+    try { if (record.discovery && !record.discovery.routingConfirmed) throw new Error('HUB_ROUTING_REQUIRED'); const asset = selectCV(profile, record.posting); cv = { id: asset.id, language: asset.language, photo: asset.photo }; }
+    catch { cvError = record.discovery && !record.discovery.routingConfirmed ? 'CV seçimi için ilanın ülkesini ve dilini doğrula.' : 'Uygun CV seçimi profilinde netleşmeli.'; }
     return { ...summaries(record), posting: record.posting, cv, cvError, assistant: assistantInfo(record),
       analysis: analysis ? { origin: analysis.origin, at: analysis.at, costMicroUsd: analysis.costMicroUsd, job: analysis.job,
         match: buildMatchAnalysis(profile, analysis.job, analysis.plan),
@@ -94,6 +99,15 @@ export async function startHub(options: { directory: string; profile: Profile; d
       }
       if (request.headers['x-hub-token'] !== token) { json(403, { code: 'HUB_SESSION_REQUIRED' }); return; }
       if (request.method !== 'GET' && request.headers.origin !== origin) { json(403, { code: 'HUB_ORIGIN_REJECTED' }); return; }
+      if (path === '/api/discovery' && request.method === 'GET') { json(200, discovery.snapshot()); return; }
+      if (path === '/api/discovery/config' && request.method === 'POST') {
+        await discovery.configure(await body(request)); json(200, discovery.snapshot()); return;
+      }
+      if (path === '/api/discovery/run' && request.method === 'POST') {
+        z.strictObject({}).parse(await body(request));
+        if (options.demo && !options.discoveryReader) { json(409, { code: 'DISCOVERY_DEMO_OFFLINE' }); return; }
+        json(200, await discovery.run(controller.signal)); return;
+      }
       if (path === '/api/jobs' && request.method === 'GET') { json(200, store.list().map(summaries)); return; }
       if (path === '/api/jobs' && request.method === 'POST') {
         const input = inputSchema.parse(await body(request)), now = new Date().toISOString(), id = randomUUID();
@@ -110,10 +124,19 @@ export async function startHub(options: { directory: string; profile: Profile; d
           analysis: { job, plan, origin: 'imported_review', at: now, costMicroUsd: null }, lastError: null });
         json(201, detail(record)); return;
       }
-      const match = /^\/api\/jobs\/([a-f0-9-]{36})(?:\/(status|analyze|assistant))?$/.exec(path);
+      const match = /^\/api\/jobs\/([a-f0-9-]{36})(?:\/(status|analyze|assistant|routing))?$/.exec(path);
       if (!match) { json(404, { code: 'HUB_NOT_FOUND' }); return; }
       const id = z.uuid().parse(match[1]), action = match[2], record = store.get(id);
       if (!action && request.method === 'GET') { json(200, detail(record)); return; }
+      if (action === 'routing' && request.method === 'POST') {
+        const routing = z.strictObject({ country: z.enum(['TR','GB','IE','DE','FR','NL','BE','CH','BA','US','CA']), language: z.enum(['tr','en']) }).parse(await body(request));
+        if (!record.discovery || record.discovery.routingConfirmed || record.analysis) throw new Error('HUB_ROUTING_ALREADY_CONFIRMED');
+        const saved = await store.update(id, current => {
+          if (!current.discovery || current.discovery.routingConfirmed || current.analysis) throw new Error('HUB_ROUTING_ALREADY_CONFIRMED');
+          return { ...current, posting: { ...current.posting, ...routing }, discovery: { ...current.discovery, routingConfirmed: true } };
+        });
+        json(200, detail(saved)); return;
+      }
       if (action === 'assistant' && request.method === 'POST') {
         const command = assistantCommand.parse(await body(request));
         if (command.action === 'start') {
@@ -152,6 +175,7 @@ export async function startHub(options: { directory: string; profile: Profile; d
         json(200, detail(saved)); return;
       }
       if (action === 'analyze' && request.method === 'POST') {
+        if (record.discovery && !record.discovery.routingConfirmed) { json(409, { code: 'HUB_ROUTING_REQUIRED' }); return; }
         const consent = z.strictObject({ paidCallApproved: z.literal(true), cloudProfileApproved: z.literal(true) }).safeParse(await body(request));
         if (!consent.success) { json(403, { code: 'HUB_ANALYSIS_CONSENT_REQUIRED' }); return; }
         if (!options.analyze) { json(409, { code: 'HUB_MODEL_NOT_ENABLED' }); return; }
@@ -174,7 +198,7 @@ export async function startHub(options: { directory: string; profile: Profile; d
       json(405, { code: 'HUB_METHOD_NOT_ALLOWED' });
     } catch (error) {
       const code = error instanceof z.ZodError ? 'HUB_INPUT_INVALID' : safeCode(error);
-      json(code === 'HUB_NOT_FOUND' ? 404 : code.startsWith('HUB_') || code.startsWith('ASSIST_') || code.startsWith('JOB_') || code === 'PREP_PLAN_INVALID' ? 400 : 502, { code });
+      json(code === 'HUB_NOT_FOUND' ? 404 : code.startsWith('HUB_') || code.startsWith('ASSIST_') || code.startsWith('JOB_') || code.startsWith('DISCOVERY_') || code === 'PREP_PLAN_INVALID' ? 400 : 502, { code });
     }
   });
   server.requestTimeout = 180_000; server.headersTimeout = 10_000;

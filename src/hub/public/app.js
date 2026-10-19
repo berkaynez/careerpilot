@@ -4,6 +4,11 @@ const states = { saved: 'Kaydedildi', ready: 'Analizi hazır', review: 'İncelem
 const levels = { documented: 'Doğrudan dayanak', related: 'Kısmi dayanak', not_documented: 'Profilde belgelenmiyor' };
 const priorities = { essential: 'Temel şart', preferred: 'Tercih edilen', responsibility: 'Görev' };
 const errors = {
+  DISCOVERY_BUSY: 'Bir keşif işlemi devam ediyor. Bitmesini bekle.',
+  DISCOVERY_SOURCES_REQUIRED: 'En az bir şirket kaynağı ekle.',
+  DISCOVERY_DEMO_OFFLINE: 'Örnek modda dış kaynak taraması kapalıdır.',
+  HUB_ROUTING_REQUIRED: 'Önce ilanın çalışma ülkesini ve dilini doğrula.',
+
   ASSIST_CONTACT_CONSENT_REQUIRED: 'Form bilgilerini bu siteye yazmak için paylaşım onayı gerekiyor.',
   ASSIST_SESSION_BUSY: 'Bir form işlemi veya açık oturum var. Önce onu tamamla ya da kapat.',
   ASSIST_SESSION_CLOSED: 'Form penceresi kapalı. Yeni bir oturum açabilirsin.',
@@ -80,7 +85,7 @@ function renderList() {
     card.setAttribute('aria-pressed', String(selectedId === item.id));
     const top = node('div', 'job-top'); top.append(node('span', 'company-mark', item.company.slice(0, 1).toUpperCase()), node('span', 'company-name', item.company));
     const title = node('h3', '', item.title), bottom = node('div', 'job-bottom');
-    bottom.append(badge(item.state), node('span', 'country', item.country + ' · ' + new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'short' }).format(new Date(item.updatedAt))));
+    bottom.append(badge(item.state), node('span', 'country', (item.discovery && !item.discovery.routingConfirmed ? 'Ülke doğrulanmalı' : item.country) + ' · ' + new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'short' }).format(new Date(item.updatedAt))));
     const score = node('span', item.score === null ? 'card-score muted' : 'card-score', item.analyzing ? 'Analiz sürüyor…' : item.score === null ? (item.analysisOrigin ? 'Puan hesaplanamadı' : 'Henüz analiz yok') : item.score + '/100 uyum');
     card.append(top, title, bottom, score); card.addEventListener('click', () => showDetail(item.id).catch(error => notify(error.message, true))); $('#jobs').append(card);
   }
@@ -93,11 +98,12 @@ async function showDetail(id) {
   detailSignature = signature; selectedId = id; renderList();
   const pane = $('#detail'); pane.replaceChildren();
   const head = node('div', 'detail-head'); head.append(node('div', 'eyebrow', record.posting.company), node('h2', '', record.posting.title));
-  const meta = node('div', 'detail-meta'); meta.append(badge(record.state), node('span', 'muted', record.posting.country + ' · ' + (record.posting.language === 'en' ? 'İngilizce ilan' : 'Türkçe ilan'))); head.append(meta); pane.append(head);
+  const meta = node('div', 'detail-meta'); meta.append(badge(record.state), node('span', 'muted', record.discovery && !record.discovery.routingConfirmed ? 'Ülke ve dil doğrulanmalı' : record.posting.country + ' · ' + (record.posting.language === 'en' ? 'İngilizce ilan' : 'Türkçe ilan'))); head.append(meta); pane.append(head);
   const actions = node('div', 'detail-actions'), link = node('a', 'secondary', 'İlanı aç ↗'); link.href = record.posting.sourceUrl; link.target = '_blank'; link.rel = 'noopener noreferrer'; actions.append(link);
   const analyze = node('button', 'primary', record.analyzing ? 'Analiz sürüyor…' : record.analysis ? 'Yeniden analiz et' : 'Uyumunu analiz et');
-  analyze.disabled = !session.modelEnabled || record.analyzing; analyze.addEventListener('click', () => { $('#analyze-form').reset(); $('#model-details').textContent = session.model ? 'Model: ' + session.model.name + ' · Sağlayıcı: ' + session.model.destination + ' · Analiz sınırı: $' + session.model.perRunLimitUsd.toFixed(4) + ' · Aylık sınır: $' + session.model.monthlyLimitUsd.toFixed(2) : ''; openDialog('#analyze-dialog'); }); actions.append(analyze); pane.append(actions);
+  analyze.disabled = !session.modelEnabled || record.analyzing || Boolean(record.discovery && !record.discovery.routingConfirmed); analyze.addEventListener('click', () => { $('#analyze-form').reset(); $('#model-details').textContent = session.model ? 'Model: ' + session.model.name + ' · Sağlayıcı: ' + session.model.destination + ' · Analiz sınırı: $' + session.model.perRunLimitUsd.toFixed(4) + ' · Aylık sınır: $' + session.model.monthlyLimitUsd.toFixed(2) : ''; openDialog('#analyze-dialog'); }); actions.append(analyze); pane.append(actions);
   if (!session.modelEnabled) pane.append(node('p', 'small muted', 'Model bu oturumda kapalı. Mevcut analizini “Analiz içe aktar” ile ücretsiz görüntüleyebilirsin.'));
+  renderDiscovery(record, pane);
   renderAssistant(pane, record);
   if (record.lastError) pane.append(node('p', 'notice error', 'Son analiz tamamlanamadı: ' + friendly(record.lastError) + (record.analysis ? ' Önceki analiz aşağıda korunuyor.' : '')));
   if (record.analysis) renderAnalysis(pane, record);
@@ -135,7 +141,7 @@ function renderAssistant(pane, record) {
   const info = record.assistant, current = info.session;
   const box = node('section', 'assistant-box'); box.append(node('h3', '', 'Form yardımcısı'));
   if (!current || current.status === 'closed') {
-    box.append(node('p', 'small muted', info.available ? 'Tarayıcıda girişini yap, formu aç; bilinen boş alanları panelden doldur. Ücretli model çağrısı yapılmaz.' : 'Bu sitede otomatik doldurma henüz hazır değil. “İlanı aç” ile kendin devam edebilirsin.'));
+    box.append(node('p', 'small muted', record.discovery && !record.discovery.routingConfirmed ? 'Form yardımını açmadan önce yukarıdan ilanın ülkesini ve dilini doğrula.' : info.available ? 'Tarayıcıda girişini yap, formu aç; bilinen boş alanları panelden doldur. Ücretli model çağrısı yapılmaz.' : 'Bu sitede otomatik doldurma henüz hazır değil. “İlanı aç” ile kendin devam edebilirsin.'));
     const start = node('button', 'secondary', info.demo ? 'Örnek formu aç' : 'Form yardımcısını aç');
     start.disabled = !info.available || info.occupiedByOther || info.opening || assistantRequestPending;
     start.addEventListener('click', () => assistantConsent(record)); box.append(start);
@@ -153,7 +159,7 @@ function renderAssistant(pane, record) {
       const details = node('details', 'remaining-fields'); details.open = true;
       details.append(node('summary', '', 'Sana kalan alanlar · ' + current.lastResult.remaining.length));
       const list = node('ul');
-      const reasons = { human_decision_required: 'kararı/onayı sen ver', manual_answer_required: 'cevabı sen doldur', ambiguous_field: 'eşleşme belirsiz', interactive_widget_requires_human: 'listeden kendin seç', option_not_unique: 'uygun seçenek kesinleşmedi', existing_value_preserved: 'mevcut cevap korundu', site_validation_requires_human: 'site doğrulamasını kontrol et', manual_file_selection_required: 'CV/dosyayı kendin seç', no_matching_fields: 'önce formu aç' };
+      const reasons = { phone_country_requires_human: 'önce ülke telefon kodunu doğrula; numarayı kendin gir', human_decision_required: 'kararı/onayı sen ver', manual_answer_required: 'cevabı sen doldur', ambiguous_field: 'eşleşme belirsiz', interactive_widget_requires_human: 'listeden kendin seç', option_not_unique: 'uygun seçenek kesinleşmedi', existing_value_preserved: 'mevcut cevap korundu', site_validation_requires_human: 'site doğrulamasını kontrol et', manual_file_selection_required: 'CV/dosyayı kendin seç', no_matching_fields: 'önce formu aç' };
       for (const field of current.lastResult.remaining.slice(0, 20)) list.append(node('li', '', (field.label || 'İsimsiz alan') + ' · ' + (reasons[field.reason] || 'kendin kontrol et')));
       details.append(list); box.append(details);
     }
@@ -215,8 +221,8 @@ for (const button of document.querySelectorAll('[data-view]')) button.addEventLi
   void applyFilters().catch(error => notify(error.message, true));
 });
 function formHandler(selector, action) {
-  const form = $(selector); form.addEventListener('submit', async event => { event.preventDefault(); const button = form.querySelector('[type="submit"]'), original = button.textContent; button.disabled = true; button.textContent = 'İşleniyor…'; form.querySelector('.form-error').textContent = '';
-    try { await action(form); } catch (error) { form.querySelector('.form-error').textContent = error.message; } finally { button.disabled = false; button.textContent = original; }
+  const form = $(selector); form.addEventListener('submit', async event => { event.preventDefault(); const button = event.submitter || form.querySelector('[type="submit"]'), original = button.textContent; const submits = Array.from(form.querySelectorAll('[type="submit"]')); submits.forEach(item => item.disabled = true); button.textContent = 'İşleniyor…'; form.querySelector('.form-error').textContent = '';
+    try { await action(form, event); } catch (error) { form.querySelector('.form-error').textContent = error.message; } finally { submits.forEach(item => item.disabled = false); button.textContent = original; }
   });
 }
 formHandler('#assistant-form', async form => {
@@ -241,3 +247,51 @@ formHandler('#analyze-form', async form => {
   form.closest('dialog').close(); form.reset(); await refresh(result.id); notify('Analiz hazır. İlan şartlarını ve dayanakları gözden geçir.');
 });
 (async () => { try { session = await api('/api/session'); $('#mode').textContent = session.demo ? 'ÖRNEK MOD · Kurgusal aday ve ilanlar. Gerçek başvuru veya ücretli model çağrısı yok.' : 'YEREL ÇALIŞMA ALANI · ' + session.profile.facts + ' mesleki bilgi, ' + session.profile.cvs + ' CV kayıtlı. Model ' + (session.modelEnabled ? 'onayla kullanılabilir.' : 'kapalı.'); await refresh(); } catch (error) { notify(error.message, true); $('#jobs').replaceChildren(node('p', 'empty', 'Kayıtlar yüklenemedi. Panel bağlantısını kontrol edip sayfayı yenile.')); } })();
+
+function renderDiscovery(record, pane) {
+  if (!record.discovery) return;
+  const item = record.discovery, box = node('section', 'assistant-box');
+  box.append(node('h3', '', 'Keşif kaynağı: ' + item.sourceKey), node('p', 'small muted', 'Keşfedildi: ' + new Date(item.discoveredAt).toLocaleString('tr-TR') + ' · Yayın tarihi değildir.'), node('p', '', 'Konum: ' + (item.location || 'Belirtilmedi')));
+  const list = node('ul', 'small'); for (const reason of item.reasons) list.append(node('li', '', reason)); box.append(list);
+  if (!item.routingConfirmed) {
+    box.append(node('p', '', 'Başvurmadan önce ilanı açıp çalışma ülkesini ve ilan dilini doğrula. Remote ilanlarda çalışma bölgesi ayrıca sınırlı olabilir.'));
+    const country = node('select'); country.setAttribute('aria-label', 'İlanın çalışma ülkesi');
+    country.append(new Option('Ülke seç', '')); for (const option of document.querySelector('[name="country"]').options) country.append(new Option(option.text, option.value));
+    const language = node('select'); language.setAttribute('aria-label', 'Keşfedilen ilanın dili');
+    language.append(new Option('Dil seç', ''), new Option('Türkçe', 'tr'), new Option('İngilizce', 'en'));
+    const confirm = node('button', 'secondary', 'Ülke ve dili doğruladım'); confirm.type = 'button';
+    confirm.addEventListener('click', async () => { if (!country.value || !language.value) { notify('Ülke ve dili ilan metninden doğrulayarak seç.', true); return; }
+      confirm.disabled = true; try { await api('/api/jobs/' + record.id + '/routing', { country: country.value, language: language.value }); await refresh(record.id); notify('Ülke ve dil doğrulandı.'); } catch (error) { confirm.disabled = false; notify(error.message, true); } });
+    box.append(country, language, confirm);
+  }
+  pane.append(box);
+}
+const discoveryMessages = { DISCOVERY_IMPORT_LIMIT: '100 yeni ilan sınırına ulaşıldı; kalan kayıtlar aktarılmadı', DISCOVERY_COOLDOWN: '15 dakikalık bekleme süresi dolmadı', DISCOVERY_RATE_LIMITED: 'kaynak hız sınırı; tekrar denenmedi', DISCOVERY_SOURCE_HTTP: 'kaynak yanıt vermedi / bulunamadı', DISCOVERY_SOURCE_FORMAT: 'beklenen veri biçimi gelmedi', DISCOVERY_SOURCE_FAILED: 'kaynak okunamadı', DISCOVERY_RESPONSE_TOO_LARGE: 'yanıt boyutu sınırı', DISCOVERY_PAGE_LIMIT: 'sayfa sınırı aşıldı; kaynak aktarılmadı' };
+function sourceRow(source = { provider: 'lever', board: '', company: '', locationFallback: '' }) {
+  const row = node('div', 'discovery-source');
+  const provider = node('select'); provider.setAttribute('aria-label', 'Kaynak sağlayıcı'); provider.append(new Option('Lever', 'lever'), new Option('Greenhouse', 'greenhouse')); provider.value = source.provider;
+  const board = node('input'); board.setAttribute('aria-label', 'Şirket kaynak kodu'); board.placeholder = 'Kaynak kodu'; board.value = source.board; board.required = true; board.maxLength = 80;
+  const company = node('input'); company.setAttribute('aria-label', 'Kaynak şirket adı'); company.placeholder = 'Şirket adı'; company.value = source.company; company.required = true; company.maxLength = 120;
+  const fallback = node('input'); fallback.setAttribute('aria-label', 'Eksik konum için şirket varsayılanı'); fallback.placeholder = 'Varsayılan konum (isteğe bağlı)'; fallback.value = source.locationFallback || ''; fallback.maxLength = 120;
+  const remove = node('button', 'secondary', 'Kaldır'); remove.type = 'button'; remove.addEventListener('click', () => row.remove());
+  row.append(provider, board, company, fallback, remove); $('#discovery-sources').append(row);
+}
+function discoveryReport(report) {
+  const box = $('#discovery-result'); box.replaceChildren(); if (!report) return;
+  box.append(node('p', '', report.added + ' yeni ilan · ücretli model çağrısı yok'), node('p', 'small muted', 'Son tarama: ' + new Date(report.at).toLocaleString('tr-TR')));
+  for (const item of report.sources) box.append(node('p', 'small', item.source + ': ' + item.added + ' eklendi · ' + item.duplicates + ' zaten kayıtlı · ' + item.filtered + ' filtre dışı · ' + item.rejected + ' geçersiz kayıt' + (item.code ? ' · ' + (discoveryMessages[item.code] || 'kaynak kontrolü gerekiyor') : '')));
+}
+$('#discovery-add-source').addEventListener('click', () => { if ($('#discovery-sources').children.length < 20) sourceRow(); });
+$('#discovery-open').addEventListener('click', async () => {
+  try { const data = await api('/api/discovery'); $('#discovery-sources').replaceChildren(); for (const source of data.config.sources) sourceRow(source);
+    for (const [id, key] of [['roles','roles'], ['locations','locations'], ['keywords','keywords'], ['excluded','excludedTitles']]) $('#discovery-' + id).value = data.config[key].join(', ');
+    discoveryReport(data.lastReport); openDialog('#discovery-dialog');
+  } catch (error) { notify(error.message, true); }
+});
+formHandler('#discovery-form', async (form, event) => {
+  const terms = id => $('#discovery-' + id).value.split(',').map(value => value.trim()).filter(Boolean);
+  const sources = Array.from($('#discovery-sources').children).map(row => ({ provider: row.children[0].value, board: row.children[1].value.trim(), company: row.children[2].value.trim(), locationFallback: row.children[3].value.trim() }));
+  await api('/api/discovery/config', { version: 1, sources, roles: terms('roles'), locations: terms('locations'), keywords: terms('keywords'), excludedTitles: terms('excluded') });
+  if (event.submitter?.value === 'run') { const report = await api('/api/discovery/run', {}); discoveryReport(report); $('#filter').value = 'review'; $('#search').value = ''; await refresh(); notify(report.added + ' yeni ilan inceleme listesine eklendi.'); }
+  else notify('Keşif ayarları kaydedildi.');
+});

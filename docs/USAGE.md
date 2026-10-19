@@ -950,3 +950,71 @@ olarak değiştir. Masaüstü ve dar ekranlarda görünen **Başvurulanlar** dü
 yalnızca bu kayıtları gösterir; yanındaki sayı kayıt adedidir. Bu seçim ve mevcut
 durum filtresi aynı listeyi kullanır. Kayıt yerel diskte korunur; şirketten otomatik
 başvuru doğrulaması veya e-posta takibi yapılmaz.
+
+### Telefon alanının sınırları
+
+Ortak yardımcı “Mobile phone number” etiketini de tanır. Ayrı ülke kodu varsa
+yalnızca profilde açıkça +90 ve on rakamlı numara bulunması, kodun standart
+select alanında tekil +90 seçeneğiyle doğrulanması halinde ulusal numarayı yazar.
+Başka ülke kodlarını, özel liste widgetlarını veya belirsiz seçenekleri tahmin etmez;
+mevcut farklı kodu değiştirmez. Gerçek sitelerdeki uyumluluk ayrıca doğrulanmalıdır.
+
+
+## Resmî kaynaklardan ilan keşfi
+
+Panelde **İlan keşfet** düğmesini aç. Her şirket için sağlayıcı, kaynak kodu ve
+şirket etiketi ekle. Kod, Lever veya Greenhouse kariyer URL'sindeki şirket bölümüdür;
+örneğin `jobs.lever.co/peakgames` için `peakgames`. Tüm şirketleri kapsayan bir
+arama API'si değildir. Şirket etiketi kullanıcının verdiği addır.
+
+Pozisyonlar başlıkta, konumlar kaynağın konum etiketinde, ek anahtar kelimeler
+başlık/açıklamada aranır. Dolu her grubun sağlanması gerekir; grup içinde VEYA
+uygulanır. Hariç sözcükler başlıkta aranır. Boş konum/anahtar kelime grubu
+kısıtlama koymaz. Senior başlıkları varsayılan olarak dışlanır, ancak junior
+uygunluğu garanti edilmez. Bilinmeyen deneyim, ücret, sponsorluk veya ülke
+bilgisi uydurulmaz. Remote etiketi Türkiye'den çalışılabildiği anlamına gelmez.
+
+**Kaydet ve ilanları bul** yalnızca resmî GET uç noktalarından veri alır:
+- Greenhouse: `https://boards-api.greenhouse.io/v1/boards/{board}/jobs?content=true`
+- Lever (global): `https://api.lever.co/v0/postings/{board}?mode=json&limit=100&skip=0`
+
+İstekler backend üzerinden, kimlik bilgisi ve tarayıcı oturumu taşımadan yapılır;
+yönlendirme izlenmez. Açıklamalar düz metne çevrilir, uzak HTML çalıştırılmaz.
+API'nin verdiği her ilan bağlantısı sağlayıcı, şirket kodu ve ilan kimliğiyle
+karşılaştırılır. LinkedIn/Indeed/Kariyer.net/Glassdoor taraması ve Lever EU
+uç noktası bu teslimde yoktur. Örnek mod dış kaynağa çıkmaz.
+
+En çok 20 kaynak, yanıt başına 4 MB, istek başına 12 saniye, Lever için en çok
+10 sayfa ve tarama başına 100 yeni kayıt sınırı vardır. Kaynak başına 15 dakika
+bekleme, ağ isteğinden önce diske kaydedilir ve yeniden başlatmada korunur.
+429/ağ hatasında otomatik yeniden deneme yoktur. Her kaynak sonucu ayrı gösterilir;
+bir kaynak hatası önceki kayıtları silmez. Kapalı ilanlar otomatik arşivlenmez.
+
+Eşleşmeler mevcut **İnceleme Bekleyenler** listesine gelir. Aynı kaynak/ilan kimliği
+veya normalize edilmiş URL tekrar eklenmez; mevcut analiz veya Başvuruldu kaydı
+üzerine yazılmaz. Başka platformlarda farklı URL ile yayımlanan aynı işin kesin
+olarak birleştirilmesi bu sürümde yoktur. Keşif zamanı yayın tarihi değildir.
+Kaynağın güncellenen ilan açıklaması mevcut kayıt üzerine otomatik yazılmaz.
+
+Ülke/dil kesinleşmemiş ilanlarda `ZZ` yalnızca iç kayıt işaretidir. Panel bunu
+“Ülke ve dil doğrulanmalı” olarak gösterir; CV, model analizi ve form başlatma
+engellenir. İlanı okuyup ülke ve dili doğruladığında bu kapı açılır; ücretli analiz
+ve kişisel bilgi paylaşımı için mevcut ayrı onaylar hâlâ gerekir. İlk teslimin dil
+seçimi Türkçe/İngilizce ve ülke listesi paneldeki desteklenen ülkelerle sınırlıdır.
+
+Keşif ayarları ve son rapor `.careerpilot/hub/discovery.json`, ilanlar mevcut özel
+jobs dizininde saklanır. Keşif LLM veya ücretli API anahtarı kullanmaz. Bu sürümde
+zamanlayıcı ve otomatik başlangıç yoktur; yalnızca düğmeye basıldığında çalışır.
+Bilgisayar kapalıyken çalışma ve periyodik kontrol henüz eklenmedi.
+
+Kaynak belgeler: [Greenhouse](https://docs.greenhouse.io/job-board.html),
+[Lever](https://github.com/lever/postings-api).
+
+### Eksik kaynak konumu
+
+Kaynak ayarında isteğe bağlı **Eksik konum için şirket varsayılanı** alanı vardır.
+`Full-time`, `Part-time`, `New Grad` gibi iş türleri coğrafi konum olarak kullanılmaz.
+İlanın konumu boşsa doğruladığın şirket varsayılanı filtrede kullanılır; ilanın
+kendi farklı konumu varsa onun üzerine yazılmaz. Eşleşme nedeninde bu bilginin
+şirket varsayılanından geldiği görünür. Bu, ülke/dil doğrulamasını veya çalışma
+hakkı kontrolünü otomatik tamamlamaz. Şirketin bütün ilanlarına sabit ülke atanmaz.
