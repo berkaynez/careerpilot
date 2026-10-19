@@ -19,7 +19,10 @@
 <dialog id="discovery-dialog"><form id="discovery-form"><div class="dialog-head"><h2>Yeni ilanları keşfet</h2><button type="button" class="icon close-dialog" aria-label="Kapat">×</button></div>
 <p>Yalnızca eklediğin şirketlerin resmî Greenhouse / Lever ilan uç noktaları okunur. Hesabına giriş, ücretli model çağrısı veya başvuru gönderimi yapılmaz.</p>
 <p class="small muted">Kaynak kodu, kariyer adresindeki şirket bölümüdür: jobs.lever.co/şirket veya job-boards.greenhouse.io/şirket. Şirket adı senin kaynak etiketindir. Her kaynakta en az 15 dakika beklenir. Şirketin konumunu doğruladıysan isteğe bağlı varsayılan ekleyebilirsin; bu bilgi yalnızca kaynakta konum eksik veya iş türü olarak gelmişse kullanılır. İlanın kendi konumu korunur.</p>
+<details class="source"><summary>Birden fazla şirket kaynağını birlikte ekle</summary><p class="small muted">Greenhouse/Lever kariyer veya ilan bağlantılarını satır satır yapıştır. Şirket kodları otomatik çıkarılır; burada herhangi bir siteye istek yapılmaz. Sonra kaynakları gözden geçirip kaydet.</p><label>Kariyer bağlantıları<textarea id="discovery-links" rows="3" maxlength="30000"></textarea></label><button type="button" class="secondary" id="discovery-extract">Bağlantılardan kaynakları çıkar</button></details>
+<button type="button" class="secondary" id="discovery-search-plan">Kaynak arama planını göster</button><p id="discovery-search-note" class="small muted"></p><pre id="discovery-search-queries" class="small" hidden></pre>
 <div id="discovery-sources"></div><button type="button" class="secondary" id="discovery-add-source">+ Şirket kaynağı ekle</button>
+<label class="check"><input type="checkbox" id="discovery-early-career" checked> Yeni mezun / başlangıç seviyesi odaklı: açık kıdem şartlarını ele, seviyesi belirsiz ilanları incelemeye bırak.</label>
 <label>Pozisyonlar · virgülle ayır<input id="discovery-roles" required maxlength="2400"></label>
 <label>Konum etiketleri · virgülle ayır<input id="discovery-locations" maxlength="2400"></label>
 <label>Ek anahtar kelimeler · isteğe bağlı, virgülle ayır<input id="discovery-keywords" maxlength="2400"></label>

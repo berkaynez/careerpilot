@@ -16,7 +16,7 @@ export const recordSchema = z.strictObject({
     origin: z.enum(['model', 'imported_review', 'demo']), at: z.iso.datetime(), costMicroUsd: z.number().int().nonnegative().nullable() }).nullable(),
   lastError: z.string().regex(/^[A-Z_]+$/).nullable(),
   discovery: z.strictObject({ sourceKey: z.string().regex(/^(lever|greenhouse):[a-z0-9_-]{1,80}$/), externalId: z.string().max(80),
-    discoveredAt: z.iso.datetime(), location: z.string().max(24000), remote: z.boolean(), reasons: z.array(z.string().max(500)).max(10), routingConfirmed: z.boolean() }).nullable().default(null),
+    discoveredAt: z.iso.datetime(), location: z.string().max(24000), remote: z.boolean(), reasons: z.array(z.string().max(500)).max(10), careerLevel: z.enum(['entry', 'experienced', 'unclear']).default('unclear'), routingConfirmed: z.boolean() }).nullable().default(null),
 });
 export type HubRecord = z.infer<typeof recordSchema>;
 

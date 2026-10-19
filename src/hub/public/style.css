@@ -605,3 +605,5 @@ font-size:12px}
 .discovery-source input { flex:1; min-width:130px; width:140px; }
 .discovery-source select { width:140px; }
 #discovery-result { margin-top:16px; }
+
+#discovery-search-queries { white-space:pre-wrap; overflow-wrap:anywhere; }

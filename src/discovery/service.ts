@@ -1,3 +1,4 @@
+import { careerLevel } from './level.js';
 import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, writeFile, rename, rm } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -70,7 +71,7 @@ export async function openDiscovery(directory: string, store: Store, reader: Sou
             const posting = postingSchema.parse({ version: 1, id, company: source.company, title: job.title, text: job.text,
               sourceUrl: job.url, country: 'ZZ', language: 'en', documentLanguage: null, photoPolicy: 'unspecified', sponsorship: 'not_stated', checkedOn: timestamp.slice(0, 10) });
             await store.add({ version: 1, id, posting, state: 'review', createdAt: timestamp, updatedAt: timestamp, analysis: null, lastError: null,
-              discovery: { sourceKey: key, externalId: job.externalId, discoveredAt: timestamp, location: effective.location, remote: job.remote, reasons, routingConfirmed: false } });
+              discovery: { sourceKey: key, externalId: job.externalId, discoveredAt: timestamp, location: effective.location, remote: job.remote, reasons, careerLevel: careerLevel(job).level, routingConfirmed: false } });
             known.add(job.url); knownIds.add(key + ':' + job.externalId); row.added++; report.added++;
           }
         }

@@ -4,6 +4,7 @@ const states = { saved: 'Kaydedildi', ready: 'Analizi hazır', review: 'İncelem
 const levels = { documented: 'Doğrudan dayanak', related: 'Kısmi dayanak', not_documented: 'Profilde belgelenmiyor' };
 const priorities = { essential: 'Temel şart', preferred: 'Tercih edilen', responsibility: 'Görev' };
 const errors = {
+  DISCOVERY_SEARCH_QUERY_TOO_LONG: 'Arama sorgusu çok uzun. Rol veya konum ifadelerini kısaltıp ayarları kaydet.',
   DISCOVERY_BUSY: 'Bir keşif işlemi devam ediyor. Bitmesini bekle.',
   DISCOVERY_SOURCES_REQUIRED: 'En az bir şirket kaynağı ekle.',
   DISCOVERY_DEMO_OFFLINE: 'Örnek modda dış kaynak taraması kapalıdır.',
@@ -55,7 +56,8 @@ async function refresh(preferred) {
 }
 function visibleRecords() {
   const query = $('#search').value.toLocaleLowerCase('tr'), state = $('#filter').value;
-  return records.filter(item => (state === 'all' || item.state === state) && (item.company + ' ' + item.title).toLocaleLowerCase('tr').includes(query));
+  const visible = records.filter(item => (state === 'all' || item.state === state) && (item.company + ' ' + item.title).toLocaleLowerCase('tr').includes(query));
+  return state === 'review' ? visible.sort((a, b) => Number(b.discovery?.careerLevel === 'entry') - Number(a.discovery?.careerLevel === 'entry')) : visible;
 }
 function clearDetail() { selectedId = null; detailSignature = '';  detailSequence++; const empty = node('div', 'empty'); empty.append(node('h2', '', 'Görüntülenecek ilan seçilmedi.'), node('p', '', 'Aramayı veya filtreyi değiştirerek bir ilan seçebilirsin.')); $('#detail').replaceChildren(empty); }
 async function applyFilters() {
@@ -87,6 +89,7 @@ function renderList() {
     const title = node('h3', '', item.title), bottom = node('div', 'job-bottom');
     bottom.append(badge(item.state), node('span', 'country', (item.discovery && !item.discovery.routingConfirmed ? 'Ülke doğrulanmalı' : item.country) + ' · ' + new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'short' }).format(new Date(item.updatedAt))));
     const score = node('span', item.score === null ? 'card-score muted' : 'card-score', item.analyzing ? 'Analiz sürüyor…' : item.score === null ? (item.analysisOrigin ? 'Puan hesaplanamadı' : 'Henüz analiz yok') : item.score + '/100 uyum');
+    if (item.discovery) bottom.append(node('span', 'small muted', item.discovery.careerLevel === 'entry' ? 'Yeni mezun / başlangıç' : item.discovery.careerLevel === 'experienced' ? 'Deneyimli rol' : 'Seviye kontrol edilmeli'));
     card.append(top, title, bottom, score); card.addEventListener('click', () => showDetail(item.id).catch(error => notify(error.message, true))); $('#jobs').append(card);
   }
 }
@@ -252,6 +255,7 @@ function renderDiscovery(record, pane) {
   if (!record.discovery) return;
   const item = record.discovery, box = node('section', 'assistant-box');
   box.append(node('h3', '', 'Keşif kaynağı: ' + item.sourceKey), node('p', 'small muted', 'Keşfedildi: ' + new Date(item.discoveredAt).toLocaleString('tr-TR') + ' · Yayın tarihi değildir.'), node('p', '', 'Konum: ' + (item.location || 'Belirtilmedi')));
+  if (item.levelReason) box.append(node('p', 'small', item.levelReason));
   const list = node('ul', 'small'); for (const reason of item.reasons) list.append(node('li', '', reason)); box.append(list);
   if (!item.routingConfirmed) {
     box.append(node('p', '', 'Başvurmadan önce ilanı açıp çalışma ülkesini ve ilan dilini doğrula. Remote ilanlarda çalışma bölgesi ayrıca sınırlı olabilir.'));
@@ -285,13 +289,29 @@ $('#discovery-add-source').addEventListener('click', () => { if ($('#discovery-s
 $('#discovery-open').addEventListener('click', async () => {
   try { const data = await api('/api/discovery'); $('#discovery-sources').replaceChildren(); for (const source of data.config.sources) sourceRow(source);
     for (const [id, key] of [['roles','roles'], ['locations','locations'], ['keywords','keywords'], ['excluded','excludedTitles']]) $('#discovery-' + id).value = data.config[key].join(', ');
+    $('#discovery-early-career').checked = data.config.earlyCareer;
     discoveryReport(data.lastReport); openDialog('#discovery-dialog');
   } catch (error) { notify(error.message, true); }
 });
 formHandler('#discovery-form', async (form, event) => {
   const terms = id => $('#discovery-' + id).value.split(',').map(value => value.trim()).filter(Boolean);
   const sources = Array.from($('#discovery-sources').children).map(row => ({ provider: row.children[0].value, board: row.children[1].value.trim(), company: row.children[2].value.trim(), locationFallback: row.children[3].value.trim() }));
-  await api('/api/discovery/config', { version: 1, sources, roles: terms('roles'), locations: terms('locations'), keywords: terms('keywords'), excludedTitles: terms('excluded') });
+  await api('/api/discovery/config', { version: 1, sources, earlyCareer: $('#discovery-early-career').checked, roles: terms('roles'), locations: terms('locations'), keywords: terms('keywords'), excludedTitles: terms('excluded') });
   if (event.submitter?.value === 'run') { const report = await api('/api/discovery/run', {}); discoveryReport(report); $('#filter').value = 'review'; $('#search').value = ''; await refresh(); notify(report.added + ' yeni ilan inceleme listesine eklendi.'); }
   else notify('Keşif ayarları kaydedildi.');
+});
+
+$('#discovery-search-plan').addEventListener('click', async () => {
+  try { const data = await api('/api/discovery/search-plan'); $('#discovery-search-note').textContent = data.note; $('#discovery-search-queries').hidden = false;
+    $('#discovery-search-queries').textContent = data.queries.join('\n\n');
+  } catch (error) { notify(error.message, true); }
+});
+$('#discovery-extract').addEventListener('click', async () => {
+  try { const urls = $('#discovery-links').value.split(/\s+/).filter(Boolean); const data = await api('/api/discovery/source-candidates', { urls });
+    const known = new Set(Array.from($('#discovery-sources').children).map(row => row.children[0].value + ':' + row.children[1].value.trim().toLowerCase())); let added = 0;
+    for (const source of data.sources) { const key = source.provider + ':' + source.board.toLowerCase();
+      if (known.has(key) || $('#discovery-sources').children.length >= 20) continue; sourceRow(source); known.add(key); added++;
+    }
+    $('#discovery-search-note').textContent = added + ' kaynak adayı eklendi. Şirket adlarını/kodlarını kontrol et ve kaydet. Ağ isteği yapılmadı; uygunluk henüz doğrulanmadı.';
+  } catch (error) { $('#discovery-form .form-error').textContent = error.message; }
 });

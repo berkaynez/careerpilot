@@ -156,3 +156,26 @@ eklendi. Özel Peak kaynağına kullanıcı beyanıyla Türkiye varsayılanı gi
 Canlı tekrar taraması 5 yazılım ilanını (2 New Grad dahil) inceleme listesine ekledi.
 129 çevrimdışı test geçti; farklı ilan konumunun üzerine yazılmadığı test edildi.
 Bu taramada ücretli model çağrısı veya başvuru gönderimi yapılmadı.
+
+
+## Tek aktif iş: seviyeye uygun keşif ve kaynak aramasını tamamlama
+
+PR #11 yerel main üzerinde e0dd601 ile doğrulandı; keşif ve Peak düzeltmeleri
+birleşmiş durumda. Yeni çalışma feature/early-career-discovery dalındadır.
+
+- Başlangıç seviyesi kuralları, başlık etiketi ve inceleme listesinde yeni mezun
+  önceliği eklendi. Eski ilan ve başvurular korunuyor.
+- İş analizi/BT denetimi ve Türkçe rol karşılıkları varsayılanlara eklendi.
+- Kaydedilmiş kriterlerden sorgu taslağı ve toplu kariyer URL'sinden kaynak adayı
+  çıkarma eklendi. Bunlar ağ/LLM çağrısı yapmaz.
+- Otomatik kaynak arama servisi henüz bağlanmadı. Harici servis API erişimi,
+  sonuç saklama yetkisi ve ayrı maliyet/kota onayı gerekiyor. Kullanıcının
+  OpenAI API anahtarı arama servisi için kullanılamaz.
+- Telefon düzeltmesinin gerçek site doğrulaması hâlâ açık; sohbet tarayıcısıyla
+  tamamlanan başvurular native program doldurma testi diye raporlanmaz.
+- Bu işte ücretli çağrı, hesap oluşturma veya yeni başvuru gönderimi yapılmadı.
+
+Doğrulama: TypeScript ve 132 çevrimdışı test geçti. Ayrı kurgusal panelde
+başlangıç seviyesi seçeneği, arama taslağı ve tekrarlı URL’lerden iki şirket
+kaynağı çıkarılması doğrulandı. Gerçek panelde açık form oturumu olduğundan
+o süreç yeniden başlatılmadı; yeni sürüm henüz gerçek panele yüklenmedi.
