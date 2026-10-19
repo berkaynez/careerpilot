@@ -15,14 +15,7 @@ export async function readLocalJSON(path: string): Promise<unknown> {
 
 export async function writePreparation(directory: string, profile: Profile, job: Job, plan: unknown, origin: 'local_review' | 'model', postingText?: string) {
   const result = renderPreparation(profile, job, plan, origin);
-  const cvHandle = await open(result.cv.path, constants.O_RDONLY | constants.O_NOFOLLOW);
-  let cv: Buffer;
-  try {
-    const info = await cvHandle.stat();
-    if (!info.isFile() || info.size > 5_000_000) throw new Error('PREP_CV_INVALID');
-    cv = await cvHandle.readFile();
-    if (!cv.subarray(0, 5).equals(Buffer.from('%PDF-'))) throw new Error('PREP_CV_INVALID');
-  } finally { await cvHandle.close(); }
+  const cv = await readCVPDF(result.cv.path);
   // A fresh directory avoids silently replacing a previously reviewed packet.
   await mkdir(directory, { mode: 0o700 });
   await chmod(directory, 0o700);
@@ -37,4 +30,16 @@ export async function writePreparation(directory: string, profile: Profile, job:
     requiresSponsorship: result.requiresSponsorship, sourceUrl: job.sourceUrl, checkedOn: job.checkedOn,
     plan: result.plan, match: result.match, letter: result.letterEvidence }, null, 2) + '\n', { flag: 'wx', mode: 0o600 });
   return { directory, cvFile: cvName, status: result.status, matchScore: result.match.score };
+}
+
+export async function readCVPDF(path:string) {
+  const cvHandle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+  let cv: Buffer;
+  try {
+    const info = await cvHandle.stat();
+    if (!info.isFile() || info.size > 5_000_000) throw new Error('PREP_CV_INVALID');
+    cv = await cvHandle.readFile();
+    if (!cv.subarray(0, 5).equals(Buffer.from('%PDF-'))) throw new Error('PREP_CV_INVALID');
+  } finally { await cvHandle.close(); }
+  return cv;
 }

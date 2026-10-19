@@ -1199,3 +1199,25 @@ Gizlenen bağlantılar yeniden aramada tekrar eklenmez. Bu kontrol aynı URL/ID
 Tek bir ilanı kaldırmak için ilanı seç → başlığın altındaki **Listeden kaldır**.
 Sonrasında çıkan **Geri al** yalnızca o ilanı, eski durumu ve takip notlarıyla geri
 getirir. Bu işlem başvuruyu işverenden geri çekmez; sadece yerel listeden kaldırır.
+
+### Geniş arama ve olası tekrar grupları
+
+İlan keşfet ekranındaki ortak rol grubu yazılım, veri/iş analizi ve BT denetimi
+ifadelerini birlikte sunar. Kendi rollerini de yazabilirsin. FreeHire'daki
+“Junior etiketi olmayan ilanları da incele” seçeneği aramayı genişletir; açıkça
+kıdemli unvan/minimum deneyim ifadeleri yerel filtrede elenir. Belirsiz adayın
+seviyesini ayrıca kontrol et. Kaynak kategori ve coğrafya eksikleri nedeniyle
+her uygun ilanın bulunacağı garanti edilmez. Daha fazla kayıt için sonraki
+sayfayı iste; SerpAPI ayrı kota ve onayını kullanmaya devam eder.
+
+İncelenecek benzer ilanları grupla kutusuyla olası tekrarları açıp karşılaştır.
+Bu gruplar kesin aynı iş demek değildir; kayıtlar ve durumları ayrı kalır.
+Başvurulanlar takip ekranı gruplanmaz.
+
+### Panelden CV ve ön yazı
+
+İlan ayrıntısında ülke/dil ve kaynak metnini doğruladıktan sonra Başvuru belgeleri
+bölümünden seçilen CV'yi indirebilir, ön yazı taslağını açıp metin olarak
+indirebilirsin. Taslak mevcut onaylı aday anlatımı ve varsa analiz dayanaklarından
+hazırlanır; yeni model çağrısı yapılmaz. Metni göndermeden önce oku. Bu işlem
+CV'yi işverene yüklemez veya başvuruyu göndermez.

@@ -60,3 +60,16 @@ test('hub integrates FreeHire without SerpAPI keys, enforces origin/approval, an
   assert.equal(verified.discovery.search.verified,true);assert.equal(verified.assistant.available,false);
   assert.equal((await(await send('/api/discovery/freehire',{approved:true,scope:'turkey'})).json()).duplicates,2);assert.equal(requests,1);
 });
+
+test('broader discovery includes unlabelled roles while applying configured role and experience filters locally',async t=>{
+  const dir=await mkdtemp(join(tmpdir(),'careerpilot-broader-'));t.after(()=>rm(dir,{recursive:true,force:true}));
+  const store=await openHubStore(dir,demoProfile);
+  const search=createFreehireSearch(async input=>{const url=new URL(String(input));assert.equal(url.searchParams.has('seniority'),false);assert.deepEqual(url.searchParams.getAll('category'),['security','finance']);return json({data:[
+    {...row,public_slug:'fictional-technology-risk',title:'Technology Risk Consultant'},
+    {...row,public_slug:'fictional-senior-audit',title:'IT Audit Consultant',description:'Minimum 5 years of experience required to audit fictional systems.'},
+    {...row,public_slug:'fictional-sales',title:'Sales Consultant'},
+  ],meta:{total:3}});});
+  const result=await search({...criteria,includeUnlabelled:true,categories:['security','finance']},new AbortController().signal);
+  const report=await importFreehireJobs(store,result.rows,{...defaultDiscoveryConfig,roles:['IT audit']},'turkey');
+  assert.equal(report.added,1);assert.equal(report.filtered,2);assert.equal(store.list()[0]!.discovery?.careerLevel,'unclear');assert.equal(store.list()[0]!.analysis,null);
+});

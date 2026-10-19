@@ -1,6 +1,9 @@
-import { normalizeRole, containsTerm } from '../discovery/role-profiles.js';
+import { readCVPDF } from '../preparation/files.js';
+import { renderCoverLetter } from '../preparation/letters.js';
+import { basename } from 'node:path';
+import { relatedJobs } from './related.js';
 import { createFreehireSearch, importFreehireJobs } from '../discovery/freehire.js';
-import { roleProfiles } from '../discovery/role-profiles.js';
+import { roleProfiles, discoveryCategories } from '../discovery/role-profiles.js';
 import type { SourceSearch } from '../discovery/search-provider.js';
 import { careerLevel } from '../discovery/level.js';
 import { sourceSearchQueries, jobSearchQueries, sourcesFromSearchURLs } from '../discovery/source-search.js';
@@ -69,15 +72,7 @@ export async function startHub(options: { directory: string; profile: Profile; d
       occupiedByOther: Boolean(assistant && assistant.jobId !== record.id && snapshot?.status !== 'closed'),
       session: assistant?.jobId === record.id ? snapshot : null };
   };
-  const possibleDuplicate = (record: HubRecord) => {
-    if(record.discovery?.search?.provider !== 'freehire') return null;
-    const related=store.list().filter(other=>other.id!==record.id && normalizeRole(other.posting.company)===normalizeRole(record.posting.company)
-      && Math.min(normalizeRole(other.posting.title).split(' ').length,normalizeRole(record.posting.title).split(' ').length)>=3
-      && (containsTerm(other.posting.title,record.posting.title)||containsTerm(record.posting.title,other.posting.title)))
-      .sort((a,b)=>Number(b.state==='submitted')-Number(a.state==='submitted'))[0];
-    return related ? {id:related.id,title:related.posting.title,state:related.state} : null;
-  };
-  const summaries = (record: HubRecord) => ({ possibleDuplicate: possibleDuplicate(record), id: record.id, company: record.posting.company, title: record.posting.title, tracking:record.tracking,
+  const summaries = (record: HubRecord) => ({ relatedJobs:relatedJobs(record,store.list()), possibleDuplicate:relatedJobs(record,store.list())[0] ?? null, id: record.id, company: record.posting.company, title: record.posting.title, tracking:record.tracking,
     country: record.posting.country, state: record.state, updatedAt: record.updatedAt, analyzing: busy.has(record.id),
     discovery: record.discovery ? { ...record.discovery, careerLevel: careerLevel(record.posting).level, levelReason: careerLevel(record.posting).reason } : null,
     score: record.analysis ? buildMatchAnalysis(profile, record.analysis.job, record.analysis.plan).score : null,
@@ -129,13 +124,13 @@ export async function startHub(options: { directory: string; profile: Profile; d
           availability: options.sourceSearch ? await options.sourceSearch.status(criteria) : null }); return;
       }
       if (path === '/api/discovery/freehire' && request.method === 'POST') {
-        const input=z.strictObject({approved:z.boolean(),scope:z.enum(['turkey','remote']),page:z.number().int().min(1).max(10).default(1)}).parse(await body(request));
+        const input=z.strictObject({approved:z.boolean(),scope:z.enum(['turkey','remote']),page:z.number().int().min(1).max(10).default(1),includeUnlabelled:z.boolean().default(false)}).parse(await body(request));
         if(!input.approved) throw new Error('DISCOVERY_SEARCH_APPROVAL_REQUIRED');
         if(options.demo) throw new Error('DISCOVERY_SEARCH_NOT_ENABLED');
         if(jobSearchBusy) throw new Error('DISCOVERY_BUSY'); jobSearchBusy=true;
         try {
           const config=discovery.snapshot().config;
-          const result=await freehireSearch({scope:input.scope,earlyCareer:config.earlyCareer,page:input.page},controller.signal);
+          const result=await freehireSearch({scope:input.scope,earlyCareer:config.earlyCareer,page:input.page,includeUnlabelled:input.includeUnlabelled,categories:discoveryCategories(config.roles)},controller.signal);
           const imported=await importFreehireJobs(store,result.rows,config,input.scope);
           json(200,{...imported,total:result.total,examined:result.examined,rejected:result.rejected,cached:result.cached,page:input.page,hasMore:input.page<10 && input.page*30<result.total});
         } finally {jobSearchBusy=false;}
@@ -196,7 +191,7 @@ export async function startHub(options: { directory: string; profile: Profile; d
           analysis: { job, plan, origin: 'imported_review', at: now, costMicroUsd: null }, lastError: null });
         json(201, detail(record)); return;
       }
-      const match = /^\/api\/jobs\/([a-f0-9-]{36})(?:\/(status|analyze|assistant|routing|verify-posting|tracking|remove|restore))?$/.exec(path);
+      const match = /^\/api\/jobs\/([a-f0-9-]{36})(?:\/(status|analyze|assistant|routing|verify-posting|tracking|remove|restore|documents|cv))?$/.exec(path);
       if (!match) { json(404, { code: 'HUB_NOT_FOUND' }); return; }
       const id = z.uuid().parse(match[1]), action = match[2];
       if(action==='restore' && request.method==='POST') {
@@ -209,6 +204,16 @@ export async function startHub(options: { directory: string; profile: Profile; d
         z.strictObject({}).parse(await body(request));
         if(busy.size || opening || assistant && assistant.session.snapshot().status!=='closed')throw new Error('HUB_RECORD_BUSY');
         json(200,await store.trash(id));return;
+      }
+      if((action==='documents' || action==='cv') && request.method==='GET') {
+        if(record.discovery && (!record.discovery.routingConfirmed || record.discovery.search && !record.discovery.search.verified)) {json(409,{code:'HUB_ROUTING_REQUIRED'});return;}
+        const cv=selectCV(profile,record.posting);
+        if(action==='cv') {
+          const pdf=await readCVPDF(cv.path);response.writeHead(200,{'Content-Type':'application/pdf','Content-Disposition':"attachment; filename*=UTF-8''"+encodeURIComponent(basename(cv.path))});response.end(pdf);return;
+        }
+        if(!profile.coverLetter && !record.analysis?.plan.coverLetterFactIds.length)throw new Error('HUB_LETTER_EVIDENCE_REQUIRED');
+        const letter=renderCoverLetter(profile,record.posting,{coverLetterFactIds:record.analysis?.plan.coverLetterFactIds ?? []});
+        json(200,{cv:{filename:basename(cv.path),language:cv.language,photo:cv.photo},letter:letter.content,evidence:letter.evidence,modelCalls:0});return;
       }
       if (!action && request.method === 'GET') { json(200, detail(record)); return; }
       if (action === 'verify-posting' && request.method === 'POST') {
