@@ -157,7 +157,7 @@ function renderAssistant(pane, record) {
   const info = record.assistant, current = info.session;
   const box = node('section', 'assistant-box'); box.append(node('h3', '', 'Form yardımcısı'));
   if (!current || current.status === 'closed') {
-    box.append(node('p', 'small muted', record.discovery && !record.discovery.routingConfirmed ? 'Form yardımını açmadan önce yukarıdan ilanın ülkesini ve dilini doğrula.' : info.available ? 'Tarayıcıda girişini yap, formu aç; bilinen boş alanları panelden doldur. Ücretli model çağrısı yapılmaz.' : 'Bu sitede otomatik doldurma henüz hazır değil. “İlanı aç” ile kendin devam edebilirsin.'));
+    box.append(node('p', 'small muted', record.discovery && !record.discovery.routingConfirmed ? 'Form yardımını açmadan önce yukarıdaki ilan bilgilerini doğrula.' : info.available ? 'Tarayıcıda girişini yap, formu aç; bilinen boş alanları panelden doldur. Ücretli model çağrısı yapılmaz.' : 'Bu sitede otomatik doldurma henüz hazır değil. “İlanı aç” ile kendin devam edebilirsin.'));
     const start = node('button', 'secondary', info.demo ? 'Örnek formu aç' : 'Form yardımcısını aç');
     start.disabled = !info.available || info.occupiedByOther || info.opening || assistantRequestPending;
     start.addEventListener('click', () => assistantConsent(record)); box.append(start);
@@ -271,6 +271,7 @@ function renderDiscovery(record, pane) {
   if (item.levelReason) box.append(node('p', 'small', item.levelReason));
   if (item.search) {
     box.append(node('p', 'small', 'Arama sorgusu: ' + item.search.query));
+    box.append(node('p', 'small muted', item.search.dateHint ? 'Arama indeksinin tarih ifadesi: ' + item.search.dateHint + ' · Yayın tarihi ve ilanın açık olduğu doğrulanmadı.' : 'Arama indeksinde ayrı tarih bilgisi yok; ilanın güncelliğini kontrol et.'));
     if (!item.search.verified) {
       box.append(node('h3', '', 'Tam ilan metnini doğrula'), node('p', '', 'Bu kayıt arama motorunun kısa özetinden geldi. İlanı aç; açık olduğunu kontrol edip şirketi, tam metni, ülkeyi ve dili gir. Arama özeti uygunluk analizi için kullanılmaz.'), node('p', 'small muted', item.search.snippet));
       const form = node('form'), company = node('input'), title = node('input'), text = node('textarea'), country = node('select'), language = node('select'), message = node('p', 'form-error');
@@ -317,12 +318,29 @@ function discoveryReport(report) {
   box.append(node('p', '', report.added + ' yeni ilan · ücretli model çağrısı yok'), node('p', 'small muted', 'Son tarama: ' + new Date(report.at).toLocaleString('tr-TR')));
   for (const item of report.sources) box.append(node('p', 'small', item.source + ': ' + item.added + ' eklendi · ' + item.duplicates + ' zaten kayıtlı · ' + item.filtered + ' filtre dışı · ' + item.rejected + ' geçersiz kayıt' + (item.code ? ' · ' + (discoveryMessages[item.code] || 'kaynak kontrolü gerekiyor') : '')));
 }
-let discoveryStatusTimer, discoverySearchPending = false;
+let discoveryStatusTimer, discoverySearchPending = false, discoveryRoleProfiles = [];
+$('#discovery-role-profile').addEventListener('change', () => {
+  const profile = discoveryRoleProfiles.find(item => item.id === $('#discovery-role-profile').value);
+  if (profile) $('#discovery-roles').value = profile.roles.join(', ');
+  $('#discovery-job-queries').hidden = true;
+  void refreshDiscoveryStatus();
+});
+$('#discovery-roles').addEventListener('input', () => { $('#discovery-role-profile').value = ''; });
+$('#discovery-roles').addEventListener('change', refreshDiscoveryStatus);
+$('#discovery-early-career').addEventListener('change', refreshDiscoveryStatus);
+function jobSearchPlanURL() {
+  return '/api/discovery/job-search-plan?' + new URLSearchParams({scope: $('#discovery-job-scope').value, roles: $('#discovery-roles').value, earlyCareer: String($('#discovery-early-career').checked)});
+}
 async function refreshDiscoveryStatus() {
   clearInterval(discoveryStatusTimer);
   const button = $('#discovery-job-search'), label = $('#discovery-search-status'); button.disabled = true;
   try {
-    const data = await api('/api/discovery/job-search-plan?scope=' + $('#discovery-job-scope').value), status = data.availability;
+    const data = await api(jobSearchPlanURL()), status = data.availability;
+    discoveryRoleProfiles = data.roleProfiles || [];
+    const profiles = $('#discovery-role-profile');
+    if (profiles.options.length === 1) for (const item of discoveryRoleProfiles) {
+      const option = node('option', '', item.label); option.value = item.id; profiles.append(option);
+    }
     $('#discovery-auto-search').disabled = !data.automaticSearchEnabled || discoverySearchPending;
     if (!data.automaticSearchEnabled || !status) { label.textContent = 'Kaynak araması bu panel oturumunda kapalı.'; return; }
     const readyAt = Date.now() + status.waitSeconds * 1000;
@@ -344,6 +362,8 @@ $('#discovery-open').addEventListener('click', async () => {
   try { const data = await api('/api/discovery'); $('#discovery-sources').replaceChildren(); for (const source of data.config.sources) sourceRow(source);
     for (const [id, key] of [['roles','roles'], ['locations','locations'], ['keywords','keywords'], ['excluded','excludedTitles']]) $('#discovery-' + id).value = data.config[key].join(', ');
     $('#discovery-early-career').checked = data.config.earlyCareer;
+    $('#discovery-role-profile').value = '';
+    $('#discovery-job-queries').hidden = true;
     $('#discovery-job-approval').checked = false; $('#discovery-search-approval').checked = false; $('#discovery-auto-result').textContent = '';
     discoveryReport(data.lastReport); openDialog('#discovery-dialog'); await refreshDiscoveryStatus();
   } catch (error) { notify(error.message, true); }
@@ -389,13 +409,14 @@ $('#discovery-auto-search').addEventListener('click', async event => {
       sourceRow(source); known.add(key); added++;
     }
     output.textContent = (data.partial ? 'Kısmi sonuç: aramanın tamamı bitmedi. ' : '') + added + ' yeni kaynak adayı · ' + duplicates + ' zaten listede · ' + skipped + ' kaynak sınırı nedeniyle eklenmedi. ' + (data.cached ? 'Kayıtlı sonuçlar; yeni sorgu tüketilmedi.' : data.requests + ' arama isteği başlatıldı (başarısız istekler dahil).') + ' Kaynakları kontrol edip kaydet; resmî ilanları toplama adımı henüz çalıştırılmadı.' + (data.failureCode ? ' ' + friendly(data.failureCode) : '');
+
   } catch (error) { output.textContent = error.message; }
   finally { discoverySearchPending = false; $('#discovery-search-approval').checked = false; await refreshDiscoveryStatus(); }
 });
 
 $('#discovery-job-scope').addEventListener('change', refreshDiscoveryStatus);
 $('#discovery-job-plan').addEventListener('click', async () => {
-  try { await saveDiscoverySettings(); const data = await api('/api/discovery/job-search-plan?scope=' + $('#discovery-job-scope').value);
+  try { await saveDiscoverySettings(); const data = await api(jobSearchPlanURL());
     $('#discovery-job-queries').hidden = false; $('#discovery-job-queries').textContent = data.queries.join('\n\n'); await refreshDiscoveryStatus();
   } catch (error) { $('#discovery-job-result').textContent = error.message; }
 });
@@ -408,6 +429,16 @@ $('#discovery-job-search').addEventListener('click', async () => {
     await saveDiscoverySettings();
     const data = await api('/api/discovery/job-search', { approved: true, scope: $('#discovery-job-scope').value });
     output.textContent = (data.partial ? 'Kısmi arama sonucu. ' : '') + data.examined + ' bağlantı incelendi · ' + data.added + ' yeni ilan adayı · ' + data.duplicates + ' zaten kayıtlı · ' + data.filtered + ' filtre dışı · ' + (data.searchRejected + data.rejected) + ' desteklenmeyen/geçersiz sonuç. ' + (data.cached ? 'Önbellek kullanıldı; yeni sorgu tüketilmedi.' : data.requests + ' arama isteği başlatıldı.') + (data.failureCode ? ' ' + friendly(data.failureCode) : '');
+    const reasons = data.rejectionReasons || {}, filters = data.filterReasons || {};
+    const labels = { listingPage: 'İlan yerine liste/şirket sayfası', unsupportedSite: 'Desteklenmeyen site', unsafeURL: 'Güvensiz veya hatalı bağlantı', missingTitle: 'Başlık eksik', invalidPosting: 'Tekil ilan adresi tanınmadı' };
+    const filterLabels = { role: 'Rol eşleşmedi', excludedTitle: 'Hariç tutulan unvan', keyword: 'Ek kelime eşleşmedi', experience: 'Deneyim şartı yüksek' };
+    const details = [...Object.entries(labels).filter(([key]) => reasons[key]).map(([key,label]) => label + ': ' + reasons[key]),
+      ...Object.entries(filterLabels).filter(([key]) => filters[key]).map(([key,label]) => label + ': ' + filters[key])];
+    const unexplained = data.searchRejected - Object.values(reasons).reduce((sum, count) => sum + count, 0);
+    if (unexplained > 0) details.push('Eski kayıtta nedeni ayrılmamış sonuç: ' + unexplained);
+    if (details.length) output.textContent += ' Nedenler — ' + details.join(' · ') + '.';
+    if (!data.added && !data.duplicates) output.textContent += ' Bu aramada aday çıkmadı; bu, uygun ilan bulunmadığı anlamına gelmez. Rol grubunu veya ek kelimeleri kontrol edebilirsin.';
+
     $('#filter').value = 'review'; $('#search').value = ''; await refresh(); notify(data.added + ' ilan adayı inceleme listesine eklendi; tam metin ve uygunluk henüz doğrulanmadı.');
   } catch (error) { output.textContent = error.message; }
   finally { discoverySearchPending = false; $('#discovery-job-approval').checked = false; await refreshDiscoveryStatus(); }

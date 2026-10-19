@@ -1,3 +1,4 @@
+import { roleProfiles } from '../discovery/role-profiles.js';
 import type { SourceSearch } from '../discovery/search-provider.js';
 import { careerLevel } from '../discovery/level.js';
 import { sourceSearchQueries, jobSearchQueries, sourcesFromSearchURLs } from '../discovery/source-search.js';
@@ -109,8 +110,11 @@ export async function startHub(options: { directory: string; profile: Profile; d
           note: options.sourceSearch ? 'Kaydedilmiş kriterler. SerpAPI hazır; arama en çok 4 sorgu tüketir. Profil/CV gönderilmez.' : 'Kaydedilmiş kriterlerden sorgu taslağı. Arama servisine istek yapılmadı; API erişimi henüz yapılandırılmadı.' }); return;
       }
       if (path === '/api/discovery/job-search-plan' && request.method === 'GET') {
-        const scope = z.enum(['turkey','remote']).parse(url.searchParams.get('scope') ?? 'turkey'), criteria = jobCriteria(scope);
-        json(200, { automaticSearchEnabled: Boolean(options.sourceSearch), queries: jobSearchQueries(criteria),
+        const scope = z.enum(['turkey','remote']).parse(url.searchParams.get('scope') ?? 'turkey');
+        const criteria = jobCriteria(scope), previewRoles = url.searchParams.get('roles'), previewLevel = url.searchParams.get('earlyCareer');
+        if (previewRoles !== null) criteria.roles = z.array(z.string().trim().min(1).max(80)).min(1).max(20).parse(previewRoles.split(','));
+        if (previewLevel !== null) criteria.earlyCareer = z.enum(['true','false']).parse(previewLevel) === 'true';
+        json(200, { automaticSearchEnabled: Boolean(options.sourceSearch), queries: jobSearchQueries(criteria), roleProfiles,
           availability: options.sourceSearch ? await options.sourceSearch.status(criteria) : null }); return;
       }
       if (path === '/api/discovery/job-search' && request.method === 'POST') {
@@ -121,7 +125,7 @@ export async function startHub(options: { directory: string; profile: Profile; d
         try {
           const result = await options.sourceSearch.run(jobCriteria(input.scope), controller.signal);
           const imported = await discovery.importSearch(result.hits);
-          json(200, { ...imported, searchRejected: result.rejected, examined: result.examined, requests: result.requests,
+          json(200, { ...imported, searchRejected: result.rejected, rejectionReasons: result.rejectionReasons, examined: result.examined, requests: result.requests,
             cached: result.cached, partial: result.partial, failureCode: result.failureCode });
         } finally { jobSearchBusy = false; }
         return;

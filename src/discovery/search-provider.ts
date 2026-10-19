@@ -1,4 +1,4 @@
-import { searchHitSchema, searchHits } from './job-results.js';
+import { searchHitSchema, searchHits, rejectionReasonsSchema } from './job-results.js';
 import type { SearchHit } from './job-results.js';
 import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, readFile, writeFile, rename, rm } from 'node:fs/promises';
@@ -7,17 +7,17 @@ import { z } from 'zod';
 import { sourceSchema } from './sources.js';
 import { sourceSearchQueries, jobSearchQueries, sourcesFromSearchURLs } from './source-search.js';
 
-const cacheSchema = z.strictObject({ key: z.string(), at: z.iso.datetime(), sources: z.array(sourceSchema).max(20), hits: z.array(searchHitSchema).max(40).default([]), examined: z.number().int().nonnegative().default(0), rejected: z.number().int().nonnegative().default(0), partial: z.boolean().default(false), failureCode: z.string().nullable().default(null) });
+const cacheSchema = z.strictObject({ key: z.string(), at: z.iso.datetime(), sources: z.array(sourceSchema).max(20), hits: z.array(searchHitSchema).max(40).default([]), examined: z.number().int().nonnegative().default(0), rejected: z.number().int().nonnegative().default(0), rejectionReasons: rejectionReasonsSchema.default(() => rejectionReasonsSchema.parse({})), partial: z.boolean().default(false), failureCode: z.string().nullable().default(null) });
 const stateSchema = z.strictObject({ version: z.literal(1), attempts: z.array(z.iso.datetime()).max(1000), cache: cacheSchema.nullable() });
 const accountSchema = z.object({ account_status: z.literal('Active'), plan_monthly_price: z.literal(0),
   total_searches_left: z.number().int().nonnegative(), account_rate_limit_per_hour: z.number().int().positive(), this_hour_searches: z.number().int().nonnegative() });
 type Criteria = Parameters<typeof sourceSearchQueries>[0] & { mode?: 'jobs'; earlyCareer?: boolean };
 const queriesFor = (criteria: Criteria) => criteria.mode === 'jobs' ? jobSearchQueries(criteria) : sourceSearchQueries({roles:criteria.roles,locations:criteria.locations});
 const queryKey = (criteria: Criteria, queries: string[]) => createHash('sha256').update(JSON.stringify(criteria.mode === 'jobs' ? ['jobs',queries] : queries)).digest('hex');
-const evidence = (cache: z.infer<typeof cacheSchema>) => ({ hits: cache.hits, examined: cache.examined, rejected: cache.rejected });
+const evidence = (cache: z.infer<typeof cacheSchema>) => ({ hits: cache.hits, examined: cache.examined, rejected: cache.rejected, rejectionReasons: cache.rejectionReasons });
 export type SourceSearch = Awaited<ReturnType<typeof openSourceSearch>>;
 
-/** Only fixed SerpAPI URLs; raw account responses, credentials and search snippets never leave this module. */
+/** Only fixed SerpAPI URLs; raw account responses and credentials never leave this module. Sanitized search evidence is returned. */
 export async function openSourceSearch(directory: string, apiKey: string, request: typeof fetch = fetch, now = () => new Date()) {
   if (!apiKey.trim() || /[\r\n]/.test(apiKey)) throw new Error('DISCOVERY_SEARCH_KEY_REQUIRED');
   await mkdir(directory, { recursive: true, mode: 0o700 });
@@ -78,6 +78,7 @@ export async function openSourceSearch(directory: string, apiKey: string, reques
         if (!account.success) throw new Error('DISCOVERY_SEARCH_FREE_PLAN_REQUIRED');
         if (account.data.total_searches_left < queries.length || account.data.account_rate_limit_per_hour - account.data.this_hour_searches < queries.length)
           throw new Error('DISCOVERY_SEARCH_QUOTA_STOP');
+        const rejectionReasons = rejectionReasonsSchema.parse({});
         const urls: string[] = [], hits = new Map<string, SearchHit>(); let attempted = 0, examined = 0, rejected = 0;
         for (const q of queries) {
           signal.throwIfAborted();
@@ -86,14 +87,15 @@ export async function openSourceSearch(directory: string, apiKey: string, reques
           state.attempts.push(timestamp); await save(state); attempted++;
           try {
             const result = z.object({ error: z.string().optional(), search_metadata: z.object({ status: z.literal('Success') }),
-              organic_results: z.array(z.object({ link: z.string().max(2000), title: z.string().max(1200).optional(), snippet: z.string().max(3000).optional() })).max(100).default([]) }).safeParse(await get('/search.json', { engine: 'google', q }, signal));
+              organic_results: z.array(z.object({ link: z.string().max(2000), title: z.string().max(1200).optional(), snippet: z.string().max(3000).optional(), date: z.string().max(160).optional() })).max(100).default([]) }).safeParse(await get('/search.json', { engine: 'google', q }, signal));
             if (!result.success || result.data.error) throw new Error('DISCOVERY_SEARCH_FORMAT');
             const rows = result.data.organic_results.slice(0, 10), parsed = searchHits(rows, q);
             examined += rows.length; rejected += parsed.rejected;
+            for (const key of Object.keys(rejectionReasons) as (keyof typeof rejectionReasons)[]) rejectionReasons[key] += parsed.rejectionReasons[key];
             for (const hit of parsed.hits) if (!hits.has(hit.url)) hits.set(hit.url, hit);
             urls.push(...rows.map(item => item.link));
             // Keep completed sources even if a later query fails or this process exits.
-            state.cache = { key, at: timestamp, sources: sourcesFromSearchURLs(urls), hits: [...hits.values()], examined, rejected, partial: true, failureCode: null }; await save(state);
+            state.cache = { key, at: timestamp, sources: sourcesFromSearchURLs(urls), hits: [...hits.values()], examined, rejected, rejectionReasons, partial: true, failureCode: null }; await save(state);
           } catch (error) {
             if (!state.cache || state.cache.key !== key) throw error;
             const failureCode = error instanceof Error && /^DISCOVERY_SEARCH_[A-Z_]+$/.test(error.message) ? error.message : 'DISCOVERY_SEARCH_NETWORK';
@@ -102,7 +104,7 @@ export async function openSourceSearch(directory: string, apiKey: string, reques
           }
         }
         const sources = sourcesFromSearchURLs(urls);
-        state.cache = { key, at: timestamp, sources, hits: [...hits.values()], examined, rejected, partial: false, failureCode: null }; await save(state);
+        state.cache = { key, at: timestamp, sources, hits: [...hits.values()], examined, rejected, rejectionReasons, partial: false, failureCode: null }; await save(state);
         return { ...evidence(state.cache), sources, requests: queries.length, cached: false, modelCalls: 0, partial: false, failureCode: null };
       } finally { await rm(lock, { recursive: true }); }
     },

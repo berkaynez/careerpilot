@@ -1140,3 +1140,19 @@ Mevcut başvuru durumları ve analizler üzerine yazılmaz.
 rol araması en çok iki sorgudur; toplam günlük 8 / aylık 200 sınırı ortaktır.
 Önbellek arama türünü/bölgesini/rolleri ayırır; eski kaynak sonuçları doğrudan
 ilan gibi aktarılmaz. Aynı aramanın önbelleği yeni sorgu harcamaz.
+
+### Hazır rol grupları ve sonuç açıklamaları
+
+İlan keşfet ekranında bir hazır grup seçerek Türkçe/İngilizce unvanları pozisyon
+alanına alabilir, ardından düzenleyebilirsin. Seçim arama başlatmaz veya ayarları
+kaydetmez. Arama planı önizlemesi ücretsizdir ve profil/CV göndermez. İlan araması
+yine açık kota onayı ister; günlük 8 / aylık 200 yerel sınır, 15 dakika bekleme ve
+24 saat aynı sorgu önbelleği değişmedi. Grup değişince eski önbellek yeni arama
+sonucu gibi gösterilmez. Seçili grubun dışındaki kendi rollerin korunarak geri
+alınmak istenirse pencereyi kaydetmeden kapatıp yeniden açabilirsin.
+
+Yeni arama raporu reddedilen bağlantıları ve filtrelenen ilanları nedenleriyle
+ayırır. Eski sonuçların ayrıntısı yoksa bu açıkça belirtilir. İlan ayrıntısındaki
+arama indeksi tarih ifadesi doğrulanmamıştır; yayın tarihi veya ilanın açık
+olduğuna kanıt değildir. Şirket, tam metin, ülke ve dil doğrulanmadan analiz ve
+form yardımcısı açılmaz.

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { roleProfiles } from '../src/discovery/role-profiles.js';
 import { jobSearchQueries } from '../src/discovery/source-search.js';
 import { searchHits, importSearchJobs } from '../src/discovery/job-results.js';
 import { defaultDiscoveryConfig } from '../src/discovery/core.js';
@@ -62,6 +63,13 @@ test('panel finds individual jobs without a company catalogue, keeps foreign sit
   assert.equal((await request('/api/discovery/job-search',{approved:true,scope:'turkey'},'https://attacker.invalid')).status,403);
   assert.equal((await request('/api/discovery/job-search',{approved:false,scope:'turkey'})).status,400); assert.equal(requests,0);
   assert.equal((await(await request('/api/discovery')).json()).config.sources.length,0);
+  const plan=await(await request('/api/discovery/job-search-plan?scope=turkey')).json();
+  assert.equal(plan.roleProfiles.length,3); assert.equal(requests,0);
+  const preview=await(await request('/api/discovery/job-search-plan?scope=turkey&roles=data%20analyst,veri%20analisti&earlyCareer=false')).json();
+  assert.equal(preview.queries.length,2); assert.ok(preview.queries.every((q:string)=>!q.includes('junior')));
+  assert.equal(requests,0); // Preview cannot consume quota or save the preset.
+  assert.deepEqual((await(await request('/api/discovery')).json()).config.roles,defaultDiscoveryConfig.roles);
+  assert.equal((await request('/api/discovery/job-search-plan?roles=')).status,400);
   const report=await(await request('/api/discovery/job-search',{approved:true,scope:'turkey'})).json();
   assert.equal(report.added,3); assert.equal(report.requests,2); assert.equal(report.examined,8); assert.equal(sourceReads,0);
   assert.equal(requests,3); const repeated=await(await request('/api/discovery/job-search',{approved:true,scope:'turkey'})).json();
@@ -74,4 +82,52 @@ test('panel finds individual jobs without a company catalogue, keeps foreign sit
   const verified=await request(path+'/verify-posting',{company:'Fictional Employer',title:'Junior Developer',text:'Full fictional job description. JavaScript knowledge required; build and test interfaces.',country:'TR',language:'en'});
   assert.equal(verified.status,200); detail=await verified.json(); assert.equal(detail.discovery.search.verified,true); assert.equal(detail.discovery.routingConfirmed,true); assert.equal(detail.posting.company,'Fictional Employer'); assert.ok(detail.cv);
   assert.equal(modelCalls,0); assert.equal((await(await request('/api/discovery')).json()).config.sources.length,0);
+});
+
+test('role presets search both languages within the same two-request budget', () => {
+  for (const profile of roleProfiles) {
+    const queries = jobSearchQueries({roles:profile.roles,locations:['Türkiye','Turkey','Istanbul']});
+    assert.ok(queries.length <= 2);
+    for (const role of profile.roles) assert.ok(queries.some(query => query.includes('"' + role + '"')));
+    assert.ok(queries.every(query => query.length <= 400));
+  }
+});
+
+test('rejection diagnostics distinguish listing pages, other sites, unsafe URLs and incomplete postings', () => {
+  const parsed = searchHits([
+    {link:'https://jobs.lever.co/fictional',title:'Company jobs'},
+    {link:'https://www.linkedin.com/jobs/search',title:'Search jobs'},
+    {link:'https://example.invalid/jobs/123',title:'Unsupported'},
+    {link:'https://127.0.0.1/private',title:'Private'},
+    {link:'https://www.linkedin.com/jobs/view/123'},
+    {link:'https://tr.indeed.com/viewjob?jk=bad',title:'Broken ID'},
+  ],query);
+  assert.deepEqual(parsed.rejectionReasons,{listingPage:2,unsupportedSite:1,unsafeURL:1,missingTitle:1,invalidPosting:1});
+  assert.equal(Object.values(parsed.rejectionReasons).reduce((a,b)=>a+b,0),parsed.rejected);
+});
+
+test('English configured roles accept Turkish equivalents without adding unrelated roles or applicant facts', async t => {
+  const dir=await mkdtemp(join(tmpdir(),'careerpilot-role-aliases-')); t.after(()=>rm(dir,{recursive:true,force:true}));
+  const store=await openHubStore(dir,demoProfile);
+  const config={...defaultDiscoveryConfig,roles:['software engineer'],excludedTitles:[],keywords:[]};
+  const hits=searchHits([
+    {link:'https://www.linkedin.com/jobs/view/100',title:'Yeni Mezun Yazılım Mühendisi'},
+    {link:'https://www.linkedin.com/jobs/view/101',title:'Junior Data Analyst'},
+    {link:'https://www.linkedin.com/jobs/view/102',title:'Software Engineer',snippet:'Minimum 5 years of experience required.'},
+  ],query).hits;
+  const report=await importSearchJobs(store,hits,config);
+  assert.equal(report.added,1); assert.equal(report.filtered,2);
+  assert.deepEqual(report.filterReasons,{role:1,excludedTitle:0,keyword:0,experience:1});
+  assert.equal(store.list()[0]!.analysis,null); assert.equal(store.list()[0]!.discovery?.search?.verified,false);
+});
+
+test('search date hints remain unverified source text, separate from discovery time, across restart', async t => {
+  const dir=await mkdtemp(join(tmpdir(),'careerpilot-date-hints-')); t.after(()=>rm(dir,{recursive:true,force:true}));
+  const store=await openHubStore(dir,demoProfile), clock=()=>new Date('2026-10-19T12:00:00Z');
+  const hits=searchHits([{link:'https://www.linkedin.com/jobs/view/12345',title:'Junior Software Engineer',date:'<b>2 years ago</b>'}],query).hits;
+  await importSearchJobs(store,hits,defaultDiscoveryConfig,clock);
+  const record=(await openHubStore(dir,demoProfile)).list()[0]!;
+  assert.equal(record.discovery?.discoveredAt,clock().toISOString());
+  assert.equal(record.discovery?.search?.dateHint,'2 years ago');
+  assert.equal(record.discovery?.search?.verified,false); assert.equal(record.state,'review'); assert.equal(record.analysis,null);
 });
