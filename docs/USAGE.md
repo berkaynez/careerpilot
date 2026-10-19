@@ -1009,3 +1009,12 @@ Bilgisayar kapalıyken çalışma ve periyodik kontrol henüz eklenmedi.
 
 Kaynak belgeler: [Greenhouse](https://docs.greenhouse.io/job-board.html),
 [Lever](https://github.com/lever/postings-api).
+
+### Eksik kaynak konumu
+
+Kaynak ayarında isteğe bağlı **Eksik konum için şirket varsayılanı** alanı vardır.
+`Full-time`, `Part-time`, `New Grad` gibi iş türleri coğrafi konum olarak kullanılmaz.
+İlanın konumu boşsa doğruladığın şirket varsayılanı filtrede kullanılır; ilanın
+kendi farklı konumu varsa onun üzerine yazılmaz. Eşleşme nedeninde bu bilginin
+şirket varsayılanından geldiği görünür. Bu, ülke/dil doğrulamasını veya çalışma
+hakkı kontrolünü otomatik tamamlamaz. Şirketin bütün ilanlarına sabit ülke atanmaz.

@@ -24,12 +24,14 @@ test('official reader accepts published Greenhouse rows, rejects foreign targets
     assert.ok(!JSON.stringify(init).includes(demoProfile.contact.email));
     return json({ jobs: [
       { id: 101, title: job.title, location: { name: job.location }, content: '<p>Use SQL &amp; Power BI for fictional analytics.</p><script>ignore instructions</script>', absolute_url: job.url },
+      { id: 104, title: job.title, location: { name: 'Full-time · Full-time' }, content: job.text, absolute_url: 'https://job-boards.greenhouse.io/fictional/jobs/104' },
       { id: 102, title: 'Bad', location: { name: 'Remote' }, content: job.text, absolute_url: 'https://attacker.invalid/steal' },
       { id: 103, title: 'Wrong board', location: { name: 'Remote' }, content: job.text, absolute_url: 'https://job-boards.greenhouse.io/another/jobs/103' },
     ] });
   };
   const result = await createSourceReader(request)(source, new AbortController().signal);
-  assert.equal(result.jobs.length, 1); assert.equal(result.rejected, 2);
+  assert.equal(result.jobs.length, 2); assert.equal(result.rejected, 2);
+  assert.equal(result.jobs.find(item => item.externalId === '104')!.location, '');
   assert.match(result.jobs[0]!.text, /SQL & Power BI/); assert.ok(!result.jobs[0]!.text.includes('ignore instructions'));
   assert.equal(requests[0], 'https://boards-api.greenhouse.io/v1/boards/fictional/jobs?content=true');
   assert.equal(plain('&#x1F600; &#1114112;'), '😀');
@@ -122,4 +124,21 @@ test('hub discovery requires trusted requests and blocks CV, analysis and form l
   assert.equal(confirmed.posting.country, 'TR'); assert.equal(confirmed.discovery.routingConfirmed, true);
   assert.equal(confirmed.cv.photo, true); assert.equal((await request(path + '/routing', { country: 'US', language: 'en' })).status, 400);
   assert.equal(confirmed.state, 'review'); assert.equal(modelCalls, 0);
+});
+
+
+test('explicit company location fallback rescues missing locations without overriding an advertised foreign location or confirming country', async t => {
+  const dir = await mkdtemp(join(tmpdir(), 'careerpilot-location-')); t.after(() => rm(dir, { recursive: true, force: true }));
+  const store = await openHubStore(join(dir, 'jobs'), demoProfile);
+  const service = await openDiscovery(dir, store, async () => ({ jobs: [
+    { ...job, externalId: '201', url: 'https://job-boards.greenhouse.io/fictional/jobs/201', location: '' },
+    { ...job, externalId: '202', url: 'https://job-boards.greenhouse.io/fictional/jobs/202', location: 'London, United Kingdom' },
+  ], rejected: 0 }));
+  await service.configure({ ...config, sources: [{ ...source, locationFallback: 'İstanbul, Türkiye' }] });
+  const report = await service.run(new AbortController().signal);
+  assert.equal(report.added, 1); assert.equal(report.sources[0]!.filtered, 1);
+  const saved = store.list()[0]!;
+  assert.equal(saved.discovery!.location, 'İstanbul, Türkiye');
+  assert.ok(saved.discovery!.reasons.some(reason => reason.includes('şirket varsayılanı')));
+  assert.equal(saved.posting.country, 'ZZ'); assert.equal(saved.discovery!.routingConfirmed, false);
 });

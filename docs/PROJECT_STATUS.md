@@ -145,3 +145,14 @@ mevcut toplu başvuru, CAPTCHA aşma ve gözetimsiz gönderim sınırları korun
 - İlk teslim kullanıcı düğmesiyle çalışır. Arka plan/periyodik tarama yoktur.
   Sonraki aday iş, kaynak/kriter iyileştirmesinden sonra açılıp kapatılabilir
   periyodik kontrolü değerlendirmektir. Henüz zamanlanmış görev oluşturulmadı.
+
+
+### Peak konum düzeltmesi
+
+Kullanıcı Peak ilanlarının Türkiye’de olduğunu doğruladı. Resmî API’nin konum
+alanı `Full-time` geldiğinden ilk filtre bu kayıtları yanlışlıkla eledi.
+İş türleri konumdan ayrıldı; yalnızca eksik konum için açık kaynak varsayılanı
+eklendi. Özel Peak kaynağına kullanıcı beyanıyla Türkiye varsayılanı girildi.
+Canlı tekrar taraması 5 yazılım ilanını (2 New Grad dahil) inceleme listesine ekledi.
+129 çevrimdışı test geçti; farklı ilan konumunun üzerine yazılmadığı test edildi.
+Bu taramada ücretli model çağrısı veya başvuru gönderimi yapılmadı.
