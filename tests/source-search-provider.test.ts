@@ -115,3 +115,28 @@ test('legacy cached results preserve unknown rejection counts without resetting 
   assert.equal(cached.rejected,7); assert.equal(Object.values(cached.rejectionReasons).reduce((a,b)=>a+b,0),0);
   assert.equal((await reopened.status(criteria)).remainingToday,7);
 });
+
+test('saved job-search summary survives restart and expiry without requests, reservations or imports', async t => {
+  const dir=await mkdtemp(join(tmpdir(),'careerpilot-saved-summary-')); t.after(()=>rm(dir,{recursive:true,force:true}));
+  let clock=new Date('2026-10-19T10:00:00Z'), calls=0;
+  const jobCriteria={...criteria,mode:'jobs' as const};
+  const request: typeof fetch=async input=>{
+    calls++; if(new URL(String(input)).pathname==='/account.json') return json(account);
+    return json({search_metadata:{status:'Success'},organic_results:[
+      {link:'https://www.linkedin.com/jobs/view/123',title:'Junior Software Engineer'},
+      {link:'https://tr.linkedin.com/jobs/view/123?tracking=remove',title:'Junior Software Engineer'},
+      {link:'https://jobs.lever.co/fictional',title:'Company jobs'},
+    ]});
+  };
+  const first=await openSourceSearch(dir,'secret',request,()=>clock);
+  await first.run(jobCriteria,new AbortController().signal); assert.equal(calls,2);
+  const reopened=await openSourceSearch(dir,'secret',async()=>{throw new Error('must not request');},()=>clock);
+  const before=await readFile(join(dir,'source-search.json'),'utf8');
+  const ready=await reopened.status(jobCriteria), report=ready.lastResult!;
+  assert.equal(report.examined,3); assert.equal(report.uniqueLinks,1); assert.equal(report.repeatedLinks,1);
+  assert.equal(report.rejected,1); assert.equal(report.rejectionReasons.listingPage,1); assert.equal(report.partial,false);
+  assert.equal((await reopened.status({...jobCriteria,roles:['data analyst']})).lastResult,null);
+  clock=new Date('2026-10-21T10:00:00Z');
+  const expired=await reopened.status(jobCriteria); assert.equal(expired.cached,false); assert.deepEqual(expired.lastResult,report);
+  assert.equal(await readFile(join(dir,'source-search.json'),'utf8'),before); assert.equal(calls,2);
+});

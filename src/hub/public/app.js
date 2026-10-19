@@ -318,6 +318,21 @@ function discoveryReport(report) {
   box.append(node('p', '', report.added + ' yeni ilan · ücretli model çağrısı yok'), node('p', 'small muted', 'Son tarama: ' + new Date(report.at).toLocaleString('tr-TR')));
   for (const item of report.sources) box.append(node('p', 'small', item.source + ': ' + item.added + ' eklendi · ' + item.duplicates + ' zaten kayıtlı · ' + item.filtered + ' filtre dışı · ' + item.rejected + ' geçersiz kayıt' + (item.code ? ' · ' + (discoveryMessages[item.code] || 'kaynak kontrolü gerekiyor') : '')));
 }
+function renderSearchSummary(report) {
+  const box = $('#discovery-job-summary'); box.replaceChildren(); box.hidden = !report;
+  if (!report) return;
+  box.append(node('h3', '', 'Son arama özeti'), node('p', 'small muted', new Date(report.at).toLocaleString('tr-TR') + ' · Bu rol ve bölge kriterleri için kayıtlı sonuçlar'));
+  box.append(node('p', '', report.examined + ' bağlantı incelendi · ' + report.uniqueLinks + ' benzersiz ilan bağlantısı · ' + report.repeatedLinks + ' arama içi tekrar · ' + report.rejected + ' elenen bağlantı'));
+  box.append(node('p', 'small muted', 'Benzersiz bağlantı sayısı yeni eklenen veya hâlâ açık ilan sayısı değildir. Panele ekleme sırasında rol/deneyim filtreleri ve önceki başvurular ayrıca kontrol edilir.'));
+  const reasons = report.rejectionReasons, labels = {listingPage: 'Liste/şirket sayfası', unsupportedSite: 'Desteklenmeyen site', unsafeURL: 'Güvensiz/hatalı bağlantı', missingTitle: 'Başlık eksik', invalidPosting: 'Tekil ilan adresi tanınmadı'};
+  const details = node('details'), heading = node('summary', '', 'Bağlantılar neden elendi?'); details.append(heading);
+  for (const [key, label] of Object.entries(labels)) if (reasons[key]) details.append(node('p', 'small', label + ': ' + reasons[key]));
+  const unknown = Math.max(0, report.rejected - Object.values(reasons).reduce((sum, count) => sum + count, 0));
+  if (unknown) details.append(node('p', 'small', 'Eski kayıtta nedeni ayrılmamış sonuç: ' + unknown));
+  if (!report.rejected) details.append(node('p', 'small', 'Bu aramada bağlantı doğrulamasında elenen sonuç yok.'));
+  box.append(details);
+  if (report.partial) box.append(node('p', 'small', 'Kısmi sonuç: arama tamamlanmadı.' + (report.failureCode ? ' ' + friendly(report.failureCode) : '')));
+}
 let discoveryStatusTimer, discoverySearchPending = false, discoveryRoleProfiles = [];
 $('#discovery-role-profile').addEventListener('change', () => {
   const profile = discoveryRoleProfiles.find(item => item.id === $('#discovery-role-profile').value);
@@ -335,7 +350,9 @@ async function refreshDiscoveryStatus() {
   clearInterval(discoveryStatusTimer);
   const button = $('#discovery-job-search'), label = $('#discovery-search-status'); button.disabled = true;
   try {
-    const data = await api(jobSearchPlanURL()), status = data.availability;
+    const planURL = jobSearchPlanURL(), data = await api(planURL), status = data.availability;
+    if (planURL !== jobSearchPlanURL()) return;
+    renderSearchSummary(status?.lastResult || null);
     discoveryRoleProfiles = data.roleProfiles || [];
     const profiles = $('#discovery-role-profile');
     if (profiles.options.length === 1) for (const item of discoveryRoleProfiles) {
@@ -365,6 +382,7 @@ $('#discovery-open').addEventListener('click', async () => {
     $('#discovery-role-profile').value = '';
     $('#discovery-job-queries').hidden = true;
     $('#discovery-job-approval').checked = false; $('#discovery-search-approval').checked = false; $('#discovery-auto-result').textContent = '';
+    $('#discovery-job-result').textContent = ''; renderSearchSummary(null);
     discoveryReport(data.lastReport); openDialog('#discovery-dialog'); await refreshDiscoveryStatus();
   } catch (error) { notify(error.message, true); }
 });
