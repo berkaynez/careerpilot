@@ -64,7 +64,7 @@ test('panel finds individual jobs without a company catalogue, keeps foreign sit
   assert.equal((await request('/api/discovery/job-search',{approved:false,scope:'turkey'})).status,400); assert.equal(requests,0);
   assert.equal((await(await request('/api/discovery')).json()).config.sources.length,0);
   const plan=await(await request('/api/discovery/job-search-plan?scope=turkey')).json();
-  assert.equal(plan.roleProfiles.length,3); assert.equal(requests,0);
+  assert.equal(plan.roleProfiles.length,4); assert.equal(requests,0);
   const preview=await(await request('/api/discovery/job-search-plan?scope=turkey&roles=data%20analyst,veri%20analisti&earlyCareer=false')).json();
   assert.equal(preview.queries.length,2); assert.ok(preview.queries.every((q:string)=>!q.includes('junior')));
   assert.equal(requests,0); // Preview cannot consume quota or save the preset.

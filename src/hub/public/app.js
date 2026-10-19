@@ -7,6 +7,8 @@ const followUpDue=item=>Boolean(item.tracking?.followUpOn && item.tracking.follo
 const levels = { documented: 'Doğrudan dayanak', related: 'Kısmi dayanak', not_documented: 'Profilde belgelenmiyor' };
 const priorities = { essential: 'Temel şart', preferred: 'Tercih edilen', responsibility: 'Görev' };
 const errors = {
+  HUB_LETTER_EVIDENCE_REQUIRED:'Ön yazı için önce profil anlatımını veya ilan analizini hazırlamalısın.',
+  HUB_ROUTING_REQUIRED:'Önce şirket, tam ilan metni, ülke ve dil bilgilerini doğrula.',
   HUB_RECORD_BUSY:'Önce devam eden analiz veya form oturumunu kapat.',
   HUB_TRACKING_SUBMITTED_REQUIRED:'Takip bilgilerini yalnızca Başvuruldu kayıtlarında düzenleyebilirsin.',
   DISCOVERY_FREEHIRE_COOLDOWN: 'FreeHire yeni sorgusu için 30 saniye bekle.',
@@ -106,13 +108,32 @@ function renderList() {
   $('#tracking-filters').hidden=view!=='submitted';$('#tracking-overview').hidden=view!=='submitted';
   const applications=records.filter(item=>item.state==='submitted');
   $('#tracking-overview').textContent=applications.length+' başvuru · '+applications.filter(followUpDue).length+' bugün/geciken takip · '+applications.filter(item=>!item.tracking?.appliedOn).length+' başvuru tarihi eksik';
+  $('#group-related-label').hidden=!['all','review'].includes(view) || !records.some(item=>item.state==='review');
   const filtered = visibleRecords();
   $('#list-count').textContent = filtered.length + ' ilan'; $('#jobs').replaceChildren();
   if (!filtered.length) {
     const empty = node('div', 'empty'); empty.append(node('h3', '', view === 'submitted' ? 'Henüz başvurulan ilan yok.' : records.length ? 'Bu filtrede ilan yok.' : 'İlk fırsatını ekle.'), node('p', '', view === 'submitted' ? 'Tamamladığın ilanın durumunu “Başvuruldu” olarak değiştir; burada takip edebilirsin. Arama yaptıysan aramayı da kontrol et.' : records.length ? 'Aramayı veya durum filtresini değiştirebilirsin.' : 'İlan metnini kaydet; başvurunun bütün adımlarını buradan takip et.'));
     $('#jobs').append(empty); return;
   }
-  for (const item of filtered) {
+  const groups=groupReviewRecords(filtered,$('#group-related').checked && ['all','review'].includes(view));
+  if(groups.length<filtered.length)$('#list-count').textContent=filtered.length+' kayıt · '+groups.length+' görünür grup';
+  for(const group of groups){
+    const primary=group.find(item=>item.id===selectedId)||group[0];$('#jobs').append(makeJobCard(primary));
+    const other=group.filter(item=>item.id!==primary.id);
+    if(other.length){const box=node('details','source'),label=node('summary','','Olası tekrarlar · '+other.length+' diğer kayıt');box.append(label,node('p','small muted','Aynı iş oldukları doğrulanmadı. Kayıtlar ve durumları ayrı tutulur.'));for(const item of other)box.append(makeJobCard(item));$('#jobs').append(box);}
+  }
+}
+function groupReviewRecords(items,enabled){
+  if(!enabled)return items.map(item=>[item]);
+  const remaining=new Map(items.map(item=>[item.id,item])),groups=[];
+  while(remaining.size){const first=remaining.values().next().value;remaining.delete(first.id);const group=[first];
+    if(first.state==='review')for(let index=0;index<group.length;index++)for(const other of remaining.values())
+      if(other.state==='review' && ((group[index].relatedJobs||[]).some(link=>link.id===other.id)||(other.relatedJobs||[]).some(link=>link.id===group[index].id))){group.push(other);remaining.delete(other.id);}
+    groups.push(group);
+  }
+  return groups;
+}
+function makeJobCard(item){
     const card = node('button', 'job-card' + (selectedId === item.id ? ' selected' : '')); card.type = 'button';
     card.setAttribute('aria-pressed', String(selectedId === item.id));
     const top = node('div', 'job-top'); top.append(node('span', 'company-mark', item.company.slice(0, 1).toUpperCase()), node('span', 'company-name', item.company));
@@ -125,9 +146,9 @@ function renderList() {
       bottom.append(node('span','small muted','Başvuru: '+(item.tracking?.appliedOn || 'Tarih girilmemiş')));
       if(item.tracking?.followUpOn)bottom.append(node('span',followUpDue(item)?'authorization':'small muted','Takip: '+item.tracking.followUpOn));
     }
-    card.append(top, title, bottom, score); card.addEventListener('click', () => showDetail(item.id).catch(error => notify(error.message, true))); $('#jobs').append(card);
-  }
+    card.append(top, title, bottom, score); card.addEventListener('click', () => showDetail(item.id).catch(error => notify(error.message, true))); return card;
 }
+
 async function showDetail(id) {
   const sequence = ++detailSequence;
   const record = await api('/api/jobs/' + id); if (sequence !== detailSequence) return;
@@ -152,7 +173,19 @@ async function showDetail(id) {
   if (record.lastError) pane.append(node('p', 'notice error', 'Son analiz tamamlanamadı: ' + friendly(record.lastError) + (record.analysis ? ' Önceki analiz aşağıda korunuyor.' : '')));
   if (record.analysis) renderAnalysis(pane, record);
   else { const box = node('div', 'analysis-empty'); box.append(node('span', 'eyebrow', 'SIRADAKİ ADIM'), node('h3', '', 'Bu fırsat sana ne kadar yakın?'), node('p', 'muted', 'Analiz eklendiğinde güçlü yönlerin, belgelenmeyen şartlar ve puanın dayanakları burada görünecek.')); pane.append(box); }
-  const cvBox = node('section', 'cv-box'); cvBox.append(node('h3', '', 'Başvuru belgeleri'), node('p', '', record.cv ? (record.cv.language === 'en' ? 'İngilizce' : 'Türkçe') + ' CV · ' + (record.cv.photo ? 'Fotoğraflı' : 'Fotoğrafsız') : record.cvError), node('p', 'small muted', 'CV otomatik yüklenmedi. İlanın belge talimatlarını kontrol ederek başvuru sitesinde seç.')); pane.append(cvBox);
+  const cvBox = node('section', 'cv-box'); cvBox.append(node('h3', '', 'Başvuru belgeleri'), node('p', '', record.cv ? (record.cv.language === 'en' ? 'İngilizce' : 'Türkçe') + ' CV · ' + (record.cv.photo ? 'Fotoğraflı' : 'Fotoğrafsız') : record.cvError), node('p', 'small muted', 'CV otomatik yüklenmedi. İlanın belge talimatlarını kontrol ederek başvuru sitesinde seç.')); const docsReady=Boolean(record.cv) && !(record.discovery?.search && !record.discovery.search.verified);
+  const downloadCV=node('button','secondary','Seçilen CV’yi indir');downloadCV.disabled=!docsReady;
+  downloadCV.addEventListener('click',async()=>{downloadCV.disabled=true;try{
+    const response=await fetch('/api/jobs/'+id+'/cv',{headers:{'X-Hub-Token':session.token}});if(!response.ok){const error=await response.json();throw new Error(friendly(error.code));}
+    downloadLocalFile(await response.blob(),'CV_'+record.posting.company.replace(/[^\p{L}\p{N}]+/gu,'_').slice(0,60)+'.pdf');
+  }catch(error){notify(error.message,true);}finally{downloadCV.disabled=false;}});
+  const preview=node('button','secondary','Ön yazı taslağını aç');preview.disabled=!docsReady;
+  preview.addEventListener('click',async()=>{preview.disabled=true;try{
+    const data=await api('/api/jobs/'+id+'/documents');const letter=node('textarea');letter.rows=12;letter.readOnly=true;letter.setAttribute('aria-label','Ön yazı taslağı');letter.value=data.letter;
+    const save=node('button','secondary','Ön yazıyı indir');save.addEventListener('click',()=>downloadLocalFile(new Blob([data.letter],{type:'text/plain;charset=utf-8'}),'On_Yazi_'+record.posting.company.replace(/[^\p{L}\p{N}]+/gu,'_').slice(0,60)+'.txt'));
+    cvBox.append(node('p','small muted','Şirket, pozisyon, kayıtlı profil anlatımın ve varsa analizde seçilen dayanaklarla hazırlanır. Göndermeden önce oku.'),letter,save);preview.hidden=true;
+  }catch(error){notify(error.message,true);preview.disabled=false;}});
+  cvBox.append(downloadCV,preview);pane.append(cvBox);
   const tracking = node('section', 'tracking'); tracking.append(node('h3', '', 'Başvuru durumun'));
   const select = node('select'); select.setAttribute('aria-label', 'Başvuru durumunu değiştir');
   for (const [value, label] of Object.entries(states)) { const option = node('option', '', label); option.value = value; select.append(option); } select.value = record.state;
@@ -503,13 +536,13 @@ let freehirePage=1, freehireSavedCriteria='';
 async function runFreehire(page) {
   const output=$('#freehire-result');
   if(!$('#freehire-approval').checked){output.textContent='Bölge ve seviye filtrelerinin FreeHire ile paylaşımını onayla.';return;}
-  const criteria=JSON.stringify([$('#discovery-job-scope').value,$('#discovery-roles').value,$('#discovery-early-career').checked,$('#discovery-keywords').value,$('#discovery-excluded').value]);
+  const criteria=JSON.stringify([$('#discovery-job-scope').value,$('#discovery-roles').value,$('#discovery-early-career').checked,$('#discovery-keywords').value,$('#discovery-excluded').value,$('#freehire-unlabelled').checked]);
   if(page>1 && criteria!==freehireSavedCriteria){output.textContent='Kriterler değişti; ilk sayfadan yeniden ara.';$('#freehire-next').hidden=true;return;}
   discoverySearchPending=true; $('#freehire-search').disabled=true; $('#freehire-next').disabled=true; $('#discovery-job-search').disabled=true; $('#discovery-auto-search').disabled=true;
   output.textContent='FreeHire ilanları getiriliyor…';
   try {
     await saveDiscoverySettings();
-    const data=await api('/api/discovery/freehire',{approved:true,scope:$('#discovery-job-scope').value,page});
+    const data=await api('/api/discovery/freehire',{approved:true,scope:$('#discovery-job-scope').value,page,includeUnlabelled:$('#freehire-unlabelled').checked});
     freehirePage=page;freehireSavedCriteria=criteria;$('#freehire-next').hidden=!data.hasMore;
     output.textContent='Sayfa '+page+' · Kaynağın bildirdiği toplam: '+data.total+' · '+data.examined+' kayıt incelendi · '+data.added+' yeni aday · '+data.duplicates+' zaten kayıtlı · '+data.filtered+' filtre dışı · '+data.closed+' kapalı · '+data.rejected+' geçersiz. '+(data.cached?'Kayıtlı sonuçlar kullanıldı.':'SerpAPI sorgusu ve ücretli model kullanılmadı.');
     $('#filter').value='review';$('#search').value='';await refresh();notify(data.added+' FreeHire ilan adayı eklendi; bilgileri kontrol et.');
@@ -537,3 +570,7 @@ function renderApplicationTracking(pane,record){
 for(const id of ['tracking-stage-filter','tracking-followup-filter'])$('#'+id).addEventListener('change',()=>applyFilters().catch(error=>notify(error.message,true)));
 $('#clear-archived').addEventListener('click',async()=>{const button=$('#clear-archived');button.disabled=true;try{const result=await api('/api/jobs/clear-archived',{});notify(result.removed+' vazgeçilen kayıt kaldırıldı. Geri getirme düğmesiyle kurtarabilirsin.');await refresh();}catch(error){notify(error.message,true);}finally{button.disabled=false;}});
 $('#restore-trash').addEventListener('click',async()=>{const button=$('#restore-trash');button.disabled=true;try{const result=await api('/api/trash/restore',{});notify(result.restored+' kayıt geri getirildi.');await refresh();}catch(error){notify(error.message,true);}finally{button.disabled=false;}});
+
+$('#group-related').addEventListener('change',renderList);
+
+function downloadLocalFile(blob,filename){const url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download=filename;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}

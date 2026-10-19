@@ -1,3 +1,4 @@
+import {discoveryCategoryValues} from './role-profiles.js';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { jobLink } from '../jobs/links.js';
@@ -7,7 +8,7 @@ import { searchFilterReason } from './job-results.js';
 import type { DiscoveryConfig } from './core.js';
 import type { openHubStore } from '../hub/store.js';
 
-export const freehireCriteria = z.strictObject({scope:z.enum(['turkey','remote']), earlyCareer:z.boolean(), page:z.number().int().min(1).max(10)});
+export const freehireCriteria = z.strictObject({scope:z.enum(['turkey','remote']), earlyCareer:z.boolean(), page:z.number().int().min(1).max(10), includeUnlabelled:z.boolean().default(false), categories:z.array(z.enum(discoveryCategoryValues)).max(13).default([])});
 const rowSchema = z.object({public_slug:z.string().regex(/^[a-z0-9][a-z0-9-]{0,199}$/), title:z.string().min(1).max(1200),
   url:z.string().max(2000).optional(), company:z.string().max(1200).nullable().optional(), description:z.string().max(24000).nullable().optional(),
   location:z.string().max(24000).nullable().optional(), countries:z.array(z.string().max(3)).max(100).default([]),
@@ -26,7 +27,8 @@ export function createFreehireSearch(request:typeof fetch=fetch, now=()=>Date.no
     try {
       const url=new URL('https://freehire.me/api/v1/agent/jobs/search');
       url.search=new URLSearchParams({limit:'30',offset:String((criteria.page-1)*30),posted_within_days:'30',description_format:'text',
-        ...(criteria.scope==='turkey'?{countries:'TR'}:{work_mode:'remote'}),...(criteria.earlyCareer?{seniority:'junior'}:{})}).toString();
+        ...(criteria.scope==='turkey'?{countries:'TR'}:{work_mode:'remote'}),...(criteria.earlyCareer && !criteria.includeUnlabelled?{seniority:'junior'}:{})}).toString();
+      for(const category of criteria.categories) url.searchParams.append('category',category);
       let response:Response;
       try { response=await request(url,{redirect:'error',credentials:'omit',headers:{Accept:'application/json'},signal:AbortSignal.any([signal,AbortSignal.timeout(20_000)])}); }
       catch { throw new Error('DISCOVERY_FREEHIRE_NETWORK'); }

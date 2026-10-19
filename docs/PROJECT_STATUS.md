@@ -420,7 +420,49 @@ Aşağıdaki teslim bu yön değişikliğini uygular.
   başlatma ve başvuru notlarının korunması kurgusal veriyle doğrulandı.
   Gerçek başvuru kayıtları bu artımda değiştirilmedi.
 
-Sıradaki tek iş: kullanıcının gerçek başvurularının tarih/aşama bilgilerini
-kendisi girerken akışı gözlemek; sonraki ek özelliği kullanıcının tamamlayacağı
-“bir de” talebine göre seçmek. E-posta bağlantısı, otomatik mesaj veya yeni
-başvuru gönderimi onaylanmış kapsam değildir.
+## Geniş arama, olası tekrar grupları ve panelden belge hazırlığı — tamamlandı
+
+- Yazılım + analiz + BT denetimi ortak rol grubu eklendi. BT denetimi için
+  technology risk/assurance ve Türkçe karşılıkları yerel sözlüğe dahil edildi.
+  Kullanıcının product/frontend/backend gibi özel rolleri korunur; bunlar da
+  uygun kaynak kategori filtrelerine bağlanır. Bu, aday becerisi/uygunluğu iddiası değildir.
+- FreeHire'da junior etiketi olmayan kayıtlar da ayrıca incelenebilir. Bu seçenek
+  sağlayıcıdaki junior filtresini kaldırır; mevcut earlyCareer ve unvan/kelime/
+  açık minimum deneyim filtreleri yerelde çalışır. Belirsiz seviye junior diye
+  etiketlenmez. Kategori filtreleri sağlayıcının canlı facets yanıtıyla doğrulandı.
+- FreeHire/SerpAPI/manuel kaynaklar için aynı bilinen şirket ve benzer unvanlı
+  kayıtlar karşılaştırılabilir. İncelenecek kayıtlar isteğe bağlı açılır gruplarda
+  görünür; hiçbir kayıt veya başvuru durumu birleştirilmez/silinmez. Bilinmeyen
+  şirketler sadece aynı unvan nedeniyle gruplanmaz. Doğrulanmış farklı ülke
+  eşleşmeleri aday ilişkisine alınmaz. Başvurulanlar takip kayıtları ayrı kalır.
+- Doğrulanmış ilanlarda CV indir ve yerel ön yazı taslağını aç/indir düğmeleri var.
+  Mevcut selectCV/renderCoverLetter ve PDF okuma denetimi kullanılır; yeni model,
+  doküman üretim motoru veya paket eklenmedi. Taslak, şirket/pozisyon, kayıtlı
+  onaylı aday anlatımı ve varsa analizde seçili dayanaklardan oluşur; yeni bir
+  modelin ilan şartlarına göre yeniden yazdığı metin olarak sunulmaz.
+- Belgeler sadece loopback + token/origin kontrollü uç noktadan alınır. Keyfi dosya
+  yolu istemciden kabul edilmez; CV PDF/5 MB/O_NOFOLLOW kontrolünden geçer.
+  Kaynaktan gelen ülke/dil/tam metin doğrulanmadan CV/ön yazı uçları da engellenir.
+- Gerçek Türkiye geniş araması: kaynak toplam 501 bildirdi; ilk 30 kayıttan
+  9 yeni review adayı, 2 bilinen, 19 filtre dışı. Toplam 501, uygun/açık iş sayısı
+  değildir ve bütün sayfalar taranmadı. İlk 9 adayda yazılım ve iş analizi var;
+  panel 7 olası grup gösterdi. Gruplar açılıp iki farklı kayıt görüldü.
+- BT denetimi odaklı arama: 55 kayıt iki sayfada incelendi; 0 yeni, 1 bilinen,
+  54 filtre dışı. Bu kaynak/filtre denemesi Türkiye'de uygun BT denetimi işi
+  olmadığını kanıtlamaz. Ayrı kaynaklarda canlı arama henüz tamamlanmadı.
+- SerpAPI yerel günlük sınırı UTC gününde dolu olduğundan yeni sorgu yapılmadı;
+  ledger ve sınırlar değiştirilmedi. Bütçe/sağlayıcı kontrolü korunur.
+- Gerçek panelde yerel ön yazı önizlemesi açıldı. Seçilmiş gerçek EN/fotoğraflı
+  PDF, içerik değiştirilmeden yerelde okunabildi. İşverene yükleme/gönderim yok.
+- TypeScript, 162 çevrimdışı test ve whitespace kontrolü geçti. Yeni testler
+  etiketsiz seviyede yerel deneyim elemesini, kategori/rol kapsamını, şirket/ülke
+  eşleştirmesini ve belge uçlarının kaynak doğrulama/erişim sınırlarını kapsar.
+- Önceden var olan ilan dosyaları ve arama ledger hash'leri aynı. Kullanıcının
+  son durumuyla 11 submitted, 9 review, 13 gizlenen kayıt var. Eski rol tercihleri
+  korunup BT denetim/technology risk ifadeleri eklendi. Ücretli model/profil
+  paylaşımı/gerçek başvuru gönderimi bu artımda yapılmadı.
+
+Sıradaki tek iş: getirilen yeni adaylardan henüz başvurulmamış birini kullanıcıyla
+seçip işveren kaynağını doğrulayarak CV/ön yazı hazırlığını gerçek adayda tamamlamak.
+Yeni ücretli analiz gerekiyorsa o çağrı için ayrıca onay gerekir. SerpAPI canlı
+aramasını ancak mevcut kota izin verdiğinde kullanıcı onayıyla genişlet.
