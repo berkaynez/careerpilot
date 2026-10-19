@@ -15,6 +15,8 @@ export const recordSchema = z.strictObject({
   analysis: z.strictObject({ job: jobSchema, plan: planSchema,
     origin: z.enum(['model', 'imported_review', 'demo']), at: z.iso.datetime(), costMicroUsd: z.number().int().nonnegative().nullable() }).nullable(),
   lastError: z.string().regex(/^[A-Z_]+$/).nullable(),
+  discovery: z.strictObject({ sourceKey: z.string().regex(/^(lever|greenhouse):[a-z0-9_-]{1,80}$/), externalId: z.string().max(80),
+    discoveredAt: z.iso.datetime(), location: z.string().max(24000), remote: z.boolean(), reasons: z.array(z.string().max(500)).max(10), routingConfirmed: z.boolean() }).nullable().default(null),
 });
 export type HubRecord = z.infer<typeof recordSchema>;
 
@@ -54,9 +56,9 @@ export async function openHubStore(directory: string, profile: Profile) {
   return {
     list: () => [...records.values()].map(record => structuredClone(record)).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
     get(id: string) { const value = records.get(id); if (!value) throw new Error('HUB_NOT_FOUND'); return structuredClone(value); },
-    add: (record: HubRecord) => enqueue(async () => {
+    add: (record: z.input<typeof recordSchema>) => enqueue(async () => {
       if (records.has(record.id)) throw new Error('HUB_RECORD_EXISTS');
-      return save(record);
+      return save(check(record));
     }),
     update: (id: string, change: (record: HubRecord) => HubRecord) => enqueue(async () => {
       const old = records.get(id); if (!old) throw new Error('HUB_NOT_FOUND');
