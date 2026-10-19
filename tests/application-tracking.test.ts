@@ -56,3 +56,27 @@ test('tracking and cleanup require trusted origin/session, validate dates and pr
   const reopened=await openHubStore(join(dir,'jobs'),demoProfile);assert.deepEqual(reopened.get(created.id).tracking,tracking);assert.equal(reopened.list().length,1);
   assert.equal((await(await send('/api/trash/restore',{})).json()).restored,1);assert.equal((await(await send('/api/jobs/'+second.id)).json()).state,'archived');assert.equal(models,0);
 });
+
+test('individual removal preserves application tracking and restores only the selected record',async t=>{
+  const dir=await mkdtemp(join(tmpdir(),'careerpilot-single-trash-'));t.after(()=>rm(dir,{recursive:true,force:true}));
+  const store=await openHubStore(dir,demoProfile),seeds=demoRecords();
+  await store.add({...seeds[0]!,state:'submitted',tracking:{...tracking,stage:'interview'}});await store.add({...seeds[1]!,state:'archived'});
+  await store.trashArchived();await store.trash(seeds[0]!.id);assert.equal(store.list().length,0);
+  const reopened=await openHubStore(dir,demoProfile);const restored=await reopened.restore(seeds[0]!.id);
+  assert.equal(restored.state,'submitted');assert.deepEqual(restored.tracking,tracking);assert.equal(reopened.list().length,1);assert.equal(reopened.list({includeTrashed:true}).filter(row=>row.trashedAt).length,1);
+});
+
+test('individual remove and restore endpoints enforce origin/session and leave other applications unchanged',async t=>{
+  const dir=await mkdtemp(join(tmpdir(),'careerpilot-single-trash-api-'));
+  const hub=await startHub({directory:join(dir,'jobs'),profile:demoProfile,seed:demoRecords()});t.after(async()=>{await hub.close();await rm(dir,{recursive:true,force:true});});
+  const session=await(await fetch(hub.origin+'/api/session')).json();
+  const headers={Origin:hub.origin,'Content-Type':'application/json','X-Hub-Token':session.token};
+  const records=await(await fetch(hub.origin+'/api/jobs',{headers})).json(),path='/api/jobs/'+records[0].id;
+  const send=(action:string,origin=hub.origin)=>fetch(hub.origin+path+'/'+action,{method:'POST',headers:{...headers,Origin:origin},body:'{}'});
+  assert.equal((await send('remove','https://attacker.invalid')).status,403);
+  assert.equal((await send('remove')).status,200);assert.equal((await fetch(hub.origin+path,{headers})).status,404);
+  assert.equal((await send('restore','https://attacker.invalid')).status,403);
+  assert.equal((await send('restore')).status,200);
+  const restored=await(await fetch(hub.origin+path,{headers})).json();assert.equal(restored.state,records[0].state);
+  assert.equal((await(await fetch(hub.origin+'/api/jobs',{headers})).json()).length,2);
+});

@@ -196,9 +196,20 @@ export async function startHub(options: { directory: string; profile: Profile; d
           analysis: { job, plan, origin: 'imported_review', at: now, costMicroUsd: null }, lastError: null });
         json(201, detail(record)); return;
       }
-      const match = /^\/api\/jobs\/([a-f0-9-]{36})(?:\/(status|analyze|assistant|routing|verify-posting|tracking))?$/.exec(path);
+      const match = /^\/api\/jobs\/([a-f0-9-]{36})(?:\/(status|analyze|assistant|routing|verify-posting|tracking|remove|restore))?$/.exec(path);
       if (!match) { json(404, { code: 'HUB_NOT_FOUND' }); return; }
-      const id = z.uuid().parse(match[1]), action = match[2], record = store.get(id);
+      const id = z.uuid().parse(match[1]), action = match[2];
+      if(action==='restore' && request.method==='POST') {
+        z.strictObject({}).parse(await body(request));
+        if(busy.size || opening || assistant && assistant.session.snapshot().status!=='closed')throw new Error('HUB_RECORD_BUSY');
+        json(200,detail(await store.restore(id)));return;
+      }
+      const record = store.get(id);
+      if(action==='remove' && request.method==='POST') {
+        z.strictObject({}).parse(await body(request));
+        if(busy.size || opening || assistant && assistant.session.snapshot().status!=='closed')throw new Error('HUB_RECORD_BUSY');
+        json(200,await store.trash(id));return;
+      }
       if (!action && request.method === 'GET') { json(200, detail(record)); return; }
       if (action === 'verify-posting' && request.method === 'POST') {
         const verified = z.strictObject({ company: postingSchema.shape.company, title: postingSchema.shape.title,

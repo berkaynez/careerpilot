@@ -1,6 +1,6 @@
 # CareerPilot — güncel durum ve devam planı
 
-Son düzenleme: 19 Ekim 2026. Bu dosya güncel kapsamın ve sıradaki işin tek kaynağıdır.
+Son düzenleme: 20 Ekim 2026. Bu dosya güncel kapsamın ve sıradaki işin tek kaynağıdır.
 Bir iş tamamlandığında buradaki durum değiştirilir; yeni bir paralel plan eklenmez.
 
 ## Ürün hedefi
@@ -407,6 +407,18 @@ Aşağıdaki teslim bu yön değişikliğini uygular.
   doğrulaması ve origin/session koruması kurgusal veriyle test edildi.
   Gerçek panelde 11 kayıt kaldırma, Başvurulanlar takibi ve aşama filtresi görüldü;
   gerçek başvurulara deneme notu veya tahmini tarih yazılmadı.
+
+## Tekil ilan kaldırma — tamamlandı
+
+- Her ilanın ayrıntısında, başlığın altındaki eylem satırında Listeden kaldır
+  düğmesi var. Başvuru yapılmış ilanlar da tek tek kaldırılabilir; durum ve
+  takip notları korunur. Kaldırma sonrası Geri al yalnızca o ilanı geri getirir.
+  Önceki toplu kaldırma/geri getirme seçenekleri devam eder.
+- Devam eden analiz veya form oturumu varken kaldırma/geri alma engellenir.
+  Origin/session koruması ve kalıcı yeniden keşif tekrar kontrolü korunur.
+- TypeScript ve 157 çevrimdışı test geçti. Tekil kaldırma/geri alma, yeniden
+  başlatma ve başvuru notlarının korunması kurgusal veriyle doğrulandı.
+  Gerçek başvuru kayıtları bu artımda değiştirilmedi.
 
 Sıradaki tek iş: kullanıcının gerçek başvurularının tarih/aşama bilgilerini
 kendisi girerken akışı gözlemek; sonraki ek özelliği kullanıcının tamamlayacağı

@@ -1195,3 +1195,7 @@ Vazgeçilenleri kaldır yalnızca Vazgeçildi durumundakileri listeden gizler.
 Kaldırılanları geri getir ile kurtarabilirsin; kalıcı dosya silme yapılmaz.
 Gizlenen bağlantılar yeniden aramada tekrar eklenmez. Bu kontrol aynı URL/ID
 üzerindedir; farklı yayınların aynı iş olduğu otomatik varsayılmaz.
+
+Tek bir ilanı kaldırmak için ilanı seç → başlığın altındaki **Listeden kaldır**.
+Sonrasında çıkan **Geri al** yalnızca o ilanı, eski durumu ve takip notlarıyla geri
+getirir. Bu işlem başvuruyu işverenden geri çekmez; sadece yerel listeden kaldırır.
