@@ -49,7 +49,7 @@ export function searchFilterReason(title:string, text:string, config:DiscoveryCo
 }
 /** Import unverified search evidence, never crawl an account or present a snippet as a full job description. */
 export async function importSearchJobs(store: Awaited<ReturnType<typeof openHubStore>>, raw: SearchHit[], config: DiscoveryConfig, now = () => new Date()) {
-  const hits = z.array(searchHitSchema).max(40).parse(raw), known = new Set(store.list().flatMap(record => { let url=record.posting.sourceUrl; try { url=jobLink(url).url; } catch {} return [url,...(record.discovery?.search?.originalURL?[record.discovery.search.originalURL]:[])]; }));
+  const hits = z.array(searchHitSchema).max(40).parse(raw), known = new Set(store.list({includeTrashed:true}).flatMap(record => { let url=record.posting.sourceUrl; try { url=jobLink(url).url; } catch {} return [url,...(record.discovery?.search?.originalURL?[record.discovery.search.originalURL]:[])]; }));
   const filterReasons = { role: 0, excludedTitle: 0, keyword: 0, experience: 0 };
   const report = { added: 0, duplicates: 0, filtered: 0, rejected: 0, modelCalls: 0, filterReasons };
   for (const hit of hits) {

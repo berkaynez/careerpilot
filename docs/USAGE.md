@@ -1182,3 +1182,16 @@ Adayı açınca şirket ve kaynaktan gelen ilan metni doğrulama alanında hazı
 İlanı açıp kontrol et, ülke/dili seç ve bilgileri doğrula. Olası tekrar uyarısı
 varsa benzer kaydı karşılaştır. FreeHire kaydından otomatik form doldurma yapılmaz;
 işveren sitesindeki giriş, CV yüklemesi ve başvuru gönderimi kullanıcıdadır.
+
+### Başvuru takibi ve vazgeçilenleri kaldırma
+
+Başvurulanlar → bir ilan seç → Başvuru takibi alanından aşamayı, başvuru ve
+sonraki takip tarihini, notunu gir → Takibi kaydet. Aşama ve takip tarihi
+filtreleriyle bugün/geciken takipleri görebilirsin. Başvuru tarihini bilmiyorsan
+boş bırak; kayıt güncelleme tarihi otomatik başvuru tarihi olarak kullanılmaz.
+Notlar yereldir; takip tarihi otomatik bildirim veya mesaj göndermez.
+
+Vazgeçilenleri kaldır yalnızca Vazgeçildi durumundakileri listeden gizler.
+Kaldırılanları geri getir ile kurtarabilirsin; kalıcı dosya silme yapılmaz.
+Gizlenen bağlantılar yeniden aramada tekrar eklenmez. Bu kontrol aynı URL/ID
+üzerindedir; farklı yayınların aynı iş olduğu otomatik varsayılmaz.

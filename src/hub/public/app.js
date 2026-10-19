@@ -1,9 +1,14 @@
 'use strict';
 const $ = selector => document.querySelector(selector);
 const states = { saved: 'Kaydedildi', ready: 'Analizi hazır', review: 'İnceleme gerekiyor', submitted: 'Başvuruldu', archived: 'Vazgeçildi' };
+const trackingStages={not_set:'Aşama belirtilmedi',awaiting_response:'Yanıt bekleniyor',screening:'İK görüşmesi',interview:'Mülakat',assessment:'Test / değerlendirme',offer:'Teklif',rejected:'Olumsuz',closed:'Süreç kapandı'};
+const localDay=()=>{const date=new Date();return date.getFullYear()+'-'+String(date.getMonth()+1).padStart(2,'0')+'-'+String(date.getDate()).padStart(2,'0');};
+const followUpDue=item=>Boolean(item.tracking?.followUpOn && item.tracking.followUpOn<=localDay() && !['rejected','closed'].includes(item.tracking.stage));
 const levels = { documented: 'Doğrudan dayanak', related: 'Kısmi dayanak', not_documented: 'Profilde belgelenmiyor' };
 const priorities = { essential: 'Temel şart', preferred: 'Tercih edilen', responsibility: 'Görev' };
 const errors = {
+  HUB_RECORD_BUSY:'Önce devam eden analiz veya form oturumunu kapat.',
+  HUB_TRACKING_SUBMITTED_REQUIRED:'Takip bilgilerini yalnızca Başvuruldu kayıtlarında düzenleyebilirsin.',
   DISCOVERY_FREEHIRE_COOLDOWN: 'FreeHire yeni sorgusu için 30 saniye bekle.',
   DISCOVERY_FREEHIRE_RATE_LIMITED: 'FreeHire hız sınırı bildirdi; 5 dakika sonra yeniden deneyebilirsin.',
   DISCOVERY_FREEHIRE_HTTP: 'FreeHire erişimi reddetti. Tekrar denenmedi; SerpAPI seçeneğini kullanabilirsin.',
@@ -60,7 +65,10 @@ function notify(text, error = false) { const box = $('#notice'); box.textContent
 function badge(state) { return node('span', 'badge ' + state, states[state]); }
 function openDialog(id) { const dialog = $(id); dialog.querySelector('.form-error').textContent = ''; dialog.showModal(); }
 async function refresh(preferred) {
-  records = await api('/api/jobs');
+  const [jobs,trash]=await Promise.all([api('/api/jobs'),api('/api/trash')]); records=jobs;
+  const archived=records.filter(item=>item.state==='archived').length;
+  $('#clear-archived').hidden=!archived;$('#clear-archived').textContent='Vazgeçilenleri kaldır ('+archived+')';
+  $('#restore-trash').hidden=!trash.count;$('#restore-trash').textContent='Kaldırılanları geri getir ('+trash.count+')';
   $('#stat-all').textContent = records.length;
   $('#stat-ready').textContent = records.filter(item => item.analysisOrigin).length;
   $('#stat-review').textContent = records.filter(item => item.state === 'review').length;
@@ -75,8 +83,8 @@ async function refresh(preferred) {
 }
 function visibleRecords() {
   const query = $('#search').value.toLocaleLowerCase('tr'), state = $('#filter').value;
-  const visible = records.filter(item => (state === 'all' || item.state === state) && (item.company + ' ' + item.title).toLocaleLowerCase('tr').includes(query));
-  return state === 'review' ? visible.sort((a, b) => Number(b.discovery?.careerLevel === 'entry') - Number(a.discovery?.careerLevel === 'entry')) : visible;
+  const visible = records.filter(item => (state !== 'submitted' || (($('#tracking-stage-filter').value==='all' || (item.tracking?.stage || 'not_set')===$('#tracking-stage-filter').value) && ($('#tracking-followup-filter').value==='all' || ($('#tracking-followup-filter').value==='due'?followUpDue(item):!item.tracking?.followUpOn)))) && (state === 'all' || item.state === state) && (item.company + ' ' + item.title).toLocaleLowerCase('tr').includes(query));
+  return state === 'submitted' ? visible.sort((a,b)=>Number(followUpDue(b))-Number(followUpDue(a)) || (a.tracking?.followUpOn || '9999').localeCompare(b.tracking?.followUpOn || '9999')) : state === 'review' ? visible.sort((a, b) => Number(b.discovery?.careerLevel === 'entry') - Number(a.discovery?.careerLevel === 'entry')) : visible;
 }
 function clearDetail() { selectedId = null; detailSignature = '';  detailSequence++; const empty = node('div', 'empty'); empty.append(node('h2', '', 'Görüntülenecek ilan seçilmedi.'), node('p', '', 'Aramayı veya filtreyi değiştirerek bir ilan seçebilirsin.')); $('#detail').replaceChildren(empty); }
 async function applyFilters() {
@@ -95,6 +103,9 @@ function renderList() {
   }
   $('#nav-submitted-count').textContent = records.filter(item => item.state === 'submitted').length;
   $('#list-title').textContent = view === 'submitted' ? 'Başvurulanlar' : view === 'review' ? 'İnceleme bekleyenler' : 'İlanların';
+  $('#tracking-filters').hidden=view!=='submitted';$('#tracking-overview').hidden=view!=='submitted';
+  const applications=records.filter(item=>item.state==='submitted');
+  $('#tracking-overview').textContent=applications.length+' başvuru · '+applications.filter(followUpDue).length+' bugün/geciken takip · '+applications.filter(item=>!item.tracking?.appliedOn).length+' başvuru tarihi eksik';
   const filtered = visibleRecords();
   $('#list-count').textContent = filtered.length + ' ilan'; $('#jobs').replaceChildren();
   if (!filtered.length) {
@@ -109,6 +120,11 @@ function renderList() {
     bottom.append(badge(item.state), node('span', 'country', (item.discovery && !item.discovery.routingConfirmed ? 'Ülke doğrulanmalı' : item.country) + ' · ' + new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'short' }).format(new Date(item.updatedAt))));
     const score = node('span', item.score === null ? 'card-score muted' : 'card-score', item.analyzing ? 'Analiz sürüyor…' : item.score === null ? (item.analysisOrigin ? 'Puan hesaplanamadı' : 'Henüz analiz yok') : item.score + '/100 uyum');
     if (item.discovery) bottom.append(node('span', 'small muted', item.discovery.careerLevel === 'entry' ? 'Yeni mezun / başlangıç' : item.discovery.careerLevel === 'experienced' ? 'Deneyimli rol' : 'Seviye kontrol edilmeli'));
+    if(item.state==='submitted'){
+      score.textContent=trackingStages[item.tracking?.stage || 'not_set'];
+      bottom.append(node('span','small muted','Başvuru: '+(item.tracking?.appliedOn || 'Tarih girilmemiş')));
+      if(item.tracking?.followUpOn)bottom.append(node('span',followUpDue(item)?'authorization':'small muted','Takip: '+item.tracking.followUpOn));
+    }
     card.append(top, title, bottom, score); card.addEventListener('click', () => showDetail(item.id).catch(error => notify(error.message, true))); $('#jobs').append(card);
   }
 }
@@ -121,6 +137,7 @@ async function showDetail(id) {
   const pane = $('#detail'); pane.replaceChildren();
   const head = node('div', 'detail-head'); head.append(node('div', 'eyebrow', record.posting.company), node('h2', '', record.posting.title));
   const meta = node('div', 'detail-meta'); meta.append(badge(record.state), node('span', 'muted', record.discovery && !record.discovery.routingConfirmed ? 'Ülke ve dil doğrulanmalı' : record.posting.country + ' · ' + (record.posting.language === 'en' ? 'İngilizce ilan' : 'Türkçe ilan'))); head.append(meta); pane.append(head);
+  renderApplicationTracking(pane,record);
   const actions = node('div', 'detail-actions'), link = node('a', 'secondary', 'İlanı aç ↗'); link.href = record.posting.sourceUrl; link.target = '_blank'; link.rel = 'noopener noreferrer'; actions.append(link);
   const analyze = node('button', 'primary', record.analyzing ? 'Analiz sürüyor…' : record.analysis ? 'Yeniden analiz et' : 'Uyumunu analiz et');
   analyze.disabled = !session.modelEnabled || record.analyzing || Boolean(record.discovery && !record.discovery.routingConfirmed); analyze.addEventListener('click', () => { $('#analyze-form').reset(); $('#model-details').textContent = session.model ? 'Model: ' + session.model.name + ' · Sağlayıcı: ' + session.model.destination + ' · Analiz sınırı: $' + session.model.perRunLimitUsd.toFixed(4) + ' · Aylık sınır: $' + session.model.monthlyLimitUsd.toFixed(2) : ''; openDialog('#analyze-dialog'); }); actions.append(analyze); pane.append(actions);
@@ -496,3 +513,22 @@ async function runFreehire(page) {
 }
 $('#freehire-search').addEventListener('click',()=>runFreehire(1));
 $('#freehire-next').addEventListener('click',()=>runFreehire(freehirePage+1));
+
+function renderApplicationTracking(pane,record){
+  if(record.state!=='submitted')return;
+  const data=record.tracking || {stage:'not_set',appliedOn:null,followUpOn:null,notes:''};
+  const box=node('section','tracking'),form=node('form');box.append(node('h3','','Başvuru takibi'));
+  const stage=node('select');for(const [value,label] of Object.entries(trackingStages)){const option=new Option(label,value);stage.append(option);}stage.value=data.stage;
+  const applied=node('input');applied.type='date';applied.value=data.appliedOn || '';
+  const next=node('input');next.type='date';next.value=data.followUpOn || '';
+  const notes=node('textarea');notes.rows=4;notes.maxLength=4000;notes.value=data.notes;
+  for(const [label,input] of [['Süreç aşaması',stage],['Başvuru tarihi',applied],['Sonraki takip tarihi',next],['Başvuru notları',notes]]){const wrapper=node('label','',label);wrapper.append(input);form.append(wrapper);}
+  form.append(node('p','small muted','Notlar yalnızca bilgisayarında saklanır. Takip tarihi panelde görünür; otomatik e-posta veya bildirim gönderilmez.'));
+  const message=node('p','form-error'),save=node('button','primary','Takibi kaydet');save.type='submit';form.append(message,save);
+  form.addEventListener('submit',async event=>{event.preventDefault();message.textContent='';if(applied.value && next.value && next.value<applied.value){message.textContent='Takip tarihi başvuru tarihinden önce olamaz.';return;}save.disabled=true;
+    try{await api('/api/jobs/'+record.id+'/tracking',{stage:stage.value,appliedOn:applied.value || null,followUpOn:next.value || null,notes:notes.value});notify('Başvuru takibi kaydedildi.');await refresh(record.id);}catch(error){message.textContent=error.message;save.disabled=false;}
+  });box.append(form);pane.append(box);
+}
+for(const id of ['tracking-stage-filter','tracking-followup-filter'])$('#'+id).addEventListener('change',()=>applyFilters().catch(error=>notify(error.message,true)));
+$('#clear-archived').addEventListener('click',async()=>{const button=$('#clear-archived');button.disabled=true;try{const result=await api('/api/jobs/clear-archived',{});notify(result.removed+' vazgeçilen kayıt kaldırıldı. Geri getirme düğmesiyle kurtarabilirsin.');await refresh();}catch(error){notify(error.message,true);}finally{button.disabled=false;}});
+$('#restore-trash').addEventListener('click',async()=>{const button=$('#restore-trash');button.disabled=true;try{const result=await api('/api/trash/restore',{});notify(result.restored+' kayıt geri getirildi.');await refresh();}catch(error){notify(error.message,true);}finally{button.disabled=false;}});

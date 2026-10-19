@@ -379,7 +379,36 @@ Aşağıdaki teslim bu yön değişikliğini uygular.
   yalnızca Türkiye/junior ilk sayfa içindir; global remote ve sayfalama mocked
   transportla doğrulanır. Ücretli model, profil/CV paylaşımı veya başvuru yoktur.
 
-Sıradaki tek iş: getirilen adaylardan başvurulmamış bir ilanı seçip işveren
-sayfasındaki açıklık, ülke/dil ve kaynak metnini doğrulayarak mevcut hazırlık
-akışına taşımak. Önce tekrar uyarılarını incele. Daha fazla kaynak/soyutlama
-katmanı eklemek yerine bu akışı gerçek başvuru hazırlığına kadar tamamla.
+## Başvuru takibi ve temizleme — tamamlandı
+
+- Kullanıcı yeni adayların çoğuna başvurduğunu belirtti; panelde kendisinin
+  işaretlediği 11 submitted / 11 archived durumu esas alındı. Durumlar tahminle
+  değiştirilmedi, aynı şirketin benzer başlıkları otomatik birleştirilmedi.
+- Vazgeçilenleri kaldır işlemi archived kayıtlarına yerel trashedAt işareti koyar.
+  Dosyalar kalıcı silinmez; Kaldırılanları geri getir düğmesiyle geri alınır.
+  Ana liste, sayaçlar ve doğrudan ilan ayrıntısı gizlenen kayıtları göstermez.
+  Kaynak/SerpAPI/FreeHire tekrar kontrolü gizlenen kayıtları da kapsar; bilinen
+  aynı URL yeniden eklenmez. Farklı yayın ID'lerinin aynı iş olduğu varsayılmaz.
+- Kullanıcı isteği gerçek panelde uygulandı: 11 archived kayıt kaldırıldı,
+  11 submitted kaydın dosya içeriği aynen korundu. Kaldırılanların eski alanları
+  aynı; yalnızca silme işareti ve eksik şema varsayılanları eklendi. SerpAPI
+  ledger değişmedi; hiçbir arama/model/başvuru çağrısı yapılmadı.
+- Başvurulanlar'da süreç aşaması (yanıt bekleme, İK, mülakat, test, teklif,
+  olumsuz, kapanış), başvuru tarihi, sonraki takip tarihi ve yerel not var.
+  Eski tarihler/aşamalar uydurulmaz; boş kayıtlar açıkça belirtilir.
+  Takip tarihi başvuru tarihinden önce olamaz. Bilgiler yalnızca submitted
+  kayıtlarında düzenlenir; başka duruma geçince korunur.
+- Süreç aşaması ve bugün/geciken takip filtreleri eklendi. Takip zamanı gelen
+  başvurular öne çıkar; olumsuz/kapanmış süreçler gecikmiş takip sayılmaz.
+  Tarihler yerel takvime göre değerlendirilir. Tarih alanı otomatik e-posta,
+  arka plan takibi veya bildirim üretmez; notlar modele/işverene gönderilmez.
+- TypeScript, 155 çevrimdışı test ve whitespace kontrolü geçti. Geri alma ve
+  yeniden başlatma, kaldırılan ilanların yeniden keşifle dönmemesi, tarih/not
+  doğrulaması ve origin/session koruması kurgusal veriyle test edildi.
+  Gerçek panelde 11 kayıt kaldırma, Başvurulanlar takibi ve aşama filtresi görüldü;
+  gerçek başvurulara deneme notu veya tahmini tarih yazılmadı.
+
+Sıradaki tek iş: kullanıcının gerçek başvurularının tarih/aşama bilgilerini
+kendisi girerken akışı gözlemek; sonraki ek özelliği kullanıcının tamamlayacağı
+“bir de” talebine göre seçmek. E-posta bağlantısı, otomatik mesaj veya yeni
+başvuru gönderimi onaylanmış kapsam değildir.

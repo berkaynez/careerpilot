@@ -9,8 +9,14 @@ import { readLocalJSON } from '../preparation/files.js';
 
 export const states = ['saved', 'ready', 'review', 'submitted', 'archived'] as const;
 export const stateSchema = z.enum(states);
+export const trackingSchema = z.strictObject({
+  stage:z.enum(['not_set','awaiting_response','screening','interview','assessment','offer','rejected','closed']),
+  appliedOn:z.iso.date().nullable(), followUpOn:z.iso.date().nullable(), notes:z.string().trim().max(4000),
+}).superRefine((value,context)=>{if(value.appliedOn && value.followUpOn && value.followUpOn<value.appliedOn)
+  context.addIssue({code:'custom',message:'Follow-up precedes application'});});
 export const recordSchema = z.strictObject({
   version: z.literal(1), id: z.uuid(), posting: postingSchema,
+  trashedAt:z.iso.datetime().nullable().default(null), tracking:trackingSchema.nullable().default(null),
   state: stateSchema, createdAt: z.iso.datetime(), updatedAt: z.iso.datetime(),
   analysis: z.strictObject({ job: jobSchema, plan: planSchema,
     origin: z.enum(['model', 'imported_review', 'demo']), at: z.iso.datetime(), costMicroUsd: z.number().int().nonnegative().nullable() }).nullable(),
@@ -55,14 +61,26 @@ export async function openHubStore(directory: string, profile: Profile) {
     } finally { await rm(temporary, { force: true }); }
   };
   return {
-    list: () => [...records.values()].map(record => structuredClone(record)).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
-    get(id: string) { const value = records.get(id); if (!value) throw new Error('HUB_NOT_FOUND'); return structuredClone(value); },
+    list: (options: {includeTrashed?:boolean} = {}) => [...records.values()].filter(record=>options.includeTrashed || !record.trashedAt).map(record => structuredClone(record)).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
+    get(id: string) { const value = records.get(id); if (!value || value.trashedAt) throw new Error('HUB_NOT_FOUND'); return structuredClone(value); },
     add: (record: z.input<typeof recordSchema>) => enqueue(async () => {
       if (records.has(record.id)) throw new Error('HUB_RECORD_EXISTS');
       return save(check(record));
     }),
+    trashArchived: () => enqueue(async()=>{
+      let removed=0;
+      for(const record of records.values()) if(record.state==='archived' && !record.trashedAt){
+        await save({...record,trashedAt:new Date().toISOString()});removed++;
+      }
+      return {removed};
+    }),
+    restoreTrash: () => enqueue(async()=>{
+      let restored=0;
+      for(const record of records.values()) if(record.trashedAt){await save({...record,trashedAt:null});restored++;}
+      return {restored};
+    }),
     update: (id: string, change: (record: HubRecord) => HubRecord) => enqueue(async () => {
-      const old = records.get(id); if (!old) throw new Error('HUB_NOT_FOUND');
+      const old = records.get(id); if (!old || old.trashedAt) throw new Error('HUB_NOT_FOUND');
       const next = change(structuredClone(old));
       if (next.id !== old.id) throw new Error('HUB_RECORD_INVALID');
       return save({ ...next, updatedAt: new Date().toISOString() });

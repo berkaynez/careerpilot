@@ -48,7 +48,7 @@ export function createFreehireSearch(request:typeof fetch=fetch, now=()=>Date.no
   };
 }
 export async function importFreehireJobs(store:Awaited<ReturnType<typeof openHubStore>>, rows:FreehireRow[], config:DiscoveryConfig, scope:'turkey'|'remote', now=()=>new Date()) {
-  const known=new Set(store.list().flatMap(row=>[row.posting.sourceUrl,...(row.discovery?.search?.originalURL?[row.discovery.search.originalURL]:[])]));
+  const known=new Set(store.list({includeTrashed:true}).flatMap(row=>[row.posting.sourceUrl,...(row.discovery?.search?.originalURL?[row.discovery.search.originalURL]:[])]));
   const report={added:0,duplicates:0,filtered:0,closed:0,modelCalls:0};
   for(const raw of rows){const row=rowSchema.parse(raw), url='https://freehire.me/jobs/'+row.public_slug;
     if(row.closed_at){report.closed++;continue;}
