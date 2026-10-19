@@ -346,9 +346,40 @@ Aşağıdaki teslim bu yön değişikliğini uygular.
   kriter değişimi ve özet okumanın disk/sayaç değiştirmemesi kurgusal transportla
   doğrulandı. Canlı sorgu kalitesi hakkında yeni bir kanıt oluşmadı.
 
-Sıradaki tek iş: kota izin verdiğinde kullanıcı onaylı bir canlı rol grubu
-aramasında eleme nedenlerini değerlendirip sorgu isabetini ölçmek. Önce yazılım
-veya veri/iş analizi grubuyla küçük deneme; toplam bulunan aday, gerçekten açık
-ilan, tekrar ve filtre nedenlerini ayır. Gerekirse site/rol sorgularını bu kanıtla
-ayarla. Sonrasında mevcut belge hazırlama akışına yerel kontrol/revizyon bağlanabilir;
-yeni ücretli değerlendirici veya site adaptörü bu artımın parçası değildir.
+## FreeHire keşfi — canlı panel denemesi tamamlandı
+
+- Kullanıcı onayıyla FreeHire'ın herkese açık agent/jobs/search API'si eklendi.
+  Yeni runtime/paket, kişisel hesap, scraping veya ücretli sağlayıcı yoktur.
+  API sözleşmesi ve fikir kaynağı: ai-job-search revizyonu
+  0f6480d32e59d7651d920a5ec6d78ede2f4113bf, freehire-search istemcisi;
+  özgün TypeScript uygulaması yazıldı, dış script çalıştırılmadı/kopyalanmadı.
+- Türkiye veya Global remote, isteğe bağlı junior ve son 30 gün filtreleri;
+  sayfa başına 30 kayıt, en çok 10 sayfa ve yalnızca insanın sonraki sayfa isteği.
+  Roller ve ek kelimeler mevcut ücretsiz yerel filtreyle uygulanır. Global remote
+  sonuçları Türkiye'den çalışma/sponsorluk uygunluğu anlamına gelmez.
+- Aynı sorgu/sayfa 10 dakika oturum içi cache kullanır. Yeni istekler arasında
+  30 saniye, 429 sonrası 5 dakika beklenir; otomatik yeniden deneme yoktur.
+  SerpAPI'nin günlük/aylık kaydı değiştirilmez. FreeHire ücretsiz/anahtarsız
+  ayrı bir kaynaktır; sınırsızlık veya hizmet sürekliliği taahhüdü değildir.
+- Şirket ve kaynağın sağladığı metin review kaydına alınır. Ülke/dil ve metin
+  insan tarafından doğrulanmadan CV seçimi, analiz ve form yardımı açılmaz.
+  Kaynağın verdiği metin doğrulama formuna hazır gelir; tekrar kopyalamak gerekmez.
+  FreeHire bağlantısında otomatik form doldurma yoktur. Desteklenen işveren
+  bağlantısı varsa ayrıca gösterilir; diğer işveren siteleri otomatik izlenmez.
+- Bilinen aynı URL'ler başvuru durumundan bağımsız tekrar kontrolüne dahildir.
+  Aynı şirket/benzer başlık kayıtları kesin tekrar diye silinmez; özellikle
+  daha önce submitted işaretlenmişse karşılaştırma uyarısı gösterilir.
+- İlk bağımsız canlı kontrol 10 kayıtla API'yi doğruladı; ardından gerçek panel
+  tek sorguda 28 kayıt aldı: 12 yeni review adayı, 16 filtre dışı, 0 kapalı ve
+  0 biçim hatası. Bunlar 12 doğrulanmış açık/ayrı/uygun iş iddiası değildir;
+  örneğin Obilet eski başvurusuna benzeyen ve aynı şirketin yeniden yayınları var.
+- Yerel toplam 22 kayıt: 14 review, 5 submitted, 3 archived. Önceki 10 ilan dosyası
+  ve SerpAPI ledger hash'leri aynı kaldı. Mevcut dört şirket kaynağı korundu.
+- TypeScript, 152 çevrimdışı test ve whitespace kontrolü geçti. Canlı başarı
+  yalnızca Türkiye/junior ilk sayfa içindir; global remote ve sayfalama mocked
+  transportla doğrulanır. Ücretli model, profil/CV paylaşımı veya başvuru yoktur.
+
+Sıradaki tek iş: getirilen adaylardan başvurulmamış bir ilanı seçip işveren
+sayfasındaki açıklık, ülke/dil ve kaynak metnini doğrulayarak mevcut hazırlık
+akışına taşımak. Önce tekrar uyarılarını incele. Daha fazla kaynak/soyutlama
+katmanı eklemek yerine bu akışı gerçek başvuru hazırlığına kadar tamamla.

@@ -4,6 +4,12 @@ const states = { saved: 'Kaydedildi', ready: 'Analizi hazır', review: 'İncelem
 const levels = { documented: 'Doğrudan dayanak', related: 'Kısmi dayanak', not_documented: 'Profilde belgelenmiyor' };
 const priorities = { essential: 'Temel şart', preferred: 'Tercih edilen', responsibility: 'Görev' };
 const errors = {
+  DISCOVERY_FREEHIRE_COOLDOWN: 'FreeHire yeni sorgusu için 30 saniye bekle.',
+  DISCOVERY_FREEHIRE_RATE_LIMITED: 'FreeHire hız sınırı bildirdi; 5 dakika sonra yeniden deneyebilirsin.',
+  DISCOVERY_FREEHIRE_HTTP: 'FreeHire erişimi reddetti. Tekrar denenmedi; SerpAPI seçeneğini kullanabilirsin.',
+  DISCOVERY_FREEHIRE_NETWORK: 'FreeHire bağlantısı tamamlanamadı; otomatik tekrar yapılmadı.',
+  DISCOVERY_FREEHIRE_FORMAT: 'FreeHire yanıtı doğrulanamadı; ilan eklenmedi.',
+  DISCOVERY_FREEHIRE_RESPONSE_TOO_LARGE: 'FreeHire yanıtı boyut sınırını aştı; işlem durduruldu.',
   DISCOVERY_SEARCH_NOT_ENABLED: 'Kaynak araması kapalı. SerpAPI anahtarını özel ayar dosyana ekleyip paneli --enable-search ile aç.',
   DISCOVERY_SEARCH_APPROVAL_REQUIRED: 'Rol ve konum paylaşımı ile ücretsiz kota kullanımı onayı gerekiyor.',
   DISCOVERY_SEARCH_FREE_PLAN_REQUIRED: 'Ücretsiz ve etkin SerpAPI planı doğrulanamadı. Arama yapılmadı; hesabındaki planı kontrol et.',
@@ -268,15 +274,23 @@ function renderDiscovery(record, pane) {
   if (!record.discovery) return;
   const item = record.discovery, box = node('section', 'assistant-box');
   box.append(node('h3', '', 'Keşif kaynağı: ' + item.sourceKey), node('p', 'small muted', 'Keşfedildi: ' + new Date(item.discoveredAt).toLocaleString('tr-TR') + ' · Yayın tarihi değildir.'), node('p', '', 'Konum: ' + (item.location || 'Belirtilmedi')));
+  if (record.possibleDuplicate) {
+    box.append(node('p','authorization',record.possibleDuplicate.state==='submitted' ? 'Aynı şirkette benzer bir ilana başvurulmuş olarak işaretlediğin kayıt var. Tekrar başvurmadan önce karşılaştır.' : 'Aynı şirkette benzer başlıklı başka bir kayıt var; yeniden yayın olabilir.'));
+    const compare=node('button','secondary','Benzer kaydı göster'); compare.addEventListener('click',()=>refresh(record.possibleDuplicate.id)); box.append(compare);
+  }
   if (item.levelReason) box.append(node('p', 'small', item.levelReason));
   if (item.search) {
+    if (item.search.provider === 'freehire' && item.search.originalURL) {
+      const link=node('a','text-button','İşveren ilanını aç ↗'); link.href=item.search.originalURL; link.target='_blank'; link.rel='noopener noreferrer'; box.append(link);
+    }
     box.append(node('p', 'small', 'Arama sorgusu: ' + item.search.query));
     box.append(node('p', 'small muted', item.search.dateHint ? 'Arama indeksinin tarih ifadesi: ' + item.search.dateHint + ' · Yayın tarihi ve ilanın açık olduğu doğrulanmadı.' : 'Arama indeksinde ayrı tarih bilgisi yok; ilanın güncelliğini kontrol et.'));
     if (!item.search.verified) {
-      box.append(node('h3', '', 'Tam ilan metnini doğrula'), node('p', '', 'Bu kayıt arama motorunun kısa özetinden geldi. İlanı aç; açık olduğunu kontrol edip şirketi, tam metni, ülkeyi ve dili gir. Arama özeti uygunluk analizi için kullanılmaz.'), node('p', 'small muted', item.search.snippet));
+      box.append(node('h3', '', 'Tam ilan metnini doğrula'), node('p', '', item.search.provider === 'freehire' ? 'FreeHire şirket ve ilan metnini getirdi. İlanı açıp açık olduğunu, metni, ülkeyi ve dili kontrol et; bilgileri aşağıdan doğrula.' : 'Bu kayıt arama motorunun kısa özetinden geldi. İlanı aç; açık olduğunu kontrol edip şirketi, tam metni, ülkeyi ve dili gir. Arama özeti uygunluk analizi için kullanılmaz.'), node('p', 'small muted', item.search.provider === 'freehire' ? 'Kaynak metni aşağıdaki alana aktarıldı.' : item.search.snippet));
       const form = node('form'), company = node('input'), title = node('input'), text = node('textarea'), country = node('select'), language = node('select'), message = node('p', 'form-error');
       company.required = true; company.maxLength = 1200; title.required = true; title.maxLength = 1200; title.value = record.posting.title;
       text.required = true; text.minLength = 20; text.maxLength = 24000; text.rows = 8;
+      if (item.search.provider === 'freehire') { company.value = record.posting.company; text.value = record.posting.text; }
       country.required = true; country.append(new Option('Ülke seç', '')); for (const option of document.querySelector('[name="country"]').options) country.append(new Option(option.text, option.value));
       language.required = true; language.append(new Option('Dil seç', ''), new Option('Türkçe', 'tr'), new Option('İngilizce', 'en'));
       for (const [caption, input] of [['Doğrulanan şirket',company],['Doğrulanan ilan başlığı',title],['Tam ilan metni',text],['Doğrulanan çalışma ülkesi',country],['Doğrulanan ilan dili',language]]) { const label = node('label','',caption); label.append(input); form.append(label); }
@@ -353,6 +367,7 @@ async function refreshDiscoveryStatus() {
     const planURL = jobSearchPlanURL(), data = await api(planURL), status = data.availability;
     if (planURL !== jobSearchPlanURL()) return;
     renderSearchSummary(status?.lastResult || null);
+    $('#freehire-search').disabled = discoverySearchPending || !data.freehireEnabled;
     discoveryRoleProfiles = data.roleProfiles || [];
     const profiles = $('#discovery-role-profile');
     if (profiles.options.length === 1) for (const item of discoveryRoleProfiles) {
@@ -382,7 +397,7 @@ $('#discovery-open').addEventListener('click', async () => {
     $('#discovery-role-profile').value = '';
     $('#discovery-job-queries').hidden = true;
     $('#discovery-job-approval').checked = false; $('#discovery-search-approval').checked = false; $('#discovery-auto-result').textContent = '';
-    $('#discovery-job-result').textContent = ''; renderSearchSummary(null);
+    $('#discovery-job-result').textContent = ''; $('#freehire-approval').checked = false; $('#freehire-result').textContent = ''; $('#freehire-next').hidden = true; renderSearchSummary(null);
     discoveryReport(data.lastReport); openDialog('#discovery-dialog'); await refreshDiscoveryStatus();
   } catch (error) { notify(error.message, true); }
 });
@@ -461,3 +476,23 @@ $('#discovery-job-search').addEventListener('click', async () => {
   } catch (error) { output.textContent = error.message; }
   finally { discoverySearchPending = false; $('#discovery-job-approval').checked = false; await refreshDiscoveryStatus(); }
 });
+
+let freehirePage=1, freehireSavedCriteria='';
+async function runFreehire(page) {
+  const output=$('#freehire-result');
+  if(!$('#freehire-approval').checked){output.textContent='Bölge ve seviye filtrelerinin FreeHire ile paylaşımını onayla.';return;}
+  const criteria=JSON.stringify([$('#discovery-job-scope').value,$('#discovery-roles').value,$('#discovery-early-career').checked,$('#discovery-keywords').value,$('#discovery-excluded').value]);
+  if(page>1 && criteria!==freehireSavedCriteria){output.textContent='Kriterler değişti; ilk sayfadan yeniden ara.';$('#freehire-next').hidden=true;return;}
+  discoverySearchPending=true; $('#freehire-search').disabled=true; $('#freehire-next').disabled=true; $('#discovery-job-search').disabled=true; $('#discovery-auto-search').disabled=true;
+  output.textContent='FreeHire ilanları getiriliyor…';
+  try {
+    await saveDiscoverySettings();
+    const data=await api('/api/discovery/freehire',{approved:true,scope:$('#discovery-job-scope').value,page});
+    freehirePage=page;freehireSavedCriteria=criteria;$('#freehire-next').hidden=!data.hasMore;
+    output.textContent='Sayfa '+page+' · Kaynağın bildirdiği toplam: '+data.total+' · '+data.examined+' kayıt incelendi · '+data.added+' yeni aday · '+data.duplicates+' zaten kayıtlı · '+data.filtered+' filtre dışı · '+data.closed+' kapalı · '+data.rejected+' geçersiz. '+(data.cached?'Kayıtlı sonuçlar kullanıldı.':'SerpAPI sorgusu ve ücretli model kullanılmadı.');
+    $('#filter').value='review';$('#search').value='';await refresh();notify(data.added+' FreeHire ilan adayı eklendi; bilgileri kontrol et.');
+  }catch(error){output.textContent=error.message;}
+  finally {discoverySearchPending=false;$('#freehire-next').disabled=false;await refreshDiscoveryStatus();}
+}
+$('#freehire-search').addEventListener('click',()=>runFreehire(1));
+$('#freehire-next').addEventListener('click',()=>runFreehire(freehirePage+1));

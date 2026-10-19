@@ -1,3 +1,5 @@
+import { normalizeRole, containsTerm } from '../discovery/role-profiles.js';
+import { createFreehireSearch, importFreehireJobs } from '../discovery/freehire.js';
 import { roleProfiles } from '../discovery/role-profiles.js';
 import type { SourceSearch } from '../discovery/search-provider.js';
 import { careerLevel } from '../discovery/level.js';
@@ -45,13 +47,14 @@ async function body(request: IncomingMessage): Promise<unknown> {
 }
 
 export async function startHub(options: { directory: string; profile: Profile; demo?: boolean;
-  seed?: HubRecord[]; sourceSearch?: SourceSearch; discoveryReader?: SourceReader; analyze?: HubAnalyzer; answers?: AssistAnswers; demoFormUrl?: string; launchAssistantBrowser?: () => Promise<Browser>; modelInfo?: { name: string; destination: string; monthlyLimitUsd: number; perRunLimitUsd: number }; port?: number }) {
+  seed?: HubRecord[]; freehireSearch?: ReturnType<typeof createFreehireSearch>; sourceSearch?: SourceSearch; discoveryReader?: SourceReader; analyze?: HubAnalyzer; answers?: AssistAnswers; demoFormUrl?: string; launchAssistantBrowser?: () => Promise<Browser>; modelInfo?: { name: string; destination: string; monthlyLimitUsd: number; perRunLimitUsd: number }; port?: number }) {
   const profile = profileSchema.parse(options.profile), store = await openHubStore(options.directory, profile);
   if (options.seed && !store.list().length) for (const record of options.seed) await store.add(record);
   const discovery = await openDiscovery(dirname(options.directory), store, options.discoveryReader);
   const token = randomBytes(32).toString('hex'), busy = new Set<string>();
   const controller = new AbortController();
   let origin = '', jobSearchBusy = false;
+  const freehireSearch = options.freehireSearch ?? createFreehireSearch();
   const jobCriteria = (scope: 'turkey' | 'remote') => { const config = discovery.snapshot().config; return { roles: config.roles, locations: scope === 'turkey' ? ['Türkiye','Turkey','Istanbul'] : ['Remote'], mode: 'jobs' as const, earlyCareer: config.earlyCareer }; };
   const answers = assistAnswersSchema.parse(options.answers ?? {});
   let assistant: { jobId: string; session: AssistSession } | null = null;
@@ -59,14 +62,22 @@ export async function startHub(options: { directory: string; profile: Profile; d
   let openingJobId: string | null = null;
   const assistantInfo = (record: HubRecord) => {
     let available = Boolean(options.demo && options.demoFormUrl), recipientOrigin: string | null = null;
-    try { recipientOrigin = new URL(available ? options.demoFormUrl! : jobLink(record.posting.sourceUrl).url).origin; available = true; } catch { /* User can still open the unsupported site manually. */ }
+    try { recipientOrigin = new URL(available ? options.demoFormUrl! : jobLink(record.posting.sourceUrl).url).origin; available = Boolean(options.demo && options.demoFormUrl) || jobLink(record.posting.sourceUrl).platform !== 'freehire'; } catch { /* User can still open the unsupported site manually. */ }
     if (record.discovery && (!record.discovery.routingConfirmed || record.discovery.search && !record.discovery.search.verified)) available = false;
     const snapshot = assistant?.session.snapshot();
     return { available, recipientOrigin, opening: Boolean(opening), demo: options.demo === true,
       occupiedByOther: Boolean(assistant && assistant.jobId !== record.id && snapshot?.status !== 'closed'),
       session: assistant?.jobId === record.id ? snapshot : null };
   };
-  const summaries = (record: HubRecord) => ({ id: record.id, company: record.posting.company, title: record.posting.title,
+  const possibleDuplicate = (record: HubRecord) => {
+    if(record.discovery?.search?.provider !== 'freehire') return null;
+    const related=store.list().filter(other=>other.id!==record.id && normalizeRole(other.posting.company)===normalizeRole(record.posting.company)
+      && Math.min(normalizeRole(other.posting.title).split(' ').length,normalizeRole(record.posting.title).split(' ').length)>=3
+      && (containsTerm(other.posting.title,record.posting.title)||containsTerm(record.posting.title,other.posting.title)))
+      .sort((a,b)=>Number(b.state==='submitted')-Number(a.state==='submitted'))[0];
+    return related ? {id:related.id,title:related.posting.title,state:related.state} : null;
+  };
+  const summaries = (record: HubRecord) => ({ possibleDuplicate: possibleDuplicate(record), id: record.id, company: record.posting.company, title: record.posting.title,
     country: record.posting.country, state: record.state, updatedAt: record.updatedAt, analyzing: busy.has(record.id),
     discovery: record.discovery ? { ...record.discovery, careerLevel: careerLevel(record.posting).level, levelReason: careerLevel(record.posting).reason } : null,
     score: record.analysis ? buildMatchAnalysis(profile, record.analysis.job, record.analysis.plan).score : null,
@@ -114,8 +125,21 @@ export async function startHub(options: { directory: string; profile: Profile; d
         const criteria = jobCriteria(scope), previewRoles = url.searchParams.get('roles'), previewLevel = url.searchParams.get('earlyCareer');
         if (previewRoles !== null) criteria.roles = z.array(z.string().trim().min(1).max(80)).min(1).max(20).parse(previewRoles.split(','));
         if (previewLevel !== null) criteria.earlyCareer = z.enum(['true','false']).parse(previewLevel) === 'true';
-        json(200, { automaticSearchEnabled: Boolean(options.sourceSearch), queries: jobSearchQueries(criteria), roleProfiles,
+        json(200, { automaticSearchEnabled: Boolean(options.sourceSearch), queries: jobSearchQueries(criteria), roleProfiles, freehireEnabled: !options.demo,
           availability: options.sourceSearch ? await options.sourceSearch.status(criteria) : null }); return;
+      }
+      if (path === '/api/discovery/freehire' && request.method === 'POST') {
+        const input=z.strictObject({approved:z.boolean(),scope:z.enum(['turkey','remote']),page:z.number().int().min(1).max(10).default(1)}).parse(await body(request));
+        if(!input.approved) throw new Error('DISCOVERY_SEARCH_APPROVAL_REQUIRED');
+        if(options.demo) throw new Error('DISCOVERY_SEARCH_NOT_ENABLED');
+        if(jobSearchBusy) throw new Error('DISCOVERY_BUSY'); jobSearchBusy=true;
+        try {
+          const config=discovery.snapshot().config;
+          const result=await freehireSearch({scope:input.scope,earlyCareer:config.earlyCareer,page:input.page},controller.signal);
+          const imported=await importFreehireJobs(store,result.rows,config,input.scope);
+          json(200,{...imported,total:result.total,examined:result.examined,rejected:result.rejected,cached:result.cached,page:input.page,hasMore:input.page<10 && input.page*30<result.total});
+        } finally {jobSearchBusy=false;}
+        return;
       }
       if (path === '/api/discovery/job-search' && request.method === 'POST') {
         const input = z.strictObject({ approved: z.boolean(), scope: z.enum(['turkey','remote']) }).parse(await body(request));

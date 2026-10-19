@@ -1167,3 +1167,18 @@ sayısı değildir. “Bağlantılar neden elendi?” ayrıntısında mevcut ned
 eski kayıtta ayrıntı yoksa belirtilir. Farklı arama kriterleri seçince bu rapor
 saklanır; önbellekte son eşleşen arama yoksa özet gösterilmez. Önbellek yalnızca
 son aramayı tutar; bu özellik tüm geçmiş aramaların arşivi değildir.
+
+### FreeHire ile ücretsiz ilan bulma
+
+İlan keşfet → rollerini ve Türkiye/Global remote seçimini kontrol et → FreeHire
+filtre paylaşım kutusunu işaretle → FreeHire ile ilan bul. Bu seçenek API anahtarı
+ve SerpAPI kotası gerektirmez. Kişisel profil/CV göndermez. Kaynak son 30 gün ve
+isteğe bağlı junior filtresiyle sayfa başına 30 kayıt getirir; rol/ek kelime
+filtresi cihazında uygulanır. Başka sonuç varsa sonraki sayfayı kendin istersin.
+Aynı sayfa 10 dakika bellekte tutulur; yeni istekler arasında 30 saniye beklenir.
+429 yanıtı alınırsa 5 dakika beklenir; otomatik tekrar veya ücretli plana geçiş yoktur.
+
+Adayı açınca şirket ve kaynaktan gelen ilan metni doğrulama alanında hazırdır.
+İlanı açıp kontrol et, ülke/dili seç ve bilgileri doğrula. Olası tekrar uyarısı
+varsa benzer kaydı karşılaştır. FreeHire kaydından otomatik form doldurma yapılmaz;
+işveren sitesindeki giriş, CV yüklemesi ve başvuru gönderimi kullanıcıdadır.
