@@ -328,6 +328,24 @@ Aşağıdaki teslim bu yön değişikliğini uygular.
   kalitesi canlı sağlayıcı sorgusuyla ölçülmedi. Ücretli model çağrısı veya başvuru
   gönderimi yok; dolu günlük kota ve mevcut özel kayıtlar korunuyor.
 
+## Son arama özeti — tamamlandı
+
+- İlan keşfet ekranı, mevcut source-search.json önbelleğindeki son eşleşen
+  kriterlerin özetini gösterir. Yeni dosya, rapor geçmişi veya sağlayıcı eklenmedi.
+- İncelenen bağlantı, benzersiz desteklenen ilan adresi, arama içi tekrar ve
+  reddedilen adres sayıları ayrıdır. Benzersiz bağlantı sayısı yeni eklenen/açık
+  ilan sayısı olarak sunulmaz; panele alınırken uygulanan rol/deneyim filtresi
+  ve önceden başvurulmuş ilan kontrolü ayrıca çalışır.
+- Pencereyi kapatma/yeniden açma ve sunucuyu yeniden başlatma raporu kaybettirmez.
+  24 saatlik tekrar kullanım süresi bitse de rapor okunabilir; yeni arama hakkı
+  veya kota muafiyeti sağlamaz. Başka rol/bölge kriterinde eski rapor gösterilmez.
+- Gerçek panelde mevcut kayıttan 20 bağlantı / 2 benzersiz / 0 arama içi tekrar /
+  18 reddedilen bağlantı gösterildi. Eski 18 sonuç için ayrıntı bulunmadığı
+  açıkça yazıyor. Yeni SerpAPI veya model isteği yapılmadı.
+- TypeScript ve 148 çevrimdışı test geçti. Yeniden başlatma, cache süresi dolması,
+  kriter değişimi ve özet okumanın disk/sayaç değiştirmemesi kurgusal transportla
+  doğrulandı. Canlı sorgu kalitesi hakkında yeni bir kanıt oluşmadı.
+
 Sıradaki tek iş: kota izin verdiğinde kullanıcı onaylı bir canlı rol grubu
 aramasında eleme nedenlerini değerlendirip sorgu isabetini ölçmek. Önce yazılım
 veya veri/iş analizi grubuyla küçük deneme; toplam bulunan aday, gerçekten açık

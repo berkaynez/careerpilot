@@ -1156,3 +1156,14 @@ ayırır. Eski sonuçların ayrıntısı yoksa bu açıkça belirtilir. İlan ay
 arama indeksi tarih ifadesi doğrulanmamıştır; yayın tarihi veya ilanın açık
 olduğuna kanıt değildir. Şirket, tam metin, ülke ve dil doğrulanmadan analiz ve
 form yardımcısı açılmaz.
+
+### Son arama özeti
+
+İlan keşfet ekranında aynı rol/bölge ve başlangıç seviyesi kriterleri için son
+arama özeti otomatik görünür. Sayfayı yenilemek veya özeti açmak yeni sorgu
+başlatmaz. Benzersiz ilan bağlantıları, arama içi tekrarlar ve reddedilen adresler
+ayrı sayılır. Bu sayılar panele yeni eklenmiş veya açık olduğu doğrulanmış ilan
+sayısı değildir. “Bağlantılar neden elendi?” ayrıntısında mevcut nedenler görünür;
+eski kayıtta ayrıntı yoksa belirtilir. Farklı arama kriterleri seçince bu rapor
+saklanır; önbellekte son eşleşen arama yoksa özet gösterilmez. Önbellek yalnızca
+son aramayı tutar; bu özellik tüm geçmiş aramaların arşivi değildir.

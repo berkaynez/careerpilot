@@ -57,8 +57,14 @@ export async function openSourceSearch(directory: string, apiKey: string, reques
       const remainingMonth = Math.max(0, 200 - state.attempts.filter(at => at.slice(0,7) === stamp.slice(0,7)).length);
       const last = Math.max(0, ...state.attempts.map(Date.parse));
       const waitSeconds = Math.max(0, Math.ceil((last + 15 * 60_000 - time) / 1000));
+      // Read the existing durable cache only: viewing this report cannot reserve or consume a query.
+      const previous = state.cache?.key === key ? state.cache : null;
+      const lastResult = previous ? { at: previous.at, examined: previous.examined,
+        uniqueLinks: previous.hits.length, repeatedLinks: Math.max(0, previous.examined - previous.rejected - previous.hits.length),
+        rejected: previous.rejected, rejectionReasons: previous.rejectionReasons,
+        partial: previous.partial, failureCode: previous.failureCode } : null;
       return { requestsPerRun: queries.length, remainingToday, remainingMonth, waitSeconds, cached,
-        partial: cached && state.cache!.partial, clockValid: last <= time };
+        partial: cached && state.cache!.partial, clockValid: last <= time, lastResult };
     },
     async run(criteria: Criteria, signal: AbortSignal) {
       const queries = queriesFor(criteria), key = queryKey(criteria, queries);
