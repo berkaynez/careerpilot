@@ -169,7 +169,7 @@ birleşmiş durumda. Yeni çalışma feature/early-career-discovery dalındadır
 - Kaydedilmiş kriterlerden sorgu taslağı ve toplu kariyer URL'sinden kaynak adayı
   çıkarma eklendi. Bunlar ağ/LLM çağrısı yapmaz.
 - SerpAPI kaynak arama bağlantısı uygulandı; varsayılan kapalıdır ve canlı
-  sağlayıcı doğrulaması henüz yapılmadı. Ayrı ücretsiz hesap/anahtar gerekir;
+  hesap erişimi canlı doğrulandı; tam arama akışı henüz doğrulanmadı. Ayrı ücretsiz hesap/anahtar gerekir;
   OpenAI anahtarı/bütçesi arama servisini kapsamaz.
 - Telefon düzeltmesinin gerçek site doğrulaması hâlâ açık; sohbet tarayıcısıyla
   tamamlanan başvurular native program doldurma testi diye raporlanmaz.
@@ -206,5 +206,27 @@ o süreç yeniden başlatılmadı; yeni sürüm henüz gerçek panele yüklenmed
   özel hostlar, ücretli plan engeli ve panel izinleri sahte servislerle doğrulandı.
   Ayrı kurgusal panelde onaysız aramanın engellenmesi ve bir kaynak adayı çıkarma
   doğrulandı. Gerçek SerpAPI çağrısı, ödeme veya yeni başvuru yapılmadı.
-- Gerçek panelde açık form oturumuna dokunulmadı. Sıradaki adım: ücretsiz SerpAPI
-  hesabı ve özel .env anahtarıyla ilk kullanıcı onaylı canlı aramayı doğrulamak.
+- Gerçek panelde açık form oturumuna dokunulmadı. Canlı deneme sonucu ve sıradaki
+  iş aşağıdadır.
+
+
+### İlk SerpAPI canlı denemesi ve süre düzeltmesi
+
+- Kullanıcı ücretsiz hesabı/anahtarı hazırladığını bildirdi. Anahtar özel `.env`
+  içinde mevcut ve dosya izinleri 0600 olarak kontrol edildi; anahtar gösterilmedi.
+- Account API canlı doğrulaması: etkin plan 0 USD, aylık 250 sorgu. Denemeden
+  sonra 248 kalan / 2 kullanılan sorgu bildirildi. OpenAI çağrısı yapılmadı.
+- İkinci arama isteği 15 saniyelik istemci sınırında bağlantı/süre hatası verdi.
+  Otomatik tekrar yapılmadı, iki rezervasyon korundu. Eski akış yalnızca bütün
+  sorgular bitince sakladığı için tamamlanan ilk yanıt korunamadı; panele yeni
+  kaynak veya ilan aktarılmadı. Arşiv listeleme uç noktası JSON vermediğinden bu
+  yöntemle sonuç kurtarma yapılamadı; desteklenmeyen entegrasyon eklenmedi.
+- Arama isteği sınırı 60 saniyeye çıkarıldı; hesap kontrolü 15 saniye kaldı.
+  Her tamamlanan sorgunun kaynakları artık ayrı ayrı kalıcı saklanır. Sonraki
+  sorgu başarısız olursa kısmi sonuç ve hata görünür; yeniden başlatmada korunur,
+  eksik sorgular otomatik tekrar edilmez. Eski önbellek dosyaları uyumludur.
+- TypeScript ve 138 çevrimdışı test geçti. Kısmi sonuç/süre aşımı düzeltmesi
+  sahte servisle doğrulandı; düzeltilmiş süreyle yeni canlı arama yapılmadı.
+- Sıradaki iş: açık form oturumunun bittiğini kullanıcıya doğrulatıp yeni paneli
+  yüklemek ve 15 dakikalık bekleme dolunca kullanıcı onayıyla canlı aramayı
+  tamamlamak. Bu bekleme veya ücretsiz kota koruması devre dışı bırakılmadı.

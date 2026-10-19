@@ -1082,6 +1082,10 @@ Her koşu önce [ücretsiz Account API](https://serpapi.com/account-api) ile etk
 bilinmeyen plan aramayı durdurur; otomatik tekrar, plan yükseltme veya ödeme yoktur.
 Yerel sayaç sağlayıcının gerçek bakiyesi değildir; başka uygulamaların tüketimi
 sağlayıcı kontrolünde görülür. Sorgu rezervasyonları hata durumunda geri verilmez.
+Her tamamlanan sorgunun kaynakları hemen saklanır. Sonraki sorgu başarısız
+olursa panel kısmi sonuçları ve hata nedenini gösterir. Aynı aramanın önbelleği
+kısmi olduğunu korur; eksik sorgular kendiliğinden tekrar edilmez. Arama isteği
+başına süre sınırı 60 saniye, hesap kontrolü 15 saniyedir.
 Arama yanıtları sınırlı okunur, sonuç hostları filtrelenir; CV veya kişisel profil
 arama servisine gönderilmez. Yalnızca kaynak kodları ve yerel sayaç/önbellek saklanır.
 

@@ -83,3 +83,18 @@ test('panel source search requires trusted origin, token and explicit criteria-s
   const jobs = await (await fetch(hub.origin + '/api/jobs', { headers })).json(); assert.equal(jobs[0].state, 'review'); assert.equal(jobs[0].discovery.routingConfirmed, false); assert.equal(jobs[0].score, null);
 
 });
+
+
+test('a later timeout preserves completed source results across restart without retrying unfinished queries', async t => {
+  const dir = await mkdtemp(join(tmpdir(), 'careerpilot-search-partial-')); t.after(() => rm(dir, {recursive:true,force:true})); let searches = 0;
+  const request: typeof fetch = async input => {
+    if (new URL(String(input)).pathname === '/account.json') return json(account);
+    searches++; if (searches === 2) throw new DOMException('timeout', 'TimeoutError'); return json(result);
+  };
+  const multiple = { ...criteria, roles: ['developer','analyst','engineer'] };
+  const first = await (await openSourceSearch(dir, 'secret', request)).run(multiple,new AbortController().signal);
+  assert.equal(first.partial,true); assert.equal(first.failureCode,'DISCOVERY_SEARCH_TIMEOUT'); assert.equal(first.sources.length,1); assert.equal(first.requests,2); assert.equal(searches,2);
+  const cached = await (await openSourceSearch(dir, 'secret', request)).run(multiple,new AbortController().signal);
+  assert.equal(cached.partial,true); assert.equal(cached.cached,true); assert.equal(cached.requests,0); assert.equal(searches,2);
+  const state = JSON.parse(await readFile(join(dir,'source-search.json'),'utf8')); assert.equal(state.attempts.length,2);
+});
