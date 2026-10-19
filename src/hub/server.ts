@@ -1,6 +1,6 @@
 import type { SourceSearch } from '../discovery/search-provider.js';
 import { careerLevel } from '../discovery/level.js';
-import { sourceSearchQueries, sourcesFromSearchURLs } from '../discovery/source-search.js';
+import { sourceSearchQueries, jobSearchQueries, sourcesFromSearchURLs } from '../discovery/source-search.js';
 import { openDiscovery } from '../discovery/service.js';
 import type { SourceReader } from '../discovery/sources.js';
 import { createServer } from 'node:http';
@@ -50,7 +50,8 @@ export async function startHub(options: { directory: string; profile: Profile; d
   const discovery = await openDiscovery(dirname(options.directory), store, options.discoveryReader);
   const token = randomBytes(32).toString('hex'), busy = new Set<string>();
   const controller = new AbortController();
-  let origin = '';
+  let origin = '', jobSearchBusy = false;
+  const jobCriteria = (scope: 'turkey' | 'remote') => { const config = discovery.snapshot().config; return { roles: config.roles, locations: scope === 'turkey' ? ['Türkiye','Turkey','Istanbul'] : ['Remote'], mode: 'jobs' as const, earlyCareer: config.earlyCareer }; };
   const answers = assistAnswersSchema.parse(options.answers ?? {});
   let assistant: { jobId: string; session: AssistSession } | null = null;
   let opening: Promise<AssistSession> | null = null;
@@ -58,7 +59,7 @@ export async function startHub(options: { directory: string; profile: Profile; d
   const assistantInfo = (record: HubRecord) => {
     let available = Boolean(options.demo && options.demoFormUrl), recipientOrigin: string | null = null;
     try { recipientOrigin = new URL(available ? options.demoFormUrl! : jobLink(record.posting.sourceUrl).url).origin; available = true; } catch { /* User can still open the unsupported site manually. */ }
-    if (record.discovery && !record.discovery.routingConfirmed) available = false;
+    if (record.discovery && (!record.discovery.routingConfirmed || record.discovery.search && !record.discovery.search.verified)) available = false;
     const snapshot = assistant?.session.snapshot();
     return { available, recipientOrigin, opening: Boolean(opening), demo: options.demo === true,
       occupiedByOther: Boolean(assistant && assistant.jobId !== record.id && snapshot?.status !== 'closed'),
@@ -74,7 +75,7 @@ export async function startHub(options: { directory: string; profile: Profile; d
     const analysis = record.analysis;
     let cv: { id: string; language: string; photo: boolean } | null = null;
     let cvError: string | null = null;
-    try { if (record.discovery && !record.discovery.routingConfirmed) throw new Error('HUB_ROUTING_REQUIRED'); const asset = selectCV(profile, record.posting); cv = { id: asset.id, language: asset.language, photo: asset.photo }; }
+    try { if (record.discovery && (!record.discovery.routingConfirmed || record.discovery.search && !record.discovery.search.verified)) throw new Error('HUB_ROUTING_REQUIRED'); const asset = selectCV(profile, record.posting); cv = { id: asset.id, language: asset.language, photo: asset.photo }; }
     catch { cvError = record.discovery && !record.discovery.routingConfirmed ? 'CV seçimi için ilanın ülkesini ve dilini doğrula.' : 'Uygun CV seçimi profilinde netleşmeli.'; }
     return { ...summaries(record), posting: record.posting, cv, cvError, assistant: assistantInfo(record),
       analysis: analysis ? { origin: analysis.origin, at: analysis.at, costMicroUsd: analysis.costMicroUsd, job: analysis.job,
@@ -106,6 +107,24 @@ export async function startHub(options: { directory: string; profile: Profile; d
         const config = discovery.snapshot().config;
         json(200, { automaticSearchEnabled: Boolean(options.sourceSearch), availability: options.sourceSearch ? await options.sourceSearch.status({ roles: config.roles, locations: config.locations.length ? config.locations : ['Turkey','United Kingdom','Remote'] }) : null, queries: sourceSearchQueries({ roles: config.roles, locations: config.locations.length ? config.locations : ['Turkey','United Kingdom','Remote'] }),
           note: options.sourceSearch ? 'Kaydedilmiş kriterler. SerpAPI hazır; arama en çok 4 sorgu tüketir. Profil/CV gönderilmez.' : 'Kaydedilmiş kriterlerden sorgu taslağı. Arama servisine istek yapılmadı; API erişimi henüz yapılandırılmadı.' }); return;
+      }
+      if (path === '/api/discovery/job-search-plan' && request.method === 'GET') {
+        const scope = z.enum(['turkey','remote']).parse(url.searchParams.get('scope') ?? 'turkey'), criteria = jobCriteria(scope);
+        json(200, { automaticSearchEnabled: Boolean(options.sourceSearch), queries: jobSearchQueries(criteria),
+          availability: options.sourceSearch ? await options.sourceSearch.status(criteria) : null }); return;
+      }
+      if (path === '/api/discovery/job-search' && request.method === 'POST') {
+        const input = z.strictObject({ approved: z.boolean(), scope: z.enum(['turkey','remote']) }).parse(await body(request));
+        if (!input.approved) throw new Error('DISCOVERY_SEARCH_APPROVAL_REQUIRED');
+        if (!options.sourceSearch) throw new Error('DISCOVERY_SEARCH_NOT_ENABLED');
+        if (jobSearchBusy) throw new Error('DISCOVERY_SEARCH_BUSY'); jobSearchBusy = true;
+        try {
+          const result = await options.sourceSearch.run(jobCriteria(input.scope), controller.signal);
+          const imported = await discovery.importSearch(result.hits);
+          json(200, { ...imported, searchRejected: result.rejected, examined: result.examined, requests: result.requests,
+            cached: result.cached, partial: result.partial, failureCode: result.failureCode });
+        } finally { jobSearchBusy = false; }
+        return;
       }
       if (path === '/api/discovery/source-search' && request.method === 'POST') {
         const { approved } = z.strictObject({ approved: z.boolean() }).parse(await body(request));
@@ -143,15 +162,26 @@ export async function startHub(options: { directory: string; profile: Profile; d
           analysis: { job, plan, origin: 'imported_review', at: now, costMicroUsd: null }, lastError: null });
         json(201, detail(record)); return;
       }
-      const match = /^\/api\/jobs\/([a-f0-9-]{36})(?:\/(status|analyze|assistant|routing))?$/.exec(path);
+      const match = /^\/api\/jobs\/([a-f0-9-]{36})(?:\/(status|analyze|assistant|routing|verify-posting))?$/.exec(path);
       if (!match) { json(404, { code: 'HUB_NOT_FOUND' }); return; }
       const id = z.uuid().parse(match[1]), action = match[2], record = store.get(id);
       if (!action && request.method === 'GET') { json(200, detail(record)); return; }
+      if (action === 'verify-posting' && request.method === 'POST') {
+        const verified = z.strictObject({ company: postingSchema.shape.company, title: postingSchema.shape.title,
+          text: postingSchema.shape.text, country: z.enum(['TR','GB','IE','DE','FR','NL','BE','CH','BA','US','CA']), language: z.enum(['tr','en']) }).parse(await body(request));
+        if (!record.discovery?.search || record.discovery.search.verified || record.analysis) throw new Error('HUB_POSTING_ALREADY_VERIFIED');
+        const saved = await store.update(id, current => {
+          if (!current.discovery?.search || current.discovery.search.verified || current.analysis) throw new Error('HUB_POSTING_ALREADY_VERIFIED');
+          return { ...current, posting: { ...current.posting, ...verified }, discovery: { ...current.discovery, routingConfirmed: true,
+            careerLevel: careerLevel(verified).level, search: { ...current.discovery.search, verified: true } } };
+        });
+        json(200, detail(saved)); return;
+      }
       if (action === 'routing' && request.method === 'POST') {
         const routing = z.strictObject({ country: z.enum(['TR','GB','IE','DE','FR','NL','BE','CH','BA','US','CA']), language: z.enum(['tr','en']) }).parse(await body(request));
-        if (!record.discovery || record.discovery.routingConfirmed || record.analysis) throw new Error('HUB_ROUTING_ALREADY_CONFIRMED');
+        if (!record.discovery || record.discovery.search || record.discovery.routingConfirmed || record.analysis) throw new Error('HUB_ROUTING_ALREADY_CONFIRMED');
         const saved = await store.update(id, current => {
-          if (!current.discovery || current.discovery.routingConfirmed || current.analysis) throw new Error('HUB_ROUTING_ALREADY_CONFIRMED');
+          if (!current.discovery || current.discovery.search || current.discovery.routingConfirmed || current.analysis) throw new Error('HUB_ROUTING_ALREADY_CONFIRMED');
           return { ...current, posting: { ...current.posting, ...routing }, discovery: { ...current.discovery, routingConfirmed: true } };
         });
         json(200, detail(saved)); return;
@@ -194,7 +224,7 @@ export async function startHub(options: { directory: string; profile: Profile; d
         json(200, detail(saved)); return;
       }
       if (action === 'analyze' && request.method === 'POST') {
-        if (record.discovery && !record.discovery.routingConfirmed) { json(409, { code: 'HUB_ROUTING_REQUIRED' }); return; }
+        if (record.discovery && (!record.discovery.routingConfirmed || record.discovery.search && !record.discovery.search.verified)) { json(409, { code: 'HUB_ROUTING_REQUIRED' }); return; }
         const consent = z.strictObject({ paidCallApproved: z.literal(true), cloudProfileApproved: z.literal(true) }).safeParse(await body(request));
         if (!consent.success) { json(403, { code: 'HUB_ANALYSIS_CONSENT_REQUIRED' }); return; }
         if (!options.analyze) { json(409, { code: 'HUB_MODEL_NOT_ENABLED' }); return; }

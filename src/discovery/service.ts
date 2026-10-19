@@ -1,3 +1,5 @@
+import { importSearchJobs } from './job-results.js';
+import type { SearchHit } from './job-results.js';
 import { careerLevel } from './level.js';
 import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, writeFile, rename, rm } from 'node:fs/promises';
@@ -30,6 +32,10 @@ export async function openDiscovery(directory: string, store: Store, reader: Sou
   };
   return {
     snapshot: () => ({ config: structuredClone(disk.config), busy, lastReport: structuredClone(disk.lastReport) }),
+    async importSearch(hits: SearchHit[]) {
+      if (busy) throw new Error('DISCOVERY_BUSY'); busy = true;
+      try { return await importSearchJobs(store, hits, disk.config, now); } finally { busy = false; }
+    },
     async configure(value: unknown) {
       if (busy) throw new Error('DISCOVERY_BUSY');
       const config = discoveryConfigSchema.parse(value); busy = true;

@@ -1,14 +1,20 @@
+import { searchHitSchema, searchHits } from './job-results.js';
+import type { SearchHit } from './job-results.js';
 import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, readFile, writeFile, rename, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { z } from 'zod';
 import { sourceSchema } from './sources.js';
-import { sourceSearchQueries, sourcesFromSearchURLs } from './source-search.js';
+import { sourceSearchQueries, jobSearchQueries, sourcesFromSearchURLs } from './source-search.js';
 
-const cacheSchema = z.strictObject({ key: z.string(), at: z.iso.datetime(), sources: z.array(sourceSchema).max(20), partial: z.boolean().default(false), failureCode: z.string().nullable().default(null) });
+const cacheSchema = z.strictObject({ key: z.string(), at: z.iso.datetime(), sources: z.array(sourceSchema).max(20), hits: z.array(searchHitSchema).max(40).default([]), examined: z.number().int().nonnegative().default(0), rejected: z.number().int().nonnegative().default(0), partial: z.boolean().default(false), failureCode: z.string().nullable().default(null) });
 const stateSchema = z.strictObject({ version: z.literal(1), attempts: z.array(z.iso.datetime()).max(1000), cache: cacheSchema.nullable() });
 const accountSchema = z.object({ account_status: z.literal('Active'), plan_monthly_price: z.literal(0),
   total_searches_left: z.number().int().nonnegative(), account_rate_limit_per_hour: z.number().int().positive(), this_hour_searches: z.number().int().nonnegative() });
+type Criteria = Parameters<typeof sourceSearchQueries>[0] & { mode?: 'jobs'; earlyCareer?: boolean };
+const queriesFor = (criteria: Criteria) => criteria.mode === 'jobs' ? jobSearchQueries(criteria) : sourceSearchQueries({roles:criteria.roles,locations:criteria.locations});
+const queryKey = (criteria: Criteria, queries: string[]) => createHash('sha256').update(JSON.stringify(criteria.mode === 'jobs' ? ['jobs',queries] : queries)).digest('hex');
+const evidence = (cache: z.infer<typeof cacheSchema>) => ({ hits: cache.hits, examined: cache.examined, rejected: cache.rejected });
 export type SourceSearch = Awaited<ReturnType<typeof openSourceSearch>>;
 
 /** Only fixed SerpAPI URLs; raw account responses, credentials and search snippets never leave this module. */
@@ -43,8 +49,8 @@ export async function openSourceSearch(directory: string, apiKey: string, reques
     } finally { await reader.cancel().catch(() => {}); reader.releaseLock(); }
   };
   return {
-    async status(criteria: Parameters<typeof sourceSearchQueries>[0]) {
-      const queries = sourceSearchQueries(criteria), key = createHash('sha256').update(JSON.stringify(queries)).digest('hex');
+    async status(criteria: Criteria) {
+      const queries = queriesFor(criteria), key = queryKey(criteria, queries);
       const state = await read(), stamp = now().toISOString(), time = Date.parse(stamp);
       const cached = state.cache?.key === key && time >= Date.parse(state.cache.at) && time - Date.parse(state.cache.at) < 24 * 3600_000;
       const remainingToday = Math.max(0, 8 - state.attempts.filter(at => at.slice(0,10) === stamp.slice(0,10)).length);
@@ -54,13 +60,13 @@ export async function openSourceSearch(directory: string, apiKey: string, reques
       return { requestsPerRun: queries.length, remainingToday, remainingMonth, waitSeconds, cached,
         partial: cached && state.cache!.partial, clockValid: last <= time };
     },
-    async run(criteria: Parameters<typeof sourceSearchQueries>[0], signal: AbortSignal) {
-      const queries = sourceSearchQueries(criteria), key = createHash('sha256').update(JSON.stringify(queries)).digest('hex');
+    async run(criteria: Criteria, signal: AbortSignal) {
+      const queries = queriesFor(criteria), key = queryKey(criteria, queries);
       try { await mkdir(lock, { mode: 0o700 }); } catch { throw new Error('DISCOVERY_SEARCH_BUSY'); }
       try {
         const state = await read(), timestamp = now().toISOString(), time = Date.parse(timestamp);
         if (state.cache?.key === key && time >= Date.parse(state.cache.at) && time - Date.parse(state.cache.at) < 24 * 3600_000)
-          return { sources: state.cache.sources, requests: 0, cached: true, modelCalls: 0, partial: state.cache.partial, failureCode: state.cache.failureCode };
+          return { ...evidence(state.cache), sources: state.cache.sources, requests: 0, cached: true, modelCalls: 0, partial: state.cache.partial, failureCode: state.cache.failureCode };
         if (state.attempts.some(at => Date.parse(at) > time)) throw new Error('DISCOVERY_SEARCH_CLOCK_INVALID');
         const monthly = state.attempts.filter(at => at.slice(0, 7) === timestamp.slice(0, 7)).length;
         const daily = state.attempts.filter(at => at.slice(0, 10) === timestamp.slice(0, 10)).length;
@@ -72,7 +78,7 @@ export async function openSourceSearch(directory: string, apiKey: string, reques
         if (!account.success) throw new Error('DISCOVERY_SEARCH_FREE_PLAN_REQUIRED');
         if (account.data.total_searches_left < queries.length || account.data.account_rate_limit_per_hour - account.data.this_hour_searches < queries.length)
           throw new Error('DISCOVERY_SEARCH_QUOTA_STOP');
-        const urls: string[] = []; let attempted = 0;
+        const urls: string[] = [], hits = new Map<string, SearchHit>(); let attempted = 0, examined = 0, rejected = 0;
         for (const q of queries) {
           signal.throwIfAborted();
           // Reserve before every search. Errors, process crashes and uncertain billing are never refunded locally.
@@ -80,21 +86,24 @@ export async function openSourceSearch(directory: string, apiKey: string, reques
           state.attempts.push(timestamp); await save(state); attempted++;
           try {
             const result = z.object({ error: z.string().optional(), search_metadata: z.object({ status: z.literal('Success') }),
-              organic_results: z.array(z.object({ link: z.string().max(2000) })).max(100).default([]) }).safeParse(await get('/search.json', { engine: 'google', q }, signal));
+              organic_results: z.array(z.object({ link: z.string().max(2000), title: z.string().max(1200).optional(), snippet: z.string().max(3000).optional() })).max(100).default([]) }).safeParse(await get('/search.json', { engine: 'google', q }, signal));
             if (!result.success || result.data.error) throw new Error('DISCOVERY_SEARCH_FORMAT');
-            urls.push(...result.data.organic_results.slice(0, 10).map(item => item.link));
+            const rows = result.data.organic_results.slice(0, 10), parsed = searchHits(rows, q);
+            examined += rows.length; rejected += parsed.rejected;
+            for (const hit of parsed.hits) if (!hits.has(hit.url)) hits.set(hit.url, hit);
+            urls.push(...rows.map(item => item.link));
             // Keep completed sources even if a later query fails or this process exits.
-            state.cache = { key, at: timestamp, sources: sourcesFromSearchURLs(urls), partial: true, failureCode: null }; await save(state);
+            state.cache = { key, at: timestamp, sources: sourcesFromSearchURLs(urls), hits: [...hits.values()], examined, rejected, partial: true, failureCode: null }; await save(state);
           } catch (error) {
             if (!state.cache || state.cache.key !== key) throw error;
             const failureCode = error instanceof Error && /^DISCOVERY_SEARCH_[A-Z_]+$/.test(error.message) ? error.message : 'DISCOVERY_SEARCH_NETWORK';
             state.cache = { ...state.cache, partial: true, failureCode }; await save(state);
-            return { sources: state.cache.sources, requests: attempted, cached: false, modelCalls: 0, partial: true, failureCode };
+            return { ...evidence(state.cache), sources: state.cache.sources, requests: attempted, cached: false, modelCalls: 0, partial: true, failureCode };
           }
         }
         const sources = sourcesFromSearchURLs(urls);
-        state.cache = { key, at: timestamp, sources, partial: false, failureCode: null }; await save(state);
-        return { sources, requests: queries.length, cached: false, modelCalls: 0, partial: false, failureCode: null };
+        state.cache = { key, at: timestamp, sources, hits: [...hits.values()], examined, rejected, partial: false, failureCode: null }; await save(state);
+        return { ...evidence(state.cache), sources, requests: queries.length, cached: false, modelCalls: 0, partial: false, failureCode: null };
       } finally { await rm(lock, { recursive: true }); }
     },
   };

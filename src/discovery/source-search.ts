@@ -19,6 +19,19 @@ export function sourceSearchQueries(input: z.input<typeof inputSchema>): string[
   }
   return result;
 }
+/** Two role-based searches across supported job sites; results are individual postings, not a company catalogue. */
+export function jobSearchQueries(input: z.input<typeof inputSchema> & { earlyCareer?: boolean }): string[] {
+  const { roles, locations } = inputSchema.parse({roles:input.roles,locations:input.locations});
+  const sites = '(site:linkedin.com/jobs/view OR site:indeed.com OR site:kariyer.net/is-ilani OR site:lever.co OR site:greenhouse.io)';
+  const result: string[] = [];
+  for (let i = 0; i < Math.min(roles.length, 2); i++) {
+    const group = roles.filter((_, index) => index % 2 === i);
+    const query = sites + ' (' + group.map(quote).join(' OR ') + ') ' + (input.earlyCareer === false ? '' : '(junior OR "new grad" OR "yeni mezun") ') + '(' + locations.map(quote).join(' OR ') + ')';
+    if (query.length > 400) throw new Error('DISCOVERY_SEARCH_QUERY_TOO_LONG');
+    result.push(query);
+  }
+  return result;
+}
 /** Search links are untrusted: never follow redirects, fetch an arbitrary host, or infer a company country. */
 export function sourcesFromSearchURLs(urls: string[]): Source[] {
   if (urls.length > 100) throw new Error('DISCOVERY_SEARCH_RESULTS_LIMIT');

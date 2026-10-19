@@ -1107,3 +1107,36 @@ Sayaç, SerpAPI hesabının gerçek bakiyesi değildir; sağlayıcı kontrolü a
 başlangıcında yapılır. Durum göstergesi dış servise istek yapmaz. Hazır olmayan
 arama düğmesi pasiftir; süre dolunca açılır. Aynı kriterlerin önbellekteki sonuçları
 bekleme sırasında da yeni sorgu tüketmeden alınabilir.
+
+
+## Rol bazlı doğrudan ilan araması
+
+Güncel panelde **İlan keşfet** ana akışı şirket seçmeden çalışır:
+
+1. Rolleri ve filtreleri düzenle; Türkiye veya Global remote seç.
+2. Rol/bölge paylaşımı ve ücretsiz kota kutusunu onayla.
+3. **İlanları ara ve panele ekle** ayarları kaydeder ve en çok iki sorgu çalıştırır.
+4. Sonuçlar tekil ilan URL'si ve başlık filtresinden geçip doğrudan
+   **İnceleme Bekleyenler** listesine eklenir. Rapor incelenen/eklenen/tekrar/
+   filtre dışı/geçersiz sayıları ayrı gösterir; şirket kaynağı eklemek gerekmez.
+5. İlanı açıp açık olduğunu kontrol et; tam metni, şirketi, ülkeyi ve dili
+   doğrulama alanına gir. Bu adımdan önce özet üzerinden analiz, CV seçimi veya
+   form başlatma yapılamaz. Model varsayılan olarak kapalı kalır.
+
+Bu özellik SerpAPI arama sonuçlarını kullanır, kişisel LinkedIn/Indeed/Kariyer.net
+hesaplarını açmaz veya siteleri kazımaz. Sadece mevcut desteklenen platformların
+tekil ilan adresleri kabul edilir. Şirket/liste sayfaları uygun ilan diye
+aktarılmaz. İlan başlığı/özeti arama motorunun verisidir; başka ilanlardan metin
+veya eski bilgi içerebilir. İlanın açık olduğu veya adayın şartları sağladığı
+iddia edilmez. Tam ilan metni bu sürümde kullanıcı tarafından getirilir.
+
+Arama bölgesi sorguya yön verir; ilanın gerçek çalışma ülkesi veya remote uygunluğu
+otomatik doğrulanmaz. Aynı iş ID'sinin farklı LinkedIn ülke/başlık URL'leri
+birleştirilir; farklı yayın ID'leri aynı işe ait olabilir ve insan kontrolü ister.
+Mevcut başvuru durumları ve analizler üzerine yazılmaz.
+
+Şirket kaynağı bulma ve resmî şirket listelerini tarama seçenekleri **Gelişmiş:
+şirket kaynaklarını takip et** bölümüne taşındı. Kaynak araması en çok dört,
+rol araması en çok iki sorgudur; toplam günlük 8 / aylık 200 sınırı ortaktır.
+Önbellek arama türünü/bölgesini/rolleri ayırır; eski kaynak sonuçları doğrudan
+ilan gibi aktarılmaz. Aynı aramanın önbelleği yeni sorgu harcamaz.

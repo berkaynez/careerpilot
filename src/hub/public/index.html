@@ -16,19 +16,25 @@
 <p class="small muted">Ad ve soyadı isteğe bağlıdır; yazarsan profilindeki tam adla eşleşmesi gerekir. CV bu işlemde yüklenmez.</p>
 <label class="check"><input id="assistant-consent" type="checkbox" required> Ad/soyad, e-posta, telefon, kayıtlı mesleki bağlantılarımın ve varsa bu ilana özel belirlediğim maaş/ihbar cevaplarının belirtilen siteye yazılmasını onaylıyorum.</label>
 <p class="form-error" role="alert"></p><div class="dialog-actions"><button type="button" class="secondary close-dialog">Vazgeç</button><button class="primary" type="submit">Onayla ve aç</button></div></form></dialog>
-<dialog id="discovery-dialog"><form id="discovery-form"><div class="dialog-head"><h2>Yeni ilanları keşfet</h2><button type="button" class="icon close-dialog" aria-label="Kapat">×</button></div>
-<p>Yalnızca eklediğin şirketlerin resmî Greenhouse / Lever ilan uç noktaları okunur. Hesabına giriş, ücretli model çağrısı veya başvuru gönderimi yapılmaz.</p>
-<p class="small muted">Kaynak kodu, kariyer adresindeki şirket bölümüdür: jobs.lever.co/şirket veya job-boards.greenhouse.io/şirket. Şirket adı senin kaynak etiketindir. Her kaynakta en az 15 dakika beklenir. Şirketin konumunu doğruladıysan isteğe bağlı varsayılan ekleyebilirsin; bu bilgi yalnızca kaynakta konum eksik veya iş türü olarak gelmişse kullanılır. İlanın kendi konumu korunur.</p>
-<details class="source"><summary>Birden fazla şirket kaynağını birlikte ekle</summary><p class="small muted">Greenhouse/Lever kariyer veya ilan bağlantılarını satır satır yapıştır. Şirket kodları otomatik çıkarılır; burada herhangi bir siteye istek yapılmaz. Sonra kaynakları gözden geçirip kaydet.</p><label>Kariyer bağlantıları<textarea id="discovery-links" rows="3" maxlength="30000"></textarea></label><button type="button" class="secondary" id="discovery-extract">Bağlantılardan kaynakları çıkar</button></details>
-<button type="button" class="secondary" id="discovery-search-plan">Kaynak arama planını göster</button><p id="discovery-search-note" class="small muted"></p><pre id="discovery-search-queries" class="small" hidden></pre>
-<section class="source"><h3>Şirket kaynaklarını otomatik bul</h3><p class="small muted">Önce rol ve konum ayarlarını kaydet. SerpAPI araması yalnızca bu kriterleri gönderir; CV veya aday profili göndermez. Bir arama en çok 4 sorgu tüketir. Aday kaynakları gözden geçirip “Kaydet ve ilanları bul” ile ilanları getir. Ücretsiz plan ve kalan kota her aramadan önce kontrol edilir.</p><p id="discovery-search-status" role="status" class="small muted"></p><label class="check"><input type="checkbox" id="discovery-search-approval"> Kaydedilmiş rol ve konum kriterlerini SerpAPI'ye göndermeyi ve ücretsiz kotamdan kullanmayı onaylıyorum.</label><button type="button" class="secondary" id="discovery-auto-search" disabled>SerpAPI ile şirket kaynaklarını bul</button><p id="discovery-auto-result" role="status" class="small"></p></section>
-<div id="discovery-sources"></div><button type="button" class="secondary" id="discovery-add-source">+ Şirket kaynağı ekle</button>
-<label class="check"><input type="checkbox" id="discovery-early-career" checked> Yeni mezun / başlangıç seviyesi odaklı: açık kıdem şartlarını ele, seviyesi belirsiz ilanları incelemeye bırak.</label>
+<dialog id="discovery-dialog"><form id="discovery-form"><div class="dialog-head"><h2>Rolüne göre ilan bul</h2><button type="button" class="icon close-dialog" aria-label="Kapat">×</button></div>
+<p>Şirket seçmeden, kayıtlı rollerinle farklı iş sitelerinde ilan ara. Sonuçlar doğrudan İnceleme Bekleyenler'e eklenir. İş sitesi hesabına giriş veya ücretli AI analizi yapılmaz.</p>
 <label>Pozisyonlar · virgülle ayır<input id="discovery-roles" required maxlength="2400"></label>
-<label>Konum etiketleri · virgülle ayır<input id="discovery-locations" maxlength="2400"></label>
+<label class="check"><input type="checkbox" id="discovery-early-career" checked> Yeni mezun / başlangıç seviyesine odaklan</label>
+<label>Arama bölgesi<select id="discovery-job-scope"><option value="turkey">Türkiye</option><option value="remote">Global remote</option></select></label>
 <label>Ek anahtar kelimeler · isteğe bağlı, virgülle ayır<input id="discovery-keywords" maxlength="2400"></label>
 <label>Başlıkta hariç tutulacaklar · virgülle ayır<input id="discovery-excluded" maxlength="2400"></label>
-<p class="small muted">Pozisyonlar kendi içinde VEYA, konumlar kendi içinde VEYA eşleşir. Dolu olan filtre gruplarının hepsi sağlanmalıdır. Remote etiketi Türkiye’den çalışma hakkını doğrulamaz. Filtre eşleşmesi uyum puanı değildir.</p>
-<div id="discovery-result" role="status" aria-live="polite"></div><p class="form-error" role="alert"></p>
-<div class="dialog-actions"><button class="secondary" type="submit" name="intent" value="save">Ayarları kaydet</button><button class="primary" type="submit" name="intent" value="run">Kaydet ve ilanları bul</button></div></form></dialog>
+<p class="small muted">Arama sonucu ilan metninin tamamı değildir; ilan kapanmış olabilir. Remote, Türkiye'den çalışma hakkı anlamına gelmez. Analiz öncesi tam metin, şirket, ülke ve dil doğrulanır.</p>
+<p id="discovery-search-status" role="status" class="small muted"></p>
+<label class="check"><input type="checkbox" id="discovery-job-approval"> Rol ve arama bölgesini SerpAPI'ye göndermeyi ve ücretsiz kotamdan kullanmayı onaylıyorum.</label>
+<button type="button" class="primary" id="discovery-job-search" disabled>İlanları ara ve panele ekle</button><button type="button" class="secondary" id="discovery-job-plan">Kaydedilmiş arama planını göster</button>
+<pre id="discovery-job-queries" class="small" hidden></pre><p id="discovery-job-result" role="status" class="small"></p>
+<details class="source"><summary>Gelişmiş: şirket kaynaklarını takip et</summary>
+<p class="small muted">Bu bölüm mevcut Greenhouse/Lever şirket listelerini ayrıca tarar; yukarıdaki rol bazlı ilan araması şirket listesine bağlı değildir. Kaynak başına 15 dakika bekleme uygulanır. Konum varsayılanını yalnızca doğruladığın şirketlerde kullan.</p>
+<label>Şirket taraması konum etiketleri · virgülle ayır<input id="discovery-locations" maxlength="2400"></label>
+<details><summary>Birden fazla şirket kaynağını birlikte ekle</summary><label>Kariyer bağlantıları<textarea id="discovery-links" rows="3" maxlength="30000"></textarea></label><button type="button" class="secondary" id="discovery-extract">Bağlantılardan kaynakları çıkar</button></details>
+<button type="button" class="secondary" id="discovery-search-plan">Kaynak arama planını göster</button><p id="discovery-search-note" class="small muted"></p><pre id="discovery-search-queries" class="small" hidden></pre>
+<label class="check"><input type="checkbox" id="discovery-search-approval"> Kaydedilmiş rol ve konum kriterlerini SerpAPI'ye göndermeyi ve ücretsiz kotamdan kullanmayı onaylıyorum.</label><button type="button" class="secondary" id="discovery-auto-search" disabled>SerpAPI ile şirket kaynaklarını bul</button><p id="discovery-auto-result" role="status" class="small"></p>
+<div id="discovery-sources"></div><button type="button" class="secondary" id="discovery-add-source">+ Şirket kaynağı ekle</button>
+<div id="discovery-result" role="status" aria-live="polite"></div><button class="secondary" type="submit" name="intent" value="run">Kaydet ve şirket ilanlarını tara</button></details>
+<p class="form-error" role="alert"></p><div class="dialog-actions"><button class="secondary" type="submit" name="intent" value="save">Ayarları kaydet</button></div></form></dialog>
 </body></html>
