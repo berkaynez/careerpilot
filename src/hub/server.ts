@@ -1,3 +1,4 @@
+import type { SourceSearch } from '../discovery/search-provider.js';
 import { careerLevel } from '../discovery/level.js';
 import { sourceSearchQueries, sourcesFromSearchURLs } from '../discovery/source-search.js';
 import { openDiscovery } from '../discovery/service.js';
@@ -43,7 +44,7 @@ async function body(request: IncomingMessage): Promise<unknown> {
 }
 
 export async function startHub(options: { directory: string; profile: Profile; demo?: boolean;
-  seed?: HubRecord[]; discoveryReader?: SourceReader; analyze?: HubAnalyzer; answers?: AssistAnswers; demoFormUrl?: string; launchAssistantBrowser?: () => Promise<Browser>; modelInfo?: { name: string; destination: string; monthlyLimitUsd: number; perRunLimitUsd: number }; port?: number }) {
+  seed?: HubRecord[]; sourceSearch?: SourceSearch; discoveryReader?: SourceReader; analyze?: HubAnalyzer; answers?: AssistAnswers; demoFormUrl?: string; launchAssistantBrowser?: () => Promise<Browser>; modelInfo?: { name: string; destination: string; monthlyLimitUsd: number; perRunLimitUsd: number }; port?: number }) {
   const profile = profileSchema.parse(options.profile), store = await openHubStore(options.directory, profile);
   if (options.seed && !store.list().length) for (const record of options.seed) await store.add(record);
   const discovery = await openDiscovery(dirname(options.directory), store, options.discoveryReader);
@@ -103,8 +104,15 @@ export async function startHub(options: { directory: string; profile: Profile; d
       if (request.method !== 'GET' && request.headers.origin !== origin) { json(403, { code: 'HUB_ORIGIN_REJECTED' }); return; }
       if (path === '/api/discovery/search-plan' && request.method === 'GET') {
         const config = discovery.snapshot().config;
-        json(200, { automaticSearchEnabled: false, queries: sourceSearchQueries({ roles: config.roles, locations: config.locations.length ? config.locations : ['Turkey','United Kingdom','Remote'] }),
-          note: 'Kaydedilmiş kriterlerden sorgu taslağı. Arama servisine istek yapılmadı; API erişimi henüz yapılandırılmadı.' }); return;
+        json(200, { automaticSearchEnabled: Boolean(options.sourceSearch), queries: sourceSearchQueries({ roles: config.roles, locations: config.locations.length ? config.locations : ['Turkey','United Kingdom','Remote'] }),
+          note: options.sourceSearch ? 'Kaydedilmiş kriterler. SerpAPI hazır; arama en çok 4 sorgu tüketir. Profil/CV gönderilmez.' : 'Kaydedilmiş kriterlerden sorgu taslağı. Arama servisine istek yapılmadı; API erişimi henüz yapılandırılmadı.' }); return;
+      }
+      if (path === '/api/discovery/source-search' && request.method === 'POST') {
+        const { approved } = z.strictObject({ approved: z.boolean() }).parse(await body(request));
+        if (!approved) throw new Error('DISCOVERY_SEARCH_APPROVAL_REQUIRED');
+        if (!options.sourceSearch) throw new Error('DISCOVERY_SEARCH_NOT_ENABLED');
+        const config = discovery.snapshot().config;
+        json(200, await options.sourceSearch.run({ roles: config.roles, locations: config.locations.length ? config.locations : ['Turkey','United Kingdom','Remote'] }, controller.signal)); return;
       }
       if (path === '/api/discovery/source-candidates' && request.method === 'POST') {
         const { urls } = z.strictObject({ urls: z.array(z.string().max(2000)).max(100) }).parse(await body(request));
