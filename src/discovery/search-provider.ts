@@ -43,6 +43,17 @@ export async function openSourceSearch(directory: string, apiKey: string, reques
     } finally { await reader.cancel().catch(() => {}); reader.releaseLock(); }
   };
   return {
+    async status(criteria: Parameters<typeof sourceSearchQueries>[0]) {
+      const queries = sourceSearchQueries(criteria), key = createHash('sha256').update(JSON.stringify(queries)).digest('hex');
+      const state = await read(), stamp = now().toISOString(), time = Date.parse(stamp);
+      const cached = state.cache?.key === key && time >= Date.parse(state.cache.at) && time - Date.parse(state.cache.at) < 24 * 3600_000;
+      const remainingToday = Math.max(0, 8 - state.attempts.filter(at => at.slice(0,10) === stamp.slice(0,10)).length);
+      const remainingMonth = Math.max(0, 200 - state.attempts.filter(at => at.slice(0,7) === stamp.slice(0,7)).length);
+      const last = Math.max(0, ...state.attempts.map(Date.parse));
+      const waitSeconds = Math.max(0, Math.ceil((last + 15 * 60_000 - time) / 1000));
+      return { requestsPerRun: queries.length, remainingToday, remainingMonth, waitSeconds, cached,
+        partial: cached && state.cache!.partial, clockValid: last <= time };
+    },
     async run(criteria: Parameters<typeof sourceSearchQueries>[0], signal: AbortSignal) {
       const queries = sourceSearchQueries(criteria), key = createHash('sha256').update(JSON.stringify(queries)).digest('hex');
       try { await mkdir(lock, { mode: 0o700 }); } catch { throw new Error('DISCOVERY_SEARCH_BUSY'); }

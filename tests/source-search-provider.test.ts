@@ -22,8 +22,10 @@ test('search sends criteria only to fixed service, caches sources across restart
     assert.match(url.searchParams.get('q')!, /software engineer/); return json(result);
   };
   const service = await openSourceSearch(dir, 'fictional-secret', request);
+  const ready = await service.status(criteria); assert.equal(calls,0); assert.equal(ready.remainingToday,8); assert.equal(ready.waitSeconds,0);
   const first = await service.run(criteria, new AbortController().signal); assert.equal(first.sources.length, 1); assert.equal(first.requests, 1); assert.equal(first.cached, false); assert.equal(calls, 2);
   const reopened = await openSourceSearch(dir, 'fictional-secret', request);
+  const status = await reopened.status(criteria); assert.equal(status.cached,true); assert.equal(status.remainingToday,7); assert.ok(status.waitSeconds > 0); assert.equal(calls,2);
   const cached = await reopened.run(criteria, new AbortController().signal); assert.equal(cached.requests, 0); assert.equal(cached.cached, true); assert.equal(calls, 2);
   const disk = await readFile(join(dir, 'source-search.json'), 'utf8'); assert.ok(!disk.includes('fictional-secret')); assert.ok(!disk.includes('private@example.invalid'));
 });

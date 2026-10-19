@@ -1101,3 +1101,9 @@ Karar kaynakları: [Serper kota ve fiyatları](https://serper.dev/),
 [SerpAPI şartları](https://serpapi.com/legal),
 [Gemini model bazlı fiyatlar](https://ai.google.dev/gemini-api/docs/pricing).
 Ücretsiz kotanın değişmeyeceği veya sonuçların eksiksiz olduğu garanti edilmez.
+
+Keşif ekranı yerel günlük/aylık kalan hakkı ve yeni aramaya kalan süreyi gösterir.
+Sayaç, SerpAPI hesabının gerçek bakiyesi değildir; sağlayıcı kontrolü arama
+başlangıcında yapılır. Durum göstergesi dış servise istek yapmaz. Hazır olmayan
+arama düğmesi pasiftir; süre dolunca açılır. Aynı kriterlerin önbellekteki sonuçları
+bekleme sırasında da yeni sorgu tüketmeden alınabilir.

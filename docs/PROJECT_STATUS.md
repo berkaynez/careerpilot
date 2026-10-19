@@ -169,7 +169,7 @@ birleşmiş durumda. Yeni çalışma feature/early-career-discovery dalındadır
 - Kaydedilmiş kriterlerden sorgu taslağı ve toplu kariyer URL'sinden kaynak adayı
   çıkarma eklendi. Bunlar ağ/LLM çağrısı yapmaz.
 - SerpAPI kaynak arama bağlantısı uygulandı; varsayılan kapalıdır ve canlı
-  hesap erişimi canlı doğrulandı; tam arama akışı henüz doğrulanmadı. Ayrı ücretsiz hesap/anahtar gerekir;
+  kaynak arama ve ilan tarama akışı canlı doğrulandı; bu denemede yeni eşleşme yok. Ayrı ücretsiz hesap/anahtar gerekir;
   OpenAI anahtarı/bütçesi arama servisini kapsamaz.
 - Telefon düzeltmesinin gerçek site doğrulaması hâlâ açık; sohbet tarayıcısıyla
   tamamlanan başvurular native program doldurma testi diye raporlanmaz.
@@ -227,6 +227,39 @@ o süreç yeniden başlatılmadı; yeni sürüm henüz gerçek panele yüklenmed
   eksik sorgular otomatik tekrar edilmez. Eski önbellek dosyaları uyumludur.
 - TypeScript ve 138 çevrimdışı test geçti. Kısmi sonuç/süre aşımı düzeltmesi
   sahte servisle doğrulandı; düzeltilmiş süreyle yeni canlı arama yapılmadı.
-- Sıradaki iş: açık form oturumunun bittiğini kullanıcıya doğrulatıp yeni paneli
-  yüklemek ve 15 dakikalık bekleme dolunca kullanıcı onayıyla canlı aramayı
-  tamamlamak. Bu bekleme veya ücretsiz kota koruması devre dışı bırakılmadı.
+- Sonraki kullanıcı onayıyla panel güncellendi ve bekleme dolunca aşağıdaki canlı
+  deneme tamamlandı. Bekleme ve ücretsiz kota korumaları korundu.
+
+
+### Panelden canlı keşif doğrulaması
+
+- Kullanıcı eski açık form oturumunu kapatıp devam etmeyi onayladı. Güncel panel
+  3211 portunda, kaynak araması açık ve ücretli model kapalı çalışıyor.
+- Panel rol/konum paylaşımı onayı → kaynak arama → kaynakları kaydetme → resmî
+  ilanları okuma akışı gerçek SerpAPI/Greenhouse/Lever uç noktalarıyla tamamlandı.
+  İlanlar sohbetin web aramasıyla elle bulunup program bulmuş gibi gösterilmedi.
+- Dört arama isteği iki yeni kaynak adayı çıkardı: dominodatalab ve idme.
+  Mevcut Peak/GitLab dahil dört kaynak yapılandırıldı. Bu kaynak listesi,
+  şirketin aday seviyesine veya Türkiye'ye uygunluğunun kanıtı değildir.
+- Tarama: 5 mevcut kayıt, 290 filtre dışı, 21 desteklenmeyen bağlantı, 0 yeni ilan.
+  Domino'nun 21 absolute_url alanı app.careerpuck.com kullanıyor; bu hedef mevcut
+  izin verilen platformlarda yok. Resmî API'nin public metadata kontrolü bunu
+  doğruladı; rastgele host/redirect izni veya yeni site adaptörü eklenmedi.
+- Önceki 8 ilan dosyası tarama öncesi/sonrası hash ile aynı; 5 submitted durum
+  kaydı ve eski analizler korunuyor. Yeni başvuru gönderilmedi, profil/CV buluta
+  gönderilmedi, OpenAI/model çağrısı yapılmadı.
+- SerpAPI Account API son kontrolü: 0 USD plan, 246 kalan / toplam 4 tüketilmiş
+  sorgu. Yerel sayaç 6 başlatılmış isteği tutuyor (önceki hatalı deneme dahil);
+  sağlayıcı önbelleği ve belirsiz faturalama nedeniyle gerçek tüketimle aynı
+  olduğu varsayılmıyor. Yerel kalan 2/gün ve 194/ay, gerçek SerpAPI bakiyesi değil.
+- Panelde yerel kalan sorgu sayısı, geri sayım, önbellek hazır bilgisi ve hazır
+  olmayan arama düğmesinin pasif durumu eklendi. Gösterge dış servisi çağırmaz;
+  arama sürerken düğme açılmaz. TypeScript ve 138 çevrimdışı test geçti; gerçek
+  panelde geri sayım, otomatik açılan düğme ve kalıcı dört kaynak doğrulandı.
+
+Sıradaki tek iş: kaynak aramasının kapsamasını ve teşhisini iyileştirmek.
+Türkiye odaklı aramayı küresel remote aramadan ayırmayı ve sorgu başına bağlantı/
+elendi sayısını görünür kılmayı değerlendir. İlk sonuçların azlığı tüm internette
+uygun ilan olmadığı anlamına gelmez. Yeni ücretli sağlayıcı, site adaptörü,
+başvuru otomasyonu veya zamanlanmış tarama ekleme; önce mevcut aramanın sonuç
+kalitesini artır. Yeni canlı aramalar için mevcut kullanıcı onayı ve kota kuralları sürer.
