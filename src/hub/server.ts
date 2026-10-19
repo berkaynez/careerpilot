@@ -104,7 +104,7 @@ export async function startHub(options: { directory: string; profile: Profile; d
       if (request.method !== 'GET' && request.headers.origin !== origin) { json(403, { code: 'HUB_ORIGIN_REJECTED' }); return; }
       if (path === '/api/discovery/search-plan' && request.method === 'GET') {
         const config = discovery.snapshot().config;
-        json(200, { automaticSearchEnabled: Boolean(options.sourceSearch), queries: sourceSearchQueries({ roles: config.roles, locations: config.locations.length ? config.locations : ['Turkey','United Kingdom','Remote'] }),
+        json(200, { automaticSearchEnabled: Boolean(options.sourceSearch), availability: options.sourceSearch ? await options.sourceSearch.status({ roles: config.roles, locations: config.locations.length ? config.locations : ['Turkey','United Kingdom','Remote'] }) : null, queries: sourceSearchQueries({ roles: config.roles, locations: config.locations.length ? config.locations : ['Turkey','United Kingdom','Remote'] }),
           note: options.sourceSearch ? 'Kaydedilmiş kriterler. SerpAPI hazır; arama en çok 4 sorgu tüketir. Profil/CV gönderilmez.' : 'Kaydedilmiş kriterlerden sorgu taslağı. Arama servisine istek yapılmadı; API erişimi henüz yapılandırılmadı.' }); return;
       }
       if (path === '/api/discovery/source-search' && request.method === 'POST') {

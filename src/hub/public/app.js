@@ -298,13 +298,34 @@ function discoveryReport(report) {
   box.append(node('p', '', report.added + ' yeni ilan · ücretli model çağrısı yok'), node('p', 'small muted', 'Son tarama: ' + new Date(report.at).toLocaleString('tr-TR')));
   for (const item of report.sources) box.append(node('p', 'small', item.source + ': ' + item.added + ' eklendi · ' + item.duplicates + ' zaten kayıtlı · ' + item.filtered + ' filtre dışı · ' + item.rejected + ' geçersiz kayıt' + (item.code ? ' · ' + (discoveryMessages[item.code] || 'kaynak kontrolü gerekiyor') : '')));
 }
+let discoveryStatusTimer, discoverySearchPending = false;
+async function refreshDiscoveryStatus() {
+  clearInterval(discoveryStatusTimer);
+  const button = $('#discovery-auto-search'), label = $('#discovery-search-status'); button.disabled = true;
+  try {
+    const data = await api('/api/discovery/search-plan'), status = data.availability;
+    if (!data.automaticSearchEnabled || !status) { label.textContent = 'Kaynak araması bu panel oturumunda kapalı.'; return; }
+    const readyAt = Date.now() + status.waitSeconds * 1000;
+    const paint = () => {
+      const wait = Math.max(0, Math.ceil((readyAt - Date.now()) / 1000));
+      const enough = status.remainingToday >= status.requestsPerRun && status.remainingMonth >= status.requestsPerRun;
+      button.disabled = discoverySearchPending || (!status.cached && (wait > 0 || !enough || !status.clockValid));
+      label.textContent = 'Yerel sorgu hakkı: bugün ' + status.remainingToday + '/8, bu ay ' + status.remainingMonth + '/200. ' +
+        (status.cached ? (status.partial ? 'Kayıtlı kısmi sonuçlar hazır; yeni sorgu tüketilmez.' : 'Kayıtlı sonuçlar hazır; yeni sorgu tüketilmez.') :
+          !status.clockValid ? 'Bilgisayarın saatini kontrol et.' : !enough ? 'Yerel sorgu sınırına ulaşıldı.' : wait > 0 ? 'Yeni arama: ' + Math.floor(wait/60) + ':' + String(wait%60).padStart(2,'0') + ' sonra.' : 'Arama hazır; en çok ' + status.requestsPerRun + ' sorgu başlatılır.') +
+        ' Sağlayıcının gerçek kotası arama başında ayrıca kontrol edilir.';
+    };
+    paint(); if ($('#discovery-dialog').open) discoveryStatusTimer = setInterval(paint, 1000);
+  } catch (error) { label.textContent = error.message; }
+}
+$('#discovery-dialog').addEventListener('close', () => clearInterval(discoveryStatusTimer));
 $('#discovery-add-source').addEventListener('click', () => { if ($('#discovery-sources').children.length < 20) sourceRow(); });
 $('#discovery-open').addEventListener('click', async () => {
   try { const data = await api('/api/discovery'); $('#discovery-sources').replaceChildren(); for (const source of data.config.sources) sourceRow(source);
     for (const [id, key] of [['roles','roles'], ['locations','locations'], ['keywords','keywords'], ['excluded','excludedTitles']]) $('#discovery-' + id).value = data.config[key].join(', ');
     $('#discovery-early-career').checked = data.config.earlyCareer;
     $('#discovery-search-approval').checked = false; $('#discovery-auto-result').textContent = '';
-    discoveryReport(data.lastReport); openDialog('#discovery-dialog');
+    discoveryReport(data.lastReport); openDialog('#discovery-dialog'); await refreshDiscoveryStatus();
   } catch (error) { notify(error.message, true); }
 });
 formHandler('#discovery-form', async (form, event) => {
@@ -313,6 +334,7 @@ formHandler('#discovery-form', async (form, event) => {
   await api('/api/discovery/config', { version: 1, sources, earlyCareer: $('#discovery-early-career').checked, roles: terms('roles'), locations: terms('locations'), keywords: terms('keywords'), excludedTitles: terms('excluded') });
   if (event.submitter?.value === 'run') { const report = await api('/api/discovery/run', {}); discoveryReport(report); $('#filter').value = 'review'; $('#search').value = ''; await refresh(); notify(report.added + ' yeni ilan inceleme listesine eklendi.'); }
   else notify('Keşif ayarları kaydedildi.');
+  await refreshDiscoveryStatus();
 });
 
 $('#discovery-search-plan').addEventListener('click', async () => {
@@ -333,7 +355,7 @@ $('#discovery-extract').addEventListener('click', async () => {
 $('#discovery-auto-search').addEventListener('click', async event => {
   const button = event.currentTarget, output = $('#discovery-auto-result');
   if (!$('#discovery-search-approval').checked) { output.textContent = errors.DISCOVERY_SEARCH_APPROVAL_REQUIRED; return; }
-  button.disabled = true; output.textContent = 'Kaydedilmiş kriterlerle şirket kaynakları aranıyor…';
+  discoverySearchPending = true; button.disabled = true; output.textContent = 'Kaydedilmiş kriterlerle şirket kaynakları aranıyor…';
   try {
     const data = await api('/api/discovery/source-search', { approved: true });
     const known = new Set(Array.from($('#discovery-sources').children).map(row => row.children[0].value + ':' + row.children[1].value.trim().toLowerCase()));
@@ -345,5 +367,5 @@ $('#discovery-auto-search').addEventListener('click', async event => {
     }
     output.textContent = (data.partial ? 'Kısmi sonuç: aramanın tamamı bitmedi. ' : '') + added + ' yeni kaynak adayı · ' + duplicates + ' zaten listede · ' + skipped + ' kaynak sınırı nedeniyle eklenmedi. ' + (data.cached ? 'Kayıtlı sonuçlar; yeni sorgu tüketilmedi.' : data.requests + ' arama isteği başlatıldı (başarısız istekler dahil).') + ' Kaynakları kontrol edip kaydet; resmî ilanları toplama adımı henüz çalıştırılmadı.' + (data.failureCode ? ' ' + friendly(data.failureCode) : '');
   } catch (error) { output.textContent = error.message; }
-  finally { button.disabled = false; $('#discovery-search-approval').checked = false; }
+  finally { discoverySearchPending = false; $('#discovery-search-approval').checked = false; await refreshDiscoveryStatus(); }
 });
