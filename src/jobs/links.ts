@@ -8,8 +8,8 @@ export function jobLink(value: string): JobLink {
   if (url.protocol !== 'https:' || url.username || url.password || url.port || url.hash) throw new Error('JOB_LINK_INVALID');
   let platform: JobPlatform;
   let jobKey: string | null = null;
-  if (['www.linkedin.com','linkedin.com'].includes(url.hostname) && /^\/jobs\/view\/(?:[^/]*-)?\d+\/?$/.test(url.pathname)) {
-    platform = 'linkedin'; url.hostname = 'www.linkedin.com';
+  if ((url.hostname === 'linkedin.com' || /^(?:www|[a-z]{2})\.linkedin\.com$/.test(url.hostname)) && /^\/jobs\/view\/(?:[^/]*-)?\d+\/?$/.test(url.pathname)) {
+    platform = 'linkedin'; url.hostname = 'www.linkedin.com'; url.pathname = '/jobs/view/' + /(?:^|[-/])(\d+)\/?$/.exec(url.pathname)![1];
   } else if (url.hostname === 'jobs.lever.co' && /^\/[a-zA-Z0-9_-]+\/[a-f0-9-]{36}(?:\/apply)?\/?$/.test(url.pathname)) {
     platform = 'lever'; url.pathname = url.pathname.replace(/\/$/, '').replace(/\/apply$/, '');
   } else if (['boards.greenhouse.io','job-boards.greenhouse.io','job-boards.eu.greenhouse.io'].includes(url.hostname)

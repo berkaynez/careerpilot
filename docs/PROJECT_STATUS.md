@@ -257,9 +257,54 @@ o süreç yeniden başlatılmadı; yeni sürüm henüz gerçek panele yüklenmed
   arama sürerken düğme açılmaz. TypeScript ve 138 çevrimdışı test geçti; gerçek
   panelde geri sayım, otomatik açılan düğme ve kalıcı dört kaynak doğrulandı.
 
-Sıradaki tek iş: kaynak aramasının kapsamasını ve teşhisini iyileştirmek.
-Türkiye odaklı aramayı küresel remote aramadan ayırmayı ve sorgu başına bağlantı/
-elendi sayısını görünür kılmayı değerlendir. İlk sonuçların azlığı tüm internette
-uygun ilan olmadığı anlamına gelmez. Yeni ücretli sağlayıcı, site adaptörü,
-başvuru otomasyonu veya zamanlanmış tarama ekleme; önce mevcut aramanın sonuç
-kalitesini artır. Yeni canlı aramalar için mevcut kullanıcı onayı ve kota kuralları sürer.
+Kullanıcı bu yaklaşımın hâlâ şirket kataloğuna bağlı olduğunu belirtti ve
+rol bazlı sonuçlardaki tekil ilanların doğrudan panele eklenmesini onayladı.
+Aşağıdaki teslim bu yön değişikliğini uygular.
+
+
+### Rol bazlı doğrudan ilan keşfi
+
+- Şirket listesine gerek olmadan SerpAPI organik sonuçlarından tekil ilanlar
+  alınır. LinkedIn/Indeed/Kariyer.net/Lever/Greenhouse adresleri mevcut URL
+  doğrulayıcısıyla kontrol edilir; liste sayfaları, özel/kimlik bilgili URL'ler ve
+  desteklenmeyen siteler taranmaz. Kişisel hesap, cookie veya CAPTCHA kullanılmaz.
+- Rol grupları iki sorguya dağıtılır; roller kesilip atılmaz. Türkiye ve Global
+  remote ayrı seçeneklerdir. Başlangıç seviyesi kutusu arama sorgusunda da etkilidir.
+  Arama sonucundaki rol/başlık ve isteğe bağlı kelime filtresi ücretsiz uygulanır.
+  Arama indeksi gerçek konum, açık ilan veya aday uygunluğu kanıtı sayılmaz.
+- Sonuçlar doğrudan review kaydı olur; şirket kaynağı ekleme veya bütün şirketin
+  iş listesini tarama ön koşulu yoktur. Eski şirket takibi Gelişmiş bölümünde kaldı.
+- Arama başlığı/özeti ve sorgu özel kayıtta kaynak bilgisiyle saklanır. Şirket,
+  ülke/dil ve tam metin başlangıçta doğrulanmamıştır. Ayrı doğrulama ekranı bu
+  bilgileri ister. Sadece ülke/dil seçmek kısa özeti analiz için yeterli hâle getirmez;
+  tam metin doğrulanana kadar CV seçimi, form başlatma ve model analizi engellenir.
+- Tam metin otomatik alınmıyor; doğrulama insanın ilanı açıp metni getirmesidir.
+  Arama motorundaki özetler başka ilanlardan metin içerebilir veya eski olabilir.
+  Tüm ilanları kapsama, açık olduklarını kanıtlama veya %80 tasarruf iddiası yoktur.
+- LinkedIn'in ülke alt alanları ve başlıklı/numerik iş bağlantıları aynı iş ID'sine
+  normalize edilir; takip parametreleri atılır. Tüm durumlar tekrar kontrolüne
+  dahildir. Aynı rolün farklı yayın ID'leri kesin aynı ilan diye otomatik silinmez.
+- Kaynak ve ilan araması aynı kalıcı günlük/aylık sayaç ve 15 dakika beklemeyi
+  kullanır; önbellek anahtarı arama türlerini ayırır. Eski cache/ilan dosyaları
+  varsayılan alanlarla okunur. Kısmi sonuçların kalıcı korunması devam eder.
+- TypeScript, 142 çevrimdışı test ve whitespace kontrolü geçti. Kurgusal testte
+  şirket kataloğu boşken üç farklı şirketten ilan eklendi; gerçek iş sitelerine
+  istek yapılmadı. Tam metin doğrulanmadan analizin engellendiği test edildi.
+- Gerçek panelde Türkiye rol araması: iki SerpAPI isteği, 20 sonuç, 18 desteklenmeyen/
+  geçersiz bağlantı ve 2 review adayı. İkisi de Dream Games Software Engineer
+  (New Grad) başlığında, farklı LinkedIn yayın ID'leridir. Açıklık, ayrı ilan mı
+  yeniden yayın mı olduğu ve uygunluk henüz doğrulanmadı. Şirket kataloğu aynı
+  dört kaynakta kaldı; hiçbir şirket iş listesi bu yeni arama adımında okunmadı.
+- Önceki 8 ilan dosyasının hash'i aynı; toplam 10 kayıt, 2 review, 5 submitted.
+  SerpAPI canlı bakiye kontrolü: 0 USD plan, 244 kalan / 6 tüketilmiş sorgu.
+  Yerel başlatılmış istek sayısı 8 (sağlayıcı önbelleği nedeniyle tüketimle aynı
+  değildir); günlük yeni sorgu sınırı doldu. Aynı Türkiye sonuçları cache'den
+  tekrar alınabilir. Yeni global remote araması yapılmadı; bütçe aşılmadı.
+- OpenAI/model çağrısı, profil/CV paylaşımı, yeni başvuru gönderimi yapılmadı.
+
+Sıradaki tek iş: rol aramasının sonuç kalitesini iyileştirmek. İlk 20 sonucun
+18'i kabul edilmedi; özellikle ilan liste sayfaları ile tekil ilan URL'lerini
+ayırma nedenlerini görünür kıl ve güncellik bilgisini kaynak göstergesi olarak
+incele. Günlük kota dolduğu için yeni sorgu planını çevrimdışı geliştir; canlı
+kapsama iddiasını sonraki kullanıcı onaylı denemeye bırak. Yeni sağlayıcı,
+site adaptörleri, hesap taraması veya başvuru gönderimi ekleme.
