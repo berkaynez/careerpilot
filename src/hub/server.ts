@@ -1,3 +1,5 @@
+import { careerLevel } from '../discovery/level.js';
+import { sourceSearchQueries, sourcesFromSearchURLs } from '../discovery/source-search.js';
 import { openDiscovery } from '../discovery/service.js';
 import type { SourceReader } from '../discovery/sources.js';
 import { createServer } from 'node:http';
@@ -63,7 +65,7 @@ export async function startHub(options: { directory: string; profile: Profile; d
   };
   const summaries = (record: HubRecord) => ({ id: record.id, company: record.posting.company, title: record.posting.title,
     country: record.posting.country, state: record.state, updatedAt: record.updatedAt, analyzing: busy.has(record.id),
-    discovery: record.discovery,
+    discovery: record.discovery ? { ...record.discovery, careerLevel: careerLevel(record.posting).level, levelReason: careerLevel(record.posting).reason } : null,
     score: record.analysis ? buildMatchAnalysis(profile, record.analysis.job, record.analysis.plan).score : null,
     analysisOrigin: record.analysis?.origin ?? null, lastError: record.lastError,
     assistantActive: openingJobId === record.id || assistant?.jobId === record.id && assistant.session.snapshot().status !== 'closed' });
@@ -99,6 +101,15 @@ export async function startHub(options: { directory: string; profile: Profile; d
       }
       if (request.headers['x-hub-token'] !== token) { json(403, { code: 'HUB_SESSION_REQUIRED' }); return; }
       if (request.method !== 'GET' && request.headers.origin !== origin) { json(403, { code: 'HUB_ORIGIN_REJECTED' }); return; }
+      if (path === '/api/discovery/search-plan' && request.method === 'GET') {
+        const config = discovery.snapshot().config;
+        json(200, { automaticSearchEnabled: false, queries: sourceSearchQueries({ roles: config.roles, locations: config.locations.length ? config.locations : ['Turkey','United Kingdom','Remote'] }),
+          note: 'Kaydedilmiş kriterlerden sorgu taslağı. Arama servisine istek yapılmadı; API erişimi henüz yapılandırılmadı.' }); return;
+      }
+      if (path === '/api/discovery/source-candidates' && request.method === 'POST') {
+        const { urls } = z.strictObject({ urls: z.array(z.string().max(2000)).max(100) }).parse(await body(request));
+        json(200, { sources: sourcesFromSearchURLs(urls), modelCalls: 0, networkCalls: 0 }); return;
+      }
       if (path === '/api/discovery' && request.method === 'GET') { json(200, discovery.snapshot()); return; }
       if (path === '/api/discovery/config' && request.method === 'POST') {
         await discovery.configure(await body(request)); json(200, discovery.snapshot()); return;

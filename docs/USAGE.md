@@ -1018,3 +1018,37 @@ Kaynak ayarında isteğe bağlı **Eksik konum için şirket varsayılanı** ala
 kendi farklı konumu varsa onun üzerine yazılmaz. Eşleşme nedeninde bu bilginin
 şirket varsayılanından geldiği görünür. Bu, ülke/dil doğrulamasını veya çalışma
 hakkı kontrolünü otomatik tamamlamaz. Şirketin bütün ilanlarına sabit ülke atanmaz.
+
+
+## Başlangıç seviyesi odağı ve kaynak arama hazırlığı
+
+Keşif ayarlarındaki başlangıç seviyesi seçeneği varsayılan olarak açıktır.
+Senior/Lead/Intermediate vb. başlıklar ve açık en az 3 yıl deneyim ifadeleri
+elenir. Tercih edilen veya belirsiz deneyim ifadelerinden kesin bir uygunluk
+kararı çıkarılmaz. New Grad/Junior başlıkları etiketlenip inceleme listesinde
+öne alınır. Başlık ve metin çelişirse açık yüksek asgari deneyim şartı önceliklidir.
+Bu kurallar bir adayın şartları sağladığını veya İngilizce/teknik yeterliliğini
+kanıtlamaz. Seçenek kapanırsa kullanıcı başlık hariç tutma filtresi hâlâ uygulanır.
+
+Varsayılan roller yazılım, veri/iş analizi ve BT denetimi ailelerini içerir.
+Mevcut kaydedilmiş rol tercihleri otomatik değiştirilmez; ayarlardan genişletilebilir.
+Mevcut ilanlar silinmeden güncel başlık/metinle etiketlenir; eski analiz skorları
+elle değiştirilmez. Kaynak/panel kayıtları yeni alanlar için geriye uyumludur.
+
+**Kaynak arama planını göster** kaydedilmiş kriterlerden en fazla 4 arama sorgusu
+hazırlar. Bu sorgular çalıştırılmaz. Henüz otomatik kaynak arama sağlayıcısı veya
+API anahtarı bağlanmadı; bu özellik şirketleri kendi kendine internette aramaz.
+Sorgular yalnızca rol/konum içerir, aday profili/CV/iletişim bilgisi içermez.
+
+**Birden fazla şirket kaynağını birlikte ekle** bölümüne kariyer/ilan bağlantıları
+satır satır yapıştırılabilir. Program yalnızca desteklenen resmî host/yol yapılarından
+kaynak kodlarını çıkarır, tekrarları ayıklar. Kaynak listesine toplam en çok 20 aday
+eklenir. Bu adımda ağ isteği yapılmaz; kaynak etiketleri `Kaynak: kod` şeklindedir,
+gerçek şirket adının doğrulandığı iddia edilmez. Kullanıcı listeyi gözden geçirip
+kaydeder; resmî uç noktaya erişim normal keşif düğmesinde doğrulanır.
+
+Gelecek otomatik arama bağlantısı için ayrı servis erişimi, sonuç saklama hakkı ve
+ayrı istek/maliyet sınırı gerekir. Mevcut OpenAI bütçesi arama servisini kapsamaz.
+İncelenen belgeler: [Brave Search API](https://brave.com/search/api/),
+[fiyatlandırma](https://api-dashboard.search.brave.com/documentation/pricing).
+Bu teslimde harici arama hesabı açılmadı veya ücretli servis çağrısı yapılmadı.
