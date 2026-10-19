@@ -22,7 +22,7 @@ import { postingSchema } from '../preparation/posting.js';
 import type { Posting } from '../preparation/posting.js';
 import { buildMatchAnalysis, jobSchema, profileSchema, selectCV, validatePlan } from '../preparation/core.js';
 import type { Profile, Job, Plan } from '../preparation/core.js';
-import { openHubStore, stateSchema } from './store.js';
+import { openHubStore, stateSchema, trackingSchema } from './store.js';
 import type { HubRecord } from './store.js';
 
 export type HubAnalyzer = (posting: Posting, signal: AbortSignal) => Promise<{ job: Job; plan: Plan; costMicroUsd: number }>;
@@ -49,7 +49,7 @@ async function body(request: IncomingMessage): Promise<unknown> {
 export async function startHub(options: { directory: string; profile: Profile; demo?: boolean;
   seed?: HubRecord[]; freehireSearch?: ReturnType<typeof createFreehireSearch>; sourceSearch?: SourceSearch; discoveryReader?: SourceReader; analyze?: HubAnalyzer; answers?: AssistAnswers; demoFormUrl?: string; launchAssistantBrowser?: () => Promise<Browser>; modelInfo?: { name: string; destination: string; monthlyLimitUsd: number; perRunLimitUsd: number }; port?: number }) {
   const profile = profileSchema.parse(options.profile), store = await openHubStore(options.directory, profile);
-  if (options.seed && !store.list().length) for (const record of options.seed) await store.add(record);
+  if (options.seed && !store.list({includeTrashed:true}).length) for (const record of options.seed) await store.add(record);
   const discovery = await openDiscovery(dirname(options.directory), store, options.discoveryReader);
   const token = randomBytes(32).toString('hex'), busy = new Set<string>();
   const controller = new AbortController();
@@ -77,7 +77,7 @@ export async function startHub(options: { directory: string; profile: Profile; d
       .sort((a,b)=>Number(b.state==='submitted')-Number(a.state==='submitted'))[0];
     return related ? {id:related.id,title:related.posting.title,state:related.state} : null;
   };
-  const summaries = (record: HubRecord) => ({ possibleDuplicate: possibleDuplicate(record), id: record.id, company: record.posting.company, title: record.posting.title,
+  const summaries = (record: HubRecord) => ({ possibleDuplicate: possibleDuplicate(record), id: record.id, company: record.posting.company, title: record.posting.title, tracking:record.tracking,
     country: record.posting.country, state: record.state, updatedAt: record.updatedAt, analyzing: busy.has(record.id),
     discovery: record.discovery ? { ...record.discovery, careerLevel: careerLevel(record.posting).level, levelReason: careerLevel(record.posting).reason } : null,
     score: record.analysis ? buildMatchAnalysis(profile, record.analysis.job, record.analysis.plan).score : null,
@@ -174,6 +174,12 @@ export async function startHub(options: { directory: string; profile: Profile; d
         if (options.demo && !options.discoveryReader) { json(409, { code: 'DISCOVERY_DEMO_OFFLINE' }); return; }
         json(200, await discovery.run(controller.signal)); return;
       }
+      if(path==='/api/trash' && request.method==='GET') {json(200,{count:store.list({includeTrashed:true}).filter(row=>row.trashedAt).length});return;}
+      if((path==='/api/jobs/clear-archived' || path==='/api/trash/restore') && request.method==='POST') {
+        z.strictObject({}).parse(await body(request));
+        if(busy.size || opening || assistant && assistant.session.snapshot().status!=='closed') throw new Error('HUB_RECORD_BUSY');
+        json(200,path==='/api/jobs/clear-archived'?await store.trashArchived():await store.restoreTrash());return;
+      }
       if (path === '/api/jobs' && request.method === 'GET') { json(200, store.list().map(summaries)); return; }
       if (path === '/api/jobs' && request.method === 'POST') {
         const input = inputSchema.parse(await body(request)), now = new Date().toISOString(), id = randomUUID();
@@ -190,7 +196,7 @@ export async function startHub(options: { directory: string; profile: Profile; d
           analysis: { job, plan, origin: 'imported_review', at: now, costMicroUsd: null }, lastError: null });
         json(201, detail(record)); return;
       }
-      const match = /^\/api\/jobs\/([a-f0-9-]{36})(?:\/(status|analyze|assistant|routing|verify-posting))?$/.exec(path);
+      const match = /^\/api\/jobs\/([a-f0-9-]{36})(?:\/(status|analyze|assistant|routing|verify-posting|tracking))?$/.exec(path);
       if (!match) { json(404, { code: 'HUB_NOT_FOUND' }); return; }
       const id = z.uuid().parse(match[1]), action = match[2], record = store.get(id);
       if (!action && request.method === 'GET') { json(200, detail(record)); return; }
@@ -244,6 +250,11 @@ export async function startHub(options: { directory: string; profile: Profile; d
           else await session.approveOrigin(command.origin, command.contactApproved);
         }
         json(200, detail(store.get(id))); return;
+      }
+      if(action==='tracking' && request.method==='POST') {
+        const tracking=trackingSchema.parse(await body(request));
+        const saved=await store.update(id,current=>{if(current.state!=='submitted')throw new Error('HUB_TRACKING_SUBMITTED_REQUIRED');return {...current,tracking};});
+        json(200,detail(saved));return;
       }
       if (action === 'status' && request.method === 'POST') {
         const { state } = z.strictObject({ state: stateSchema }).parse(await body(request));

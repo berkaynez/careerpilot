@@ -48,8 +48,8 @@ export async function openDiscovery(directory: string, store: Store, reader: Sou
       busy = true;
       try {
         const config = structuredClone(disk.config), report: z.infer<typeof reportSchema> = { at: now().toISOString(), added: 0, modelCalls: 0, sources: [] };
-        const known = new Set(store.list().map(record => { try { return jobLink(record.posting.sourceUrl).url; } catch { return record.posting.sourceUrl; } }));
-        const knownIds = new Set(store.list().filter(record => record.discovery).map(record => record.discovery!.sourceKey + ':' + record.discovery!.externalId));
+        const known = new Set(store.list({includeTrashed:true}).map(record => { try { return jobLink(record.posting.sourceUrl).url; } catch { return record.posting.sourceUrl; } }));
+        const knownIds = new Set(store.list({includeTrashed:true}).filter(record => record.discovery).map(record => record.discovery!.sourceKey + ':' + record.discovery!.externalId));
         const bounded = AbortSignal.any([signal, AbortSignal.timeout(90_000)]);
         for (const source of config.sources) {
           bounded.throwIfAborted();

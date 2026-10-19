@@ -610,3 +610,6 @@ font-size:12px}
 
 /* Hidden controls must stay hidden even when button/layout classes set display. */
 [hidden] { display: none !important; }
+
+.cleanup-actions { display:flex; flex-wrap:wrap; gap:8px; margin:12px 0; }
+.tracking form { display:grid; gap:12px; }
