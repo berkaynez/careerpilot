@@ -24,12 +24,13 @@ export const letterProfileSchema = z.strictObject({
 });
 
 /** Reviewed local prose is preserved; a model can select references but cannot rewrite this narrative. */
-export function renderCoverLetter(profile: Profile, job: Pick<Job, 'company' | 'title' | 'language' | 'documentLanguage'>, plan: Pick<Plan, 'coverLetterFactIds'>) {
+export function renderCoverLetter(profile: Profile, job: Pick<Job, 'company' | 'title' | 'language' | 'documentLanguage'>, plan: Pick<Plan, 'coverLetterFactIds'>, focus:'general'|'finance'='general') {
   const language = job.documentLanguage ?? job.language;
   const facts = new Map(profile.facts.map(fact => [fact.id, fact]));
-  const base = profile.coverLetter;
+  const base = focus==='finance'?undefined:profile.coverLetter;
   const included = new Set(base?.sections.flatMap(section => section.factIds) ?? []);
-  const additionalFactIds = plan.coverLetterFactIds.filter(id => !included.has(id)).slice(0, base ? 2 : 4);
+  const selected=focus==='finance' && !plan.coverLetterFactIds.length?(profile.financeLetterFactIds??[]):plan.coverLetterFactIds;
+  const additionalFactIds = selected.filter(id => !included.has(id)).slice(0, base ? 2 : 4);
   const paragraphs = [
     ...(base?.sections.map(section => section.text[language]) ?? []),
     ...additionalFactIds.map(id => facts.get(id)!.text[language]),

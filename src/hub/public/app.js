@@ -1,13 +1,51 @@
 'use strict';
 const $ = selector => document.querySelector(selector);
 const states = { saved: 'Kaydedildi', ready: 'Analizi hazır', review: 'İnceleme gerekiyor', submitted: 'Başvuruldu', archived: 'Vazgeçildi' };
+const needsQuality=item=>['review','saved','ready'].includes(item.state) && item.quality?.bucket!=='review';
+const trackingStages={not_set:'Aşama belirtilmedi',awaiting_response:'Yanıt bekleniyor',screening:'İK görüşmesi',interview:'Mülakat',assessment:'Test / değerlendirme',offer:'Teklif',rejected:'Olumsuz',closed:'Süreç kapandı'};
+const localDay=()=>{const date=new Date();return date.getFullYear()+'-'+String(date.getMonth()+1).padStart(2,'0')+'-'+String(date.getDate()).padStart(2,'0');};
+const followUpDue=item=>Boolean(item.tracking?.followUpOn && item.tracking.followUpOn<=localDay() && !['rejected','closed'].includes(item.tracking.stage));
 const levels = { documented: 'Doğrudan dayanak', related: 'Kısmi dayanak', not_documented: 'Profilde belgelenmiyor' };
 const priorities = { essential: 'Temel şart', preferred: 'Tercih edilen', responsibility: 'Görev' };
 const errors = {
+  DISCOVERY_SOURCE_FAILED:'Bu kaynak okunamadı; diğer kaynakların sonuçları korunuyor.',
+  DISCOVERY_SOURCE_HTTP:'Resmî kaynak erişime izin vermedi; ilanlar kapalı sayılmadı.',
+  DISCOVERY_SOURCE_FORMAT:'Kaynak yanıtı doğrulanamadı; ilan açıklığı varsayılmadı.',
+  DISCOVERY_RATE_LIMITED:'Kaynak hız sınırı bildirdi; otomatik tekrar yapılmadı.',
+  DISCOVERY_COOLDOWN:'Bu resmî kaynak için bekleme süresi dolmadı.',
+  DISCOVERY_SEARCH_CANCELLED:'Tarama durduruldu; tamamlanan kayıtlar korundu.',
+  DISCOVERY_SEARCH_INTERRUPTED:'Önceki tarama yarıda kaldı; otomatik tekrar yapılmadı.',
+  HUB_CV_FOCUS_UNAVAILABLE:'Bu CV türü henüz profilinde yok.',
+  HUB_JOB_QUALITY_REQUIRED:'Bu kayıt kalite kontrolünü geçmedi. Ücretli analizden önce ilanı ve kaynak bilgilerini kontrol et.',
+  DISCOVERY_CHECK_UNSUPPORTED:'Bu bağlantı için otomatik kaynak kontrolü yok; ilanı açarak kontrol et.',
+  HUB_LETTER_EVIDENCE_REQUIRED:'Ön yazı için önce profil anlatımını veya ilan analizini hazırlamalısın.',
+  HUB_ROUTING_REQUIRED:'Önce şirket, tam ilan metni, ülke ve dil bilgilerini doğrula.',
+  HUB_RECORD_BUSY:'Önce devam eden analiz veya form oturumunu kapat.',
+  HUB_TRACKING_SUBMITTED_REQUIRED:'Takip bilgilerini yalnızca Başvuruldu kayıtlarında düzenleyebilirsin.',
+  DISCOVERY_FREEHIRE_COOLDOWN: 'FreeHire yeni sorgusu için 30 saniye bekle.',
+  DISCOVERY_FREEHIRE_RATE_LIMITED: 'FreeHire hız sınırı bildirdi; 5 dakika sonra yeniden deneyebilirsin.',
+  DISCOVERY_FREEHIRE_HTTP: 'FreeHire erişimi reddetti. Tekrar denenmedi; SerpAPI seçeneğini kullanabilirsin.',
+  DISCOVERY_FREEHIRE_NETWORK: 'FreeHire bağlantısı tamamlanamadı; otomatik tekrar yapılmadı.',
+  DISCOVERY_FREEHIRE_FORMAT: 'FreeHire yanıtı doğrulanamadı; ilan eklenmedi.',
+  DISCOVERY_FREEHIRE_RESPONSE_TOO_LARGE: 'FreeHire yanıtı boyut sınırını aştı; işlem durduruldu.',
+  DISCOVERY_SEARCH_NOT_ENABLED: 'Kaynak araması kapalı. SerpAPI anahtarını özel ayar dosyana ekleyip paneli --enable-search ile aç.',
+  DISCOVERY_SEARCH_APPROVAL_REQUIRED: 'Rol ve konum paylaşımı ile ücretsiz kota kullanımı onayı gerekiyor.',
+  DISCOVERY_SEARCH_FREE_PLAN_REQUIRED: 'Ücretsiz ve etkin SerpAPI planı doğrulanamadı. Arama yapılmadı; hesabındaki planı kontrol et.',
+  DISCOVERY_SEARCH_QUOTA_STOP: 'Ücretsiz kota veya yerel sınır doldu. Arama durduruldu; ücretli plana geçilmedi.',
+  DISCOVERY_SEARCH_COOLDOWN: 'Yeni sorgular için en az 15 dakika bekle. Aynı başarılı arama 24 saat kayıtlı sonuçları kullanır.',
+  DISCOVERY_SEARCH_BUSY: 'Bir arama devam ediyor veya önceki işlem yarıda kaldı. Yeniden başlatmadan önce çalışan paneli kontrol et.',
+  DISCOVERY_SEARCH_TIMEOUT: 'Arama servisi süre sınırında yanıt vermedi. Otomatik tekrar yapılmadı.',
+  DISCOVERY_SEARCH_NETWORK: 'Arama bağlantısı tamamlanamadı. Tekrar denenmedi; başlamış sorgu kota kaydında tutulur.',
+  DISCOVERY_SEARCH_HTTP: 'SerpAPI isteği reddetti. Anahtarı ve hesabını kontrol et; tekrar denenmedi.',
+  DISCOVERY_SEARCH_RATE_LIMITED: 'SerpAPI hız sınırına ulaşıldı. Arama durduruldu.',
+  DISCOVERY_SEARCH_FORMAT: 'Arama sonucu doğrulanamadı. Aday kaynak eklenmedi.',
+  DISCOVERY_SEARCH_RESPONSE_TOO_LARGE: 'Arama yanıtı boyut sınırını aştı. İşlem durduruldu.',
+
+  DISCOVERY_SEARCH_QUERY_TOO_LONG: 'Arama sorgusu çok uzun. Rol veya konum ifadelerini kısaltıp ayarları kaydet.',
   DISCOVERY_BUSY: 'Bir keşif işlemi devam ediyor. Bitmesini bekle.',
   DISCOVERY_SOURCES_REQUIRED: 'En az bir şirket kaynağı ekle.',
   DISCOVERY_DEMO_OFFLINE: 'Örnek modda dış kaynak taraması kapalıdır.',
-  HUB_ROUTING_REQUIRED: 'Önce ilanın çalışma ülkesini ve dilini doğrula.',
+  HUB_ROUTING_REQUIRED: 'Önce tam ilan metnini, şirketi, çalışma ülkesini ve dili doğrula.',
 
   ASSIST_CONTACT_CONSENT_REQUIRED: 'Form bilgilerini bu siteye yazmak için paylaşım onayı gerekiyor.',
   ASSIST_SESSION_BUSY: 'Bir form işlemi veya açık oturum var. Önce onu tamamla ya da kapat.',
@@ -40,10 +78,13 @@ function notify(text, error = false) { const box = $('#notice'); box.textContent
 function badge(state) { return node('span', 'badge ' + state, states[state]); }
 function openDialog(id) { const dialog = $(id); dialog.querySelector('.form-error').textContent = ''; dialog.showModal(); }
 async function refresh(preferred) {
-  records = await api('/api/jobs');
+  const [jobs,trash]=await Promise.all([api('/api/jobs'),api('/api/trash')]); records=jobs;
+  const archived=records.filter(item=>item.state==='archived').length;
+  $('#clear-archived').hidden=!archived;$('#clear-archived').textContent='Vazgeçilenleri kaldır ('+archived+')';
+  $('#restore-trash').hidden=!trash.count;$('#restore-trash').textContent='Kaldırılanları geri getir ('+trash.count+')';
   $('#stat-all').textContent = records.length;
   $('#stat-ready').textContent = records.filter(item => item.analysisOrigin).length;
-  $('#stat-review').textContent = records.filter(item => item.state === 'review').length;
+  $('#stat-review').textContent = records.filter(item => item.state === 'review' && !needsQuality(item)).length;
   $('#stat-submitted').textContent = records.filter(item => item.state === 'submitted').length;
   $('#nav-count').textContent = records.length;
   renderList();
@@ -55,7 +96,9 @@ async function refresh(preferred) {
 }
 function visibleRecords() {
   const query = $('#search').value.toLocaleLowerCase('tr'), state = $('#filter').value;
-  return records.filter(item => (state === 'all' || item.state === state) && (item.company + ' ' + item.title).toLocaleLowerCase('tr').includes(query));
+  const matchesView=item=>($('#document-filter').value==='all'||(item.documentFocus||'general')===$('#document-filter').value) && (state==='all' || (state==='quality'?needsQuality(item):item.state===state && (state!=='review'||!needsQuality(item))));
+  const visible = records.filter(item => (state !== 'submitted' || (($('#tracking-stage-filter').value==='all' || (item.tracking?.stage || 'not_set')===$('#tracking-stage-filter').value) && ($('#tracking-followup-filter').value==='all' || ($('#tracking-followup-filter').value==='due'?followUpDue(item):!item.tracking?.followUpOn)))) && matchesView(item) && (item.company + ' ' + item.title).toLocaleLowerCase('tr').includes(query));
+  return state === 'submitted' ? visible.sort((a,b)=>Number(followUpDue(b))-Number(followUpDue(a)) || (a.tracking?.followUpOn || '9999').localeCompare(b.tracking?.followUpOn || '9999')) : state === 'review' ? visible.sort((a, b) => Number(b.discovery?.careerLevel === 'entry') - Number(a.discovery?.careerLevel === 'entry')) : visible;
 }
 function clearDetail() { selectedId = null; detailSignature = '';  detailSequence++; const empty = node('div', 'empty'); empty.append(node('h2', '', 'Görüntülenecek ilan seçilmedi.'), node('p', '', 'Aramayı veya filtreyi değiştirerek bir ilan seçebilirsin.')); $('#detail').replaceChildren(empty); }
 async function applyFilters() {
@@ -65,7 +108,7 @@ async function applyFilters() {
   }
   renderList();
 }
-function resetFilters() { $('#search').value = ''; $('#filter').value = 'all'; }
+function resetFilters() { $('#document-filter').value='all'; $('#search').value = ''; $('#filter').value = 'all'; }
 function renderList() {
   const view = $('#filter').value;
   for (const button of document.querySelectorAll('[data-view]')) {
@@ -73,23 +116,54 @@ function renderList() {
     button.classList.toggle('active', active); button.setAttribute('aria-pressed', String(active));
   }
   $('#nav-submitted-count').textContent = records.filter(item => item.state === 'submitted').length;
-  $('#list-title').textContent = view === 'submitted' ? 'Başvurulanlar' : view === 'review' ? 'İnceleme bekleyenler' : 'İlanların';
+  $('#nav-quality-count').textContent=records.filter(needsQuality).length;
+  $('#quality-overview').textContent=view==='quality'?'Bu kayıtlar açık ve güncel fırsat sayısına dahil değil. Kaynak kontrolü veya tam metin gerekiyor; kayıtlar silinmedi.':view==='review'?'Resmî kaynakta bulunan veya senin doğruladığın ilanlar. Başlangıç seviyesi ve diğer şartlar ayrıca değerlendirilir.':'';
+  $('#list-title').textContent = view === 'quality' ? 'Kaynak kontrolü gerekenler' : view === 'submitted' ? 'Başvurulanlar' : view === 'review' ? 'İncelenebilir ilanlar' : 'İlanların';
+  $('#tracking-filters').hidden=view!=='submitted';$('#tracking-overview').hidden=view!=='submitted';
+  const applications=records.filter(item=>item.state==='submitted');
+  $('#tracking-overview').textContent=applications.length+' başvuru · '+applications.filter(followUpDue).length+' bugün/geciken takip · '+applications.filter(item=>!item.tracking?.appliedOn).length+' başvuru tarihi eksik';
+  $('#group-related-label').hidden=!['all','review'].includes(view) || !records.some(item=>item.state==='review');
   const filtered = visibleRecords();
   $('#list-count').textContent = filtered.length + ' ilan'; $('#jobs').replaceChildren();
   if (!filtered.length) {
     const empty = node('div', 'empty'); empty.append(node('h3', '', view === 'submitted' ? 'Henüz başvurulan ilan yok.' : records.length ? 'Bu filtrede ilan yok.' : 'İlk fırsatını ekle.'), node('p', '', view === 'submitted' ? 'Tamamladığın ilanın durumunu “Başvuruldu” olarak değiştir; burada takip edebilirsin. Arama yaptıysan aramayı da kontrol et.' : records.length ? 'Aramayı veya durum filtresini değiştirebilirsin.' : 'İlan metnini kaydet; başvurunun bütün adımlarını buradan takip et.'));
     $('#jobs').append(empty); return;
   }
-  for (const item of filtered) {
+  const groups=groupReviewRecords(filtered,$('#group-related').checked && ['all','review'].includes(view));
+  if(groups.length<filtered.length)$('#list-count').textContent=filtered.length+' kayıt · '+groups.length+' görünür grup';
+  for(const group of groups){
+    const primary=group.find(item=>item.id===selectedId)||group[0];$('#jobs').append(makeJobCard(primary));
+    const other=group.filter(item=>item.id!==primary.id);
+    if(other.length){const box=node('details','source'),label=node('summary','','Olası tekrarlar · '+other.length+' diğer kayıt');box.append(label,node('p','small muted','Aynı iş oldukları doğrulanmadı. Kayıtlar ve durumları ayrı tutulur.'));for(const item of other)box.append(makeJobCard(item));$('#jobs').append(box);}
+  }
+}
+function groupReviewRecords(items,enabled){
+  if(!enabled)return items.map(item=>[item]);
+  const remaining=new Map(items.map(item=>[item.id,item])),groups=[];
+  while(remaining.size){const first=remaining.values().next().value;remaining.delete(first.id);const group=[first];
+    if(first.state==='review')for(let index=0;index<group.length;index++)for(const other of remaining.values())
+      if(other.state==='review' && ((group[index].relatedJobs||[]).some(link=>link.id===other.id)||(other.relatedJobs||[]).some(link=>link.id===group[index].id))){group.push(other);remaining.delete(other.id);}
+    groups.push(group);
+  }
+  return groups;
+}
+function makeJobCard(item){
     const card = node('button', 'job-card' + (selectedId === item.id ? ' selected' : '')); card.type = 'button';
     card.setAttribute('aria-pressed', String(selectedId === item.id));
     const top = node('div', 'job-top'); top.append(node('span', 'company-mark', item.company.slice(0, 1).toUpperCase()), node('span', 'company-name', item.company));
     const title = node('h3', '', item.title), bottom = node('div', 'job-bottom');
     bottom.append(badge(item.state), node('span', 'country', (item.discovery && !item.discovery.routingConfirmed ? 'Ülke doğrulanmalı' : item.country) + ' · ' + new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'short' }).format(new Date(item.updatedAt))));
     const score = node('span', item.score === null ? 'card-score muted' : 'card-score', item.analyzing ? 'Analiz sürüyor…' : item.score === null ? (item.analysisOrigin ? 'Puan hesaplanamadı' : 'Henüz analiz yok') : item.score + '/100 uyum');
-    card.append(top, title, bottom, score); card.addEventListener('click', () => showDetail(item.id).catch(error => notify(error.message, true))); $('#jobs').append(card);
-  }
+    if (item.discovery) bottom.append(node('span', 'small muted', item.discovery.careerLevel === 'entry' ? 'Yeni mezun / başlangıç' : item.discovery.careerLevel === 'experienced' ? 'Deneyimli rol' : 'Seviye kontrol edilmeli'));
+    if(item.state==='submitted'){
+      score.textContent=trackingStages[item.tracking?.stage || 'not_set'];
+      bottom.append(node('span','small muted','Başvuru: '+(item.tracking?.appliedOn || 'Tarih girilmemiş')));
+      if(item.tracking?.followUpOn)bottom.append(node('span',followUpDue(item)?'authorization':'small muted','Takip: '+item.tracking.followUpOn));
+    }
+    if(item.quality && item.state!=='submitted')bottom.append(node('span','small muted',item.quality.label));
+    card.append(top, title, bottom, score); card.addEventListener('click', () => showDetail(item.id).catch(error => notify(error.message, true))); return card;
 }
+
 async function showDetail(id) {
   const sequence = ++detailSequence;
   const record = await api('/api/jobs/' + id); if (sequence !== detailSequence) return;
@@ -101,14 +175,36 @@ async function showDetail(id) {
   const meta = node('div', 'detail-meta'); meta.append(badge(record.state), node('span', 'muted', record.discovery && !record.discovery.routingConfirmed ? 'Ülke ve dil doğrulanmalı' : record.posting.country + ' · ' + (record.posting.language === 'en' ? 'İngilizce ilan' : 'Türkçe ilan'))); head.append(meta); pane.append(head);
   const actions = node('div', 'detail-actions'), link = node('a', 'secondary', 'İlanı aç ↗'); link.href = record.posting.sourceUrl; link.target = '_blank'; link.rel = 'noopener noreferrer'; actions.append(link);
   const analyze = node('button', 'primary', record.analyzing ? 'Analiz sürüyor…' : record.analysis ? 'Yeniden analiz et' : 'Uyumunu analiz et');
-  analyze.disabled = !session.modelEnabled || record.analyzing || Boolean(record.discovery && !record.discovery.routingConfirmed); analyze.addEventListener('click', () => { $('#analyze-form').reset(); $('#model-details').textContent = session.model ? 'Model: ' + session.model.name + ' · Sağlayıcı: ' + session.model.destination + ' · Analiz sınırı: $' + session.model.perRunLimitUsd.toFixed(4) + ' · Aylık sınır: $' + session.model.monthlyLimitUsd.toFixed(2) : ''; openDialog('#analyze-dialog'); }); actions.append(analyze); pane.append(actions);
+  analyze.disabled = record.quality?.bucket==='excluded' || !session.modelEnabled || record.analyzing || Boolean(record.discovery && !record.discovery.routingConfirmed); analyze.addEventListener('click', () => { $('#analyze-form').reset(); $('#model-details').textContent = session.model ? 'Model: ' + session.model.name + ' · Sağlayıcı: ' + session.model.destination + ' · Analiz sınırı: $' + session.model.perRunLimitUsd.toFixed(4) + ' · Aylık sınır: $' + session.model.monthlyLimitUsd.toFixed(2) : ''; openDialog('#analyze-dialog'); }); const remove=node('button','secondary','Listeden kaldır');remove.type='button';remove.disabled=record.analyzing || record.assistantActive || assistantRequestPending;
+  remove.addEventListener('click',async()=>{remove.disabled=true;try{
+    await api('/api/jobs/'+id+'/remove',{});await refresh();notify(record.posting.company+' ilanı listeden kaldırıldı. ');
+    const undo=node('button','secondary','Geri al');undo.type='button';undo.addEventListener('click',async()=>{undo.disabled=true;try{await api('/api/jobs/'+id+'/restore',{});await refresh(id);notify('İlan geri getirildi.');}catch(error){undo.disabled=false;notify(error.message,true);}});$('#notice').append(undo);
+  }catch(error){remove.disabled=false;notify(error.message,true);}});
+  actions.append(analyze,remove); pane.append(actions);
+  renderApplicationTracking(pane,record);
   if (!session.modelEnabled) pane.append(node('p', 'small muted', 'Model bu oturumda kapalı. Mevcut analizini “Analiz içe aktar” ile ücretsiz görüntüleyebilirsin.'));
   renderDiscovery(record, pane);
   renderAssistant(pane, record);
   if (record.lastError) pane.append(node('p', 'notice error', 'Son analiz tamamlanamadı: ' + friendly(record.lastError) + (record.analysis ? ' Önceki analiz aşağıda korunuyor.' : '')));
   if (record.analysis) renderAnalysis(pane, record);
   else { const box = node('div', 'analysis-empty'); box.append(node('span', 'eyebrow', 'SIRADAKİ ADIM'), node('h3', '', 'Bu fırsat sana ne kadar yakın?'), node('p', 'muted', 'Analiz eklendiğinde güçlü yönlerin, belgelenmeyen şartlar ve puanın dayanakları burada görünecek.')); pane.append(box); }
-  const cvBox = node('section', 'cv-box'); cvBox.append(node('h3', '', 'Başvuru belgeleri'), node('p', '', record.cv ? (record.cv.language === 'en' ? 'İngilizce' : 'Türkçe') + ' CV · ' + (record.cv.photo ? 'Fotoğraflı' : 'Fotoğrafsız') : record.cvError), node('p', 'small muted', 'CV otomatik yüklenmedi. İlanın belge talimatlarını kontrol ederek başvuru sitesinde seç.')); pane.append(cvBox);
+  const cvBox = node('section', 'cv-box'); cvBox.append(node('h3', '', 'Başvuru belgeleri'), node('p', '', record.cv ? (record.cv.language === 'en' ? 'İngilizce' : 'Türkçe') + ' CV · ' + (record.cv.photo ? 'Fotoğraflı' : 'Fotoğrafsız') : record.cvError), node('p', 'small muted', 'CV otomatik yüklenmedi. İlanın belge talimatlarını kontrol ederek başvuru sitesinde seç.')); const docsReady=Boolean(record.cv) && !(record.discovery?.search && !record.discovery.search.verified);
+  const downloadCV=node('button','secondary','Seçilen CV’yi indir');downloadCV.disabled=!docsReady;
+  downloadCV.addEventListener('click',async()=>{downloadCV.disabled=true;try{
+    const response=await fetch('/api/jobs/'+id+'/cv',{headers:{'X-Hub-Token':session.token}});if(!response.ok){const error=await response.json();throw new Error(friendly(error.code));}
+    downloadLocalFile(await response.blob(),'CV_'+record.posting.company.replace(/[^\p{L}\p{N}]+/gu,'_').slice(0,60)+'.pdf');
+  }catch(error){notify(error.message,true);}finally{downloadCV.disabled=false;}});
+  const preview=node('button','secondary','Ön yazı taslağını aç');preview.disabled=!docsReady;
+  preview.addEventListener('click',async()=>{preview.disabled=true;try{
+    const data=await api('/api/jobs/'+id+'/documents');const letter=node('textarea');letter.rows=12;letter.readOnly=true;letter.setAttribute('aria-label','Ön yazı taslağı');letter.value=data.letter;
+    const save=node('button','secondary','Ön yazıyı indir');save.addEventListener('click',()=>downloadLocalFile(new Blob([data.letter],{type:'text/plain;charset=utf-8'}),'On_Yazi_'+record.posting.company.replace(/[^\p{L}\p{N}]+/gu,'_').slice(0,60)+'.txt'));
+    cvBox.append(node('p','small muted','Şirket, pozisyon, kayıtlı profil anlatımın ve varsa analizde seçilen dayanaklarla hazırlanır. Göndermeden önce oku.'),letter,save);preview.hidden=true;
+  }catch(error){notify(error.message,true);preview.disabled=false;}});
+  const focus=node('select');focus.setAttribute('aria-label','Başvuru belgelerinin odağı');
+  for(const value of record.availableDocumentFocus||['general'])focus.append(new Option(value==='finance'?'Finans / işletme':'Genel / teknoloji',value));focus.value=record.documentFocus||'general';focus.disabled=record.analyzing||record.assistantActive;
+  focus.addEventListener('change',async()=>{focus.disabled=true;try{await api('/api/jobs/'+id+'/document-focus',{focus:focus.value});await refresh(id);notify('Bu ilanın CV ve ön yazı türü kaydedildi.');}catch(error){notify(error.message,true);focus.disabled=false;}});
+  const focusLabel=node('label','','CV ve ön yazı türü');focusLabel.append(focus);cvBox.append(focusLabel);
+  cvBox.append(downloadCV,preview);pane.append(cvBox);
   const tracking = node('section', 'tracking'); tracking.append(node('h3', '', 'Başvuru durumun'));
   const select = node('select'); select.setAttribute('aria-label', 'Başvuru durumunu değiştir');
   for (const [value, label] of Object.entries(states)) { const option = node('option', '', label); option.value = value; select.append(option); } select.value = record.state;
@@ -141,7 +237,7 @@ function renderAssistant(pane, record) {
   const info = record.assistant, current = info.session;
   const box = node('section', 'assistant-box'); box.append(node('h3', '', 'Form yardımcısı'));
   if (!current || current.status === 'closed') {
-    box.append(node('p', 'small muted', record.discovery && !record.discovery.routingConfirmed ? 'Form yardımını açmadan önce yukarıdan ilanın ülkesini ve dilini doğrula.' : info.available ? 'Tarayıcıda girişini yap, formu aç; bilinen boş alanları panelden doldur. Ücretli model çağrısı yapılmaz.' : 'Bu sitede otomatik doldurma henüz hazır değil. “İlanı aç” ile kendin devam edebilirsin.'));
+    box.append(node('p', 'small muted', record.discovery && !record.discovery.routingConfirmed ? 'Form yardımını açmadan önce yukarıdaki ilan bilgilerini doğrula.' : info.available ? 'Tarayıcıda girişini yap, formu aç; bilinen boş alanları panelden doldur. Ücretli model çağrısı yapılmaz.' : 'Bu sitede otomatik doldurma henüz hazır değil. “İlanı aç” ile kendin devam edebilirsin.'));
     const start = node('button', 'secondary', info.demo ? 'Örnek formu aç' : 'Form yardımcısını aç');
     start.disabled = !info.available || info.occupiedByOther || info.opening || assistantRequestPending;
     start.addEventListener('click', () => assistantConsent(record)); box.append(start);
@@ -215,6 +311,7 @@ function renderAnalysis(pane, record) {
 $('#new-open').addEventListener('click', () => openDialog('#new-dialog'));
 $('#import-open').addEventListener('click', () => openDialog('#import-dialog'));
 for (const button of document.querySelectorAll('.close-dialog')) button.addEventListener('click', () => button.closest('dialog').close());
+$('#document-filter').addEventListener('change',()=>applyFilters().catch(error=>notify(error.message,true)));
 $('#search').addEventListener('input', () => applyFilters().catch(error => notify(error.message, true))); $('#filter').addEventListener('change', () => applyFilters().catch(error => notify(error.message, true)));
 for (const button of document.querySelectorAll('[data-view]')) button.addEventListener('click', () => {
   $('#search').value = ''; $('#filter').value = button.dataset.view;
@@ -252,6 +349,43 @@ function renderDiscovery(record, pane) {
   if (!record.discovery) return;
   const item = record.discovery, box = node('section', 'assistant-box');
   box.append(node('h3', '', 'Keşif kaynağı: ' + item.sourceKey), node('p', 'small muted', 'Keşfedildi: ' + new Date(item.discoveredAt).toLocaleString('tr-TR') + ' · Yayın tarihi değildir.'), node('p', '', 'Konum: ' + (item.location || 'Belirtilmedi')));
+  if(record.quality){
+    box.append(node('h3','',record.quality.label));
+    for(const reason of record.quality.reasons)box.append(node('p','small',reason));
+    if(record.quality.checkedAt)box.append(node('p','small muted','Son kaynak kontrolü: '+new Date(record.quality.checkedAt).toLocaleString('tr-TR')));
+    if(record.quality.canCheck){const check=node('button','secondary','Resmî kaynaktan kontrol et');check.type='button';check.disabled=record.analyzing||record.assistantActive;
+      check.addEventListener('click',async()=>{check.disabled=true;check.textContent='Kaynak okunuyor…';try{const result=await api('/api/jobs/'+record.id+'/check-source',{});await refresh(record.id);notify(result.quality.label);}catch(error){notify(error.message,true);check.disabled=false;check.textContent='Resmî kaynaktan kontrol et';}});box.append(check);}
+  }
+  if(item.provenance)box.append(node('p','small muted','Asıl kaynak etiketi: '+(item.provenance.source||'Bilinmiyor')+' · Kaynakta ilk görülme: '+(item.provenance.firstSeenAt||'Bilinmiyor')+' · Yeniden tarih verilmiş: '+(item.provenance.fakeFreshness?'Kaynak uyarısı var':'Uyarı bildirilmedi')));
+  if (record.possibleDuplicate) {
+    box.append(node('p','authorization',record.possibleDuplicate.state==='submitted' ? 'Aynı şirkette benzer bir ilana başvurulmuş olarak işaretlediğin kayıt var. Tekrar başvurmadan önce karşılaştır.' : 'Aynı şirkette benzer başlıklı başka bir kayıt var; yeniden yayın olabilir.'));
+    const compare=node('button','secondary','Benzer kaydı göster'); compare.addEventListener('click',()=>refresh(record.possibleDuplicate.id)); box.append(compare);
+  }
+  if (item.levelReason) box.append(node('p', 'small', item.levelReason));
+  if (item.search) {
+    if (item.search.provider === 'freehire' && item.search.originalURL) {
+      const link=node('a','text-button','İşveren ilanını aç ↗'); link.href=item.search.originalURL; link.target='_blank'; link.rel='noopener noreferrer'; box.append(link);
+    }
+    box.append(node('p', 'small', 'Arama sorgusu: ' + item.search.query));
+    box.append(node('p', 'small muted', item.search.dateHint ? 'Kaynağın bildirdiği tarih: ' + item.search.dateHint + ' · Yayın tarihi ve ilanın açık olduğu doğrulanmadı.' : 'Arama indeksinde ayrı tarih bilgisi yok; ilanın güncelliğini kontrol et.'));
+    if (!item.search.verified) {
+      box.append(node('h3', '', 'Tam ilan metnini doğrula'), node('p', '', item.search.provider === 'freehire' ? 'FreeHire şirket ve ilan metnini getirdi. İlanı açıp açık olduğunu, metni, ülkeyi ve dili kontrol et; bilgileri aşağıdan doğrula.' : 'Bu kayıt arama motorunun kısa özetinden geldi. İlanı aç; açık olduğunu kontrol edip şirketi, tam metni, ülkeyi ve dili gir. Arama özeti uygunluk analizi için kullanılmaz.'), node('p', 'small muted', item.search.provider === 'freehire' ? 'Kaynak metni aşağıdaki alana aktarıldı.' : item.search.snippet));
+      const form = node('form'), company = node('input'), title = node('input'), text = node('textarea'), country = node('select'), language = node('select'), message = node('p', 'form-error');
+      company.required = true; company.maxLength = 1200; title.required = true; title.maxLength = 1200; title.value = record.posting.title;
+      text.required = true; text.minLength = 20; text.maxLength = 24000; text.rows = 8;
+      if (item.search.provider === 'freehire') { company.value = record.posting.company; text.value = record.posting.text; }
+      country.required = true; country.append(new Option('Ülke seç', '')); for (const option of document.querySelector('[name="country"]').options) country.append(new Option(option.text, option.value));
+      language.required = true; language.append(new Option('Dil seç', ''), new Option('Türkçe', 'tr'), new Option('İngilizce', 'en'));
+      for (const [caption, input] of [['Doğrulanan şirket',company],['Doğrulanan ilan başlığı',title],['Tam ilan metni',text],['Doğrulanan çalışma ülkesi',country],['Doğrulanan ilan dili',language]]) { const label = node('label','',caption); label.append(input); form.append(label); }
+      const submit = node('button', 'secondary', 'İlan bilgilerini doğrula'); submit.type = 'submit'; form.append(message, submit);
+      form.addEventListener('submit', async event => { event.preventDefault(); if (!form.reportValidity()) return; submit.disabled = true;
+        try { await api('/api/jobs/' + record.id + '/verify-posting', { company: company.value, title: title.value, text: text.value, country: country.value, language: language.value }); await refresh(record.id); notify('Tam ilan bilgileri doğrulandı.'); }
+        catch (error) { message.textContent = error.message; submit.disabled = false; }
+      });
+      box.append(form); pane.append(box); return;
+    }
+    box.append(node('p', 'small', 'Tam ilan bilgileri kullanıcı tarafından doğrulandı.'));
+  }
   const list = node('ul', 'small'); for (const reason of item.reasons) list.append(node('li', '', reason)); box.append(list);
   if (!item.routingConfirmed) {
     box.append(node('p', '', 'Başvurmadan önce ilanı açıp çalışma ülkesini ve ilan dilini doğrula. Remote ilanlarda çalışma bölgesi ayrıca sınırlı olabilir.'));
@@ -281,17 +415,236 @@ function discoveryReport(report) {
   box.append(node('p', '', report.added + ' yeni ilan · ücretli model çağrısı yok'), node('p', 'small muted', 'Son tarama: ' + new Date(report.at).toLocaleString('tr-TR')));
   for (const item of report.sources) box.append(node('p', 'small', item.source + ': ' + item.added + ' eklendi · ' + item.duplicates + ' zaten kayıtlı · ' + item.filtered + ' filtre dışı · ' + item.rejected + ' geçersiz kayıt' + (item.code ? ' · ' + (discoveryMessages[item.code] || 'kaynak kontrolü gerekiyor') : '')));
 }
+function renderSearchSummary(report) {
+  const box = $('#discovery-job-summary'); box.replaceChildren(); box.hidden = !report;
+  if (!report) return;
+  box.append(node('h3', '', 'Son arama özeti'), node('p', 'small muted', new Date(report.at).toLocaleString('tr-TR') + ' · Bu rol ve bölge kriterleri için kayıtlı sonuçlar'));
+  box.append(node('p', '', report.examined + ' bağlantı incelendi · ' + report.uniqueLinks + ' benzersiz ilan bağlantısı · ' + report.repeatedLinks + ' arama içi tekrar · ' + report.rejected + ' elenen bağlantı'));
+  box.append(node('p', 'small muted', 'Benzersiz bağlantı sayısı yeni eklenen veya hâlâ açık ilan sayısı değildir. Panele ekleme sırasında rol/deneyim filtreleri ve önceki başvurular ayrıca kontrol edilir.'));
+  const reasons = report.rejectionReasons, labels = {listingPage: 'Liste/şirket sayfası', unsupportedSite: 'Desteklenmeyen site', unsafeURL: 'Güvensiz/hatalı bağlantı', missingTitle: 'Başlık eksik', invalidPosting: 'Tekil ilan adresi tanınmadı'};
+  const details = node('details'), heading = node('summary', '', 'Bağlantılar neden elendi?'); details.append(heading);
+  for (const [key, label] of Object.entries(labels)) if (reasons[key]) details.append(node('p', 'small', label + ': ' + reasons[key]));
+  const unknown = Math.max(0, report.rejected - Object.values(reasons).reduce((sum, count) => sum + count, 0));
+  if (unknown) details.append(node('p', 'small', 'Eski kayıtta nedeni ayrılmamış sonuç: ' + unknown));
+  if (!report.rejected) details.append(node('p', 'small', 'Bu aramada bağlantı doğrulamasında elenen sonuç yok.'));
+  box.append(details);
+  if (report.partial) box.append(node('p', 'small', 'Kısmi sonuç: arama tamamlanmadı.' + (report.failureCode ? ' ' + friendly(report.failureCode) : '')));
+}
+let discoveryStatusTimer, discoverySearchPending = false, discoveryRoleProfiles = [], discoveryCustomRoles=[];
+$('#discovery-role-profile').addEventListener('change', () => {
+  const profile = discoveryRoleProfiles.find(item => item.id === $('#discovery-role-profile').value);
+  $('#discovery-roles').value = (profile?profile.roles:discoveryCustomRoles).join(', ');
+  $('#search-document-focus').value=profile?.documentFocus??'general';
+  $('#discovery-job-queries').hidden = true;
+  void refreshDiscoveryStatus();
+});
+$('#discovery-roles').addEventListener('input', () => { $('#discovery-role-profile').value = ''; discoveryCustomRoles=$('#discovery-roles').value.split(',').map(value=>value.trim()).filter(Boolean); });
+$('#discovery-roles').addEventListener('change', refreshDiscoveryStatus);
+$('#discovery-early-career').addEventListener('change', refreshDiscoveryStatus);
+function jobSearchPlanURL() {
+  return '/api/discovery/job-search-plan?' + new URLSearchParams({scope: $('#discovery-job-scope').value, roles: $('#discovery-roles').value, earlyCareer: String($('#discovery-early-career').checked)});
+}
+async function refreshDiscoveryStatus() {
+  clearInterval(discoveryStatusTimer);
+  $('#unified-search').disabled=discoverySearchPending||session.demo;
+  const button = $('#discovery-job-search'), label = $('#discovery-search-status'); button.disabled = true;
+  try {
+    const planURL = jobSearchPlanURL(), data = await api(planURL), status = data.availability;
+    if (planURL !== jobSearchPlanURL()) return;
+    renderSearchSummary(status?.lastResult || null);
+    $('#freehire-search').disabled = discoverySearchPending || !data.freehireEnabled;
+    discoveryRoleProfiles = data.roleProfiles || [];
+    const profiles = $('#discovery-role-profile');
+    if (profiles.options.length === 1) for (const item of discoveryRoleProfiles) {
+      const option = node('option', '', item.label); option.value = item.id; profiles.append(option);
+    }
+    $('#discovery-auto-search').disabled = !data.automaticSearchEnabled || discoverySearchPending;
+    if (!data.automaticSearchEnabled || !status) { label.textContent = 'Kaynak araması bu panel oturumunda kapalı.'; return; }
+    const readyAt = Date.now() + status.waitSeconds * 1000;
+    const paint = () => {
+      const wait = Math.max(0, Math.ceil((readyAt - Date.now()) / 1000));
+      const enough = status.remainingToday >= status.requestsPerRun && status.remainingMonth >= status.requestsPerRun;
+      button.disabled = discoverySearchPending || (!status.cached && (wait > 0 || !enough || !status.clockValid));
+      label.textContent = 'Yerel sorgu hakkı: bugün ' + status.remainingToday + '/8, bu ay ' + status.remainingMonth + '/200. ' +
+        (status.cached ? (status.partial ? 'Kayıtlı kısmi sonuçlar hazır; yeni sorgu tüketilmez.' : 'Kayıtlı sonuçlar hazır; yeni sorgu tüketilmez.') :
+          !status.clockValid ? 'Bilgisayarın saatini kontrol et.' : !enough ? 'Yerel sorgu sınırına ulaşıldı.' : wait > 0 ? 'Yeni arama: ' + Math.floor(wait/60) + ':' + String(wait%60).padStart(2,'0') + ' sonra.' : 'Arama hazır; en çok ' + status.requestsPerRun + ' sorgu başlatılır.') +
+        ' Sağlayıcının gerçek kotası arama başında ayrıca kontrol edilir.';
+    };
+    paint(); if ($('#discovery-dialog').open) discoveryStatusTimer = setInterval(paint, 1000);
+  } catch (error) { label.textContent = error.message; }
+}
+$('#discovery-dialog').addEventListener('close', () => clearInterval(discoveryStatusTimer));
 $('#discovery-add-source').addEventListener('click', () => { if ($('#discovery-sources').children.length < 20) sourceRow(); });
 $('#discovery-open').addEventListener('click', async () => {
   try { const data = await api('/api/discovery'); $('#discovery-sources').replaceChildren(); for (const source of data.config.sources) sourceRow(source);
     for (const [id, key] of [['roles','roles'], ['locations','locations'], ['keywords','keywords'], ['excluded','excludedTitles']]) $('#discovery-' + id).value = data.config[key].join(', ');
-    discoveryReport(data.lastReport); openDialog('#discovery-dialog');
+    discoveryCustomRoles=data.config.customRoles??data.config.roles;
+    $('#discovery-early-career').checked = data.config.earlyCareer;
+    $('#discovery-role-profile').value = '';
+    $('#discovery-job-queries').hidden = true;
+    $('#discovery-job-approval').checked = false; $('#discovery-search-approval').checked = false; $('#discovery-auto-result').textContent = '';
+    $('#discovery-job-result').textContent = ''; $('#freehire-approval').checked = false; $('#freehire-result').textContent = ''; $('#freehire-next').hidden = true; renderSearchSummary(null);
+    $('#unified-approval').checked=false;renderUnifiedReport(data.lastSearch);
+    $('#search-document-focus').value=(discoveryRoleProfiles.find(profile=>profile.roles.join(', ')===data.config.roles.join(', '))?.documentFocus??'general');
+    discoveryReport(data.lastReport); openDialog('#discovery-dialog'); await refreshDiscoveryStatus();
+    const selectedPreset=discoveryRoleProfiles.find(profile=>profile.roles.join(', ')===data.config.roles.join(', '));
+    $('#discovery-role-profile').value=selectedPreset?.id??'';$('#search-document-focus').value=selectedPreset?.documentFocus??'general';
+    if(data.lastSearch?.state==='running'){discoverySearchPending=true;$('#unified-search').disabled=true;watchExistingSearch();}
   } catch (error) { notify(error.message, true); }
 });
-formHandler('#discovery-form', async (form, event) => {
+async function saveDiscoverySettings() {
   const terms = id => $('#discovery-' + id).value.split(',').map(value => value.trim()).filter(Boolean);
   const sources = Array.from($('#discovery-sources').children).map(row => ({ provider: row.children[0].value, board: row.children[1].value.trim(), company: row.children[2].value.trim(), locationFallback: row.children[3].value.trim() }));
-  await api('/api/discovery/config', { version: 1, sources, roles: terms('roles'), locations: terms('locations'), keywords: terms('keywords'), excludedTitles: terms('excluded') });
+  await api('/api/discovery/config', { version: 1, sources, customRoles:discoveryCustomRoles, earlyCareer: $('#discovery-early-career').checked, roles: terms('roles'), locations: terms('locations'), keywords: terms('keywords'), excludedTitles: terms('excluded') });
+}
+formHandler('#discovery-form', async (form, event) => {
+  await saveDiscoverySettings();
   if (event.submitter?.value === 'run') { const report = await api('/api/discovery/run', {}); discoveryReport(report); $('#filter').value = 'review'; $('#search').value = ''; await refresh(); notify(report.added + ' yeni ilan inceleme listesine eklendi.'); }
   else notify('Keşif ayarları kaydedildi.');
+  await refreshDiscoveryStatus();
 });
+
+$('#discovery-search-plan').addEventListener('click', async () => {
+  try { const data = await api('/api/discovery/search-plan'); $('#discovery-search-note').textContent = data.note; $('#discovery-search-queries').hidden = false;
+    $('#discovery-search-queries').textContent = data.queries.join('\n\n');
+  } catch (error) { notify(error.message, true); }
+});
+$('#discovery-extract').addEventListener('click', async () => {
+  try { const urls = $('#discovery-links').value.split(/\s+/).filter(Boolean); const data = await api('/api/discovery/source-candidates', { urls });
+    const known = new Set(Array.from($('#discovery-sources').children).map(row => row.children[0].value + ':' + row.children[1].value.trim().toLowerCase())); let added = 0;
+    for (const source of data.sources) { const key = source.provider + ':' + source.board.toLowerCase();
+      if (known.has(key) || $('#discovery-sources').children.length >= 20) continue; sourceRow(source); known.add(key); added++;
+    }
+    $('#discovery-search-note').textContent = added + ' kaynak adayı eklendi. Şirket adlarını/kodlarını kontrol et ve kaydet. Ağ isteği yapılmadı; uygunluk henüz doğrulanmadı.';
+  } catch (error) { $('#discovery-form .form-error').textContent = error.message; }
+});
+
+$('#discovery-auto-search').addEventListener('click', async event => {
+  const button = event.currentTarget, output = $('#discovery-auto-result');
+  if (!$('#discovery-search-approval').checked) { output.textContent = errors.DISCOVERY_SEARCH_APPROVAL_REQUIRED; return; }
+  discoverySearchPending = true; button.disabled = true; output.textContent = 'Kaydedilmiş kriterlerle şirket kaynakları aranıyor…';
+  try {
+    const data = await api('/api/discovery/source-search', { approved: true });
+    const known = new Set(Array.from($('#discovery-sources').children).map(row => row.children[0].value + ':' + row.children[1].value.trim().toLowerCase()));
+    let added = 0, skipped = 0, duplicates = 0;
+    for (const source of data.sources) { const key = source.provider + ':' + source.board.toLowerCase();
+      if (known.has(key)) { duplicates++; continue; }
+      if ($('#discovery-sources').children.length >= 20) { skipped++; continue; }
+      sourceRow(source); known.add(key); added++;
+    }
+    output.textContent = (data.partial ? 'Kısmi sonuç: aramanın tamamı bitmedi. ' : '') + added + ' yeni kaynak adayı · ' + duplicates + ' zaten listede · ' + skipped + ' kaynak sınırı nedeniyle eklenmedi. ' + (data.cached ? 'Kayıtlı sonuçlar; yeni sorgu tüketilmedi.' : data.requests + ' arama isteği başlatıldı (başarısız istekler dahil).') + ' Kaynakları kontrol edip kaydet; resmî ilanları toplama adımı henüz çalıştırılmadı.' + (data.failureCode ? ' ' + friendly(data.failureCode) : '');
+
+  } catch (error) { output.textContent = error.message; }
+  finally { discoverySearchPending = false; $('#discovery-search-approval').checked = false; await refreshDiscoveryStatus(); }
+});
+
+$('#discovery-job-scope').addEventListener('change', refreshDiscoveryStatus);
+$('#discovery-job-plan').addEventListener('click', async () => {
+  try { await saveDiscoverySettings(); const data = await api(jobSearchPlanURL());
+    $('#discovery-job-queries').hidden = false; $('#discovery-job-queries').textContent = data.queries.join('\n\n'); await refreshDiscoveryStatus();
+  } catch (error) { $('#discovery-job-result').textContent = error.message; }
+});
+$('#discovery-job-search').addEventListener('click', async () => {
+  const output = $('#discovery-job-result');
+  if (!$('#discovery-job-approval').checked) { output.textContent = errors.DISCOVERY_SEARCH_APPROVAL_REQUIRED; return; }
+  discoverySearchPending = true; $('#discovery-job-search').disabled = true; $('#discovery-auto-search').disabled = true;
+  output.textContent = 'Rollerine göre tekil ilanlar aranıyor…';
+  try {
+    await saveDiscoverySettings();
+    const data = await api('/api/discovery/job-search', { approved: true, scope: $('#discovery-job-scope').value });
+    output.textContent = (data.partial ? 'Kısmi arama sonucu. ' : '') + data.examined + ' bağlantı incelendi · ' + data.added + ' yeni ilan adayı · ' + data.duplicates + ' zaten kayıtlı · ' + data.filtered + ' filtre dışı · ' + (data.searchRejected + data.rejected) + ' desteklenmeyen/geçersiz sonuç. ' + (data.cached ? 'Önbellek kullanıldı; yeni sorgu tüketilmedi.' : data.requests + ' arama isteği başlatıldı.') + (data.failureCode ? ' ' + friendly(data.failureCode) : '');
+    const reasons = data.rejectionReasons || {}, filters = data.filterReasons || {};
+    const labels = { listingPage: 'İlan yerine liste/şirket sayfası', unsupportedSite: 'Desteklenmeyen site', unsafeURL: 'Güvensiz veya hatalı bağlantı', missingTitle: 'Başlık eksik', invalidPosting: 'Tekil ilan adresi tanınmadı' };
+    const filterLabels = { role: 'Rol eşleşmedi', excludedTitle: 'Hariç tutulan unvan', keyword: 'Ek kelime eşleşmedi', experience: 'Deneyim şartı yüksek' };
+    const details = [...Object.entries(labels).filter(([key]) => reasons[key]).map(([key,label]) => label + ': ' + reasons[key]),
+      ...Object.entries(filterLabels).filter(([key]) => filters[key]).map(([key,label]) => label + ': ' + filters[key])];
+    const unexplained = data.searchRejected - Object.values(reasons).reduce((sum, count) => sum + count, 0);
+    if (unexplained > 0) details.push('Eski kayıtta nedeni ayrılmamış sonuç: ' + unexplained);
+    if (details.length) output.textContent += ' Nedenler — ' + details.join(' · ') + '.';
+    if (!data.added && !data.duplicates) output.textContent += ' Bu aramada aday çıkmadı; bu, uygun ilan bulunmadığı anlamına gelmez. Rol grubunu veya ek kelimeleri kontrol edebilirsin.';
+
+    $('#filter').value = 'quality'; $('#search').value = ''; await refresh(); notify(data.added + ' ilan adayı inceleme listesine eklendi; tam metin ve uygunluk henüz doğrulanmadı.');
+  } catch (error) { output.textContent = error.message; }
+  finally { discoverySearchPending = false; $('#discovery-job-approval').checked = false; await refreshDiscoveryStatus(); }
+});
+
+let freehirePage=1, freehireSavedCriteria='';
+async function runFreehire(page) {
+  const output=$('#freehire-result');
+  if(!$('#freehire-approval').checked){output.textContent='Bölge ve seviye filtrelerinin FreeHire ile paylaşımını onayla.';return;}
+  const criteria=JSON.stringify([$('#discovery-job-scope').value,$('#discovery-roles').value,$('#discovery-early-career').checked,$('#discovery-keywords').value,$('#discovery-excluded').value,$('#freehire-unlabelled').checked]);
+  if(page>1 && criteria!==freehireSavedCriteria){output.textContent='Kriterler değişti; ilk sayfadan yeniden ara.';$('#freehire-next').hidden=true;return;}
+  discoverySearchPending=true; $('#freehire-search').disabled=true; $('#freehire-next').disabled=true; $('#discovery-job-search').disabled=true; $('#discovery-auto-search').disabled=true;
+  output.textContent='FreeHire ilanları getiriliyor…';
+  try {
+    await saveDiscoverySettings();
+    const data=await api('/api/discovery/freehire',{approved:true,scope:$('#discovery-job-scope').value,page,includeUnlabelled:$('#freehire-unlabelled').checked});
+    freehirePage=page;freehireSavedCriteria=criteria;$('#freehire-next').hidden=!data.hasMore;
+    output.textContent='Sayfa '+page+' · Kaynağın bildirdiği toplam: '+data.total+' · '+data.examined+' kayıt incelendi · '+data.added+' kayıt eklendi ('+data.ready+' incelenebilir, '+data.needsCheck+' kaynak kontrolünde) · '+data.duplicates+' zaten kayıtlı · '+data.filtered+' filtre dışı · '+data.closed+' kapalı · '+data.rejected+' geçersiz · '+data.qualityRejected+' kalite nedeniyle alınmadı (eski/tarih çelişkisi: '+data.qualityReasons.stale+', eksik: '+data.qualityReasons.incomplete+', dolaylı toplayıcı: '+data.qualityReasons.indirectSource+'). '+(data.cached?'Kayıtlı sonuçlar kullanıldı.':'SerpAPI sorgusu ve ücretli model kullanılmadı.');
+    $('#filter').value=data.ready?'review':'quality';$('#search').value='';await refresh();notify(data.ready+' ilan incelemeye hazır; '+data.needsCheck+' kayıt kaynak kontrolünde. Kalite nedeniyle elenenler listeye eklenmedi.');
+  }catch(error){output.textContent=error.message;}
+  finally {discoverySearchPending=false;$('#freehire-next').disabled=false;await refreshDiscoveryStatus();}
+}
+$('#freehire-search').addEventListener('click',()=>runFreehire(1));
+$('#freehire-next').addEventListener('click',()=>runFreehire(freehirePage+1));
+
+function renderApplicationTracking(pane,record){
+  if(record.state!=='submitted')return;
+  const data=record.tracking || {stage:'not_set',appliedOn:null,followUpOn:null,notes:''};
+  const box=node('section','tracking'),form=node('form');box.append(node('h3','','Başvuru takibi'));
+  const stage=node('select');for(const [value,label] of Object.entries(trackingStages)){const option=new Option(label,value);stage.append(option);}stage.value=data.stage;
+  const applied=node('input');applied.type='date';applied.value=data.appliedOn || '';
+  const next=node('input');next.type='date';next.value=data.followUpOn || '';
+  const notes=node('textarea');notes.rows=4;notes.maxLength=4000;notes.value=data.notes;
+  for(const [label,input] of [['Süreç aşaması',stage],['Başvuru tarihi',applied],['Sonraki takip tarihi',next],['Başvuru notları',notes]]){const wrapper=node('label','',label);wrapper.append(input);form.append(wrapper);}
+  form.append(node('p','small muted','Notlar yalnızca bilgisayarında saklanır. Takip tarihi panelde görünür; otomatik e-posta veya bildirim gönderilmez.'));
+  const message=node('p','form-error'),save=node('button','primary','Takibi kaydet');save.type='submit';form.append(message,save);
+  form.addEventListener('submit',async event=>{event.preventDefault();message.textContent='';if(applied.value && next.value && next.value<applied.value){message.textContent='Takip tarihi başvuru tarihinden önce olamaz.';return;}save.disabled=true;
+    try{await api('/api/jobs/'+record.id+'/tracking',{stage:stage.value,appliedOn:applied.value || null,followUpOn:next.value || null,notes:notes.value});notify('Başvuru takibi kaydedildi.');await refresh(record.id);}catch(error){message.textContent=error.message;save.disabled=false;}
+  });box.append(form);pane.append(box);
+}
+for(const id of ['tracking-stage-filter','tracking-followup-filter'])$('#'+id).addEventListener('change',()=>applyFilters().catch(error=>notify(error.message,true)));
+$('#clear-archived').addEventListener('click',async()=>{const button=$('#clear-archived');button.disabled=true;try{const result=await api('/api/jobs/clear-archived',{});notify(result.removed+' vazgeçilen kayıt kaldırıldı. Geri getirme düğmesiyle kurtarabilirsin.');await refresh();}catch(error){notify(error.message,true);}finally{button.disabled=false;}});
+$('#restore-trash').addEventListener('click',async()=>{const button=$('#restore-trash');button.disabled=true;try{const result=await api('/api/trash/restore',{});notify(result.restored+' kayıt geri getirildi.');await refresh();}catch(error){notify(error.message,true);}finally{button.disabled=false;}});
+
+$('#group-related').addEventListener('change',renderList);
+
+function downloadLocalFile(blob,filename){const url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download=filename;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+
+
+const searchSourceNames={freehire:'FreeHire',web:'Web araması · LinkedIn / Indeed / Kariyer.net / Lever / Greenhouse',feeds:'Kayıtlı resmî Greenhouse / Lever akışları'};
+const searchSourceStates={pending:'Bekliyor',running:'Çalışıyor',completed:'Tamamlandı',partial:'Kısmi',skipped:'Atlandı',failed:'Tamamlanamadı'};
+function renderUnifiedReport(report){
+ const box=$('#unified-result');box.replaceChildren();if(!report)return;
+ const labels={running:'Tarama sürüyor',completed:'Tarama tamamlandı',partial:'Tarama kısmen tamamlandı',cancelled:'Tarama durduruldu',interrupted:'Önceki tarama yarıda kalmış; tamamlanan kayıtlar korundu'};
+ box.append(node('h3','',labels[report.state]),node('p','small muted',new Date(report.startedAt).toLocaleString('tr-TR')+' · '+report.roles.join(', ')));
+ for(const source of report.sources){
+  const line=node('p','small',searchSourceNames[source.name]+' — '+searchSourceStates[source.status]+' · '+source.examined+' incelendi · '+source.added+' eklendi · '+source.duplicates+' bilinen · '+source.filtered+' filtre dışı · '+source.qualityRejected+' kalite nedeniyle elendi · '+source.closed+' kapalı · '+source.rejected+' geçersiz');
+  box.append(line);if(source.code)box.append(node('p','small muted',friendly(source.code)));
+ }
+ box.append(node('p','small',report.added+' yeni kayıt · '+report.ready+' incelenebilir · '+report.needsCheck+' kaynak kontrolünde. Ücretli model çağrısı yapılmadı.'));
+ $('#unified-stop').hidden=report.state!=='running';
+}
+$('#unified-search').addEventListener('click',async()=>{
+ if(!$('#unified-approval').checked){notify('Rol/bölge paylaşımını ve ücretsiz arama kotası kullanımını onayla.',true);return;}
+ if(discoverySearchPending)return;
+ discoverySearchPending=true;$('#unified-search').disabled=true;$('#unified-stop').hidden=false;
+ let timer;
+ try{
+  await saveDiscoverySettings();await refreshDiscoveryStatus();
+  timer=setInterval(async()=>{try{renderUnifiedReport((await api('/api/discovery')).lastSearch);}catch{}},1500);
+  const report=await api('/api/discovery/search',{approved:true,scope:$('#discovery-job-scope').value,includeUnlabelled:$('#freehire-unlabelled').checked,documentFocus:$('#search-document-focus').value});
+  renderUnifiedReport(report);$('#document-filter').value=report.documentFocus;$('#filter').value=report.ready?'review':'quality';$('#search').value='';await refresh();notify(report.ready+' incelenebilir ilan; '+report.needsCheck+' kayıt kaynak kontrolünde.');
+ }catch(error){notify(error.message,true);}
+ finally{clearInterval(timer);discoverySearchPending=false;$('#unified-search').disabled=false;$('#unified-stop').hidden=true;$('#unified-approval').checked=false;await refreshDiscoveryStatus();}
+});
+$('#unified-stop').addEventListener('click',async()=>{try{await api('/api/discovery/search/stop',{});notify('Yeni kaynak istekleri durduruluyor; tamamlanan kayıtlar korunacak.');}catch(error){notify(error.message,true);}});
+
+let existingSearchTimer;
+function watchExistingSearch(){
+ clearInterval(existingSearchTimer);existingSearchTimer=setInterval(async()=>{
+  try{const report=(await api('/api/discovery')).lastSearch;renderUnifiedReport(report);
+   if(report?.state!=='running'){clearInterval(existingSearchTimer);discoverySearchPending=false;$('#unified-search').disabled=false;await refreshDiscoveryStatus();await refresh();}
+  }catch{clearInterval(existingSearchTimer);discoverySearchPending=false;}
+ },1500);
+}

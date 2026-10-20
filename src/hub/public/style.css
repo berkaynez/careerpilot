@@ -605,3 +605,11 @@ font-size:12px}
 .discovery-source input { flex:1; min-width:130px; width:140px; }
 .discovery-source select { width:140px; }
 #discovery-result { margin-top:16px; }
+
+#discovery-search-queries { white-space:pre-wrap; overflow-wrap:anywhere; }
+
+/* Hidden controls must stay hidden even when button/layout classes set display. */
+[hidden] { display: none !important; }
+
+.cleanup-actions { display:flex; flex-wrap:wrap; gap:8px; margin:12px 0; }
+.tracking form { display:grid; gap:12px; }

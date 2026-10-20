@@ -110,6 +110,11 @@ test('hub discovery requires trusted requests and blocks CV, analysis and form l
   const request = (path: string, data?: unknown) => fetch(hub.origin + path, { method: data === undefined ? 'GET' : 'POST',
     headers: { 'Content-Type': 'application/json', 'X-Hub-Token': session.token, Origin: hub.origin }, ...(data === undefined ? {} : { body: JSON.stringify(data) }) });
   assert.equal((await fetch(hub.origin + '/api/discovery')).status, 403);
+  const searchPlan = await (await request('/api/discovery/search-plan')).json();
+  assert.equal(searchPlan.automaticSearchEnabled, false); assert.ok(searchPlan.queries.length <= 4);
+  const candidates = await (await request('/api/discovery/source-candidates', { urls: ['https://jobs.lever.co/fictional', 'https://127.0.0.1/private'] })).json();
+  assert.equal(candidates.sources.length, 1); assert.equal(candidates.networkCalls, 0); assert.equal(modelCalls, 0);
+
   assert.equal((await request('/api/discovery/config', { ...config, sources: [{ ...source, board: 'https://127.0.0.1' }] })).status, 400);
   assert.equal((await request('/api/discovery/config', config)).status, 200);
   assert.equal((await request('/api/discovery/run', {})).status, 200);

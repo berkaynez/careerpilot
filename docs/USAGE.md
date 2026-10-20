@@ -1018,3 +1018,248 @@ Kaynak ayarında isteğe bağlı **Eksik konum için şirket varsayılanı** ala
 kendi farklı konumu varsa onun üzerine yazılmaz. Eşleşme nedeninde bu bilginin
 şirket varsayılanından geldiği görünür. Bu, ülke/dil doğrulamasını veya çalışma
 hakkı kontrolünü otomatik tamamlamaz. Şirketin bütün ilanlarına sabit ülke atanmaz.
+
+
+## Başlangıç seviyesi odağı ve kaynak arama hazırlığı
+
+Keşif ayarlarındaki başlangıç seviyesi seçeneği varsayılan olarak açıktır.
+Senior/Lead/Intermediate vb. başlıklar ve açık en az 3 yıl deneyim ifadeleri
+elenir. Tercih edilen veya belirsiz deneyim ifadelerinden kesin bir uygunluk
+kararı çıkarılmaz. New Grad/Junior başlıkları etiketlenip inceleme listesinde
+öne alınır. Başlık ve metin çelişirse açık yüksek asgari deneyim şartı önceliklidir.
+Bu kurallar bir adayın şartları sağladığını veya İngilizce/teknik yeterliliğini
+kanıtlamaz. Seçenek kapanırsa kullanıcı başlık hariç tutma filtresi hâlâ uygulanır.
+
+Varsayılan roller yazılım, veri/iş analizi ve BT denetimi ailelerini içerir.
+Mevcut kaydedilmiş rol tercihleri otomatik değiştirilmez; ayarlardan genişletilebilir.
+Mevcut ilanlar silinmeden güncel başlık/metinle etiketlenir; eski analiz skorları
+elle değiştirilmez. Kaynak/panel kayıtları yeni alanlar için geriye uyumludur.
+
+**Kaynak arama planını göster** kaydedilmiş kriterlerden en fazla 4 arama sorgusu
+hazırlar. Bu sorgular çalıştırılmaz. Henüz otomatik kaynak arama sağlayıcısı veya
+API anahtarı bağlanmadı; bu özellik şirketleri kendi kendine internette aramaz.
+Sorgular yalnızca rol/konum içerir, aday profili/CV/iletişim bilgisi içermez.
+
+**Birden fazla şirket kaynağını birlikte ekle** bölümüne kariyer/ilan bağlantıları
+satır satır yapıştırılabilir. Program yalnızca desteklenen resmî host/yol yapılarından
+kaynak kodlarını çıkarır, tekrarları ayıklar. Kaynak listesine toplam en çok 20 aday
+eklenir. Bu adımda ağ isteği yapılmaz; kaynak etiketleri `Kaynak: kod` şeklindedir,
+gerçek şirket adının doğrulandığı iddia edilmez. Kullanıcı listeyi gözden geçirip
+kaydeder; resmî uç noktaya erişim normal keşif düğmesinde doğrulanır.
+
+Gelecek otomatik arama bağlantısı için ayrı servis erişimi, sonuç saklama hakkı ve
+ayrı istek/maliyet sınırı gerekir. Mevcut OpenAI bütçesi arama servisini kapsamaz.
+İncelenen belgeler: [Brave Search API](https://brave.com/search/api/),
+[fiyatlandırma](https://api-dashboard.search.brave.com/documentation/pricing).
+Bu teslimde harici arama hesabı açılmadı veya ücretli servis çağrısı yapılmadı.
+
+
+## SerpAPI ile şirket kaynağı bulma (isteğe bağlı)
+
+[SerpAPI Free](https://serpapi.com/pricing) hesabı ayda 250 sorgu sunuyor
+(19 Ekim 2026 kontrolü). Hesabındaki güncel planı/kotayı doğrula; ücretli plan,
+kart veya ek kredi satın alma gerekmez. Anahtarını sohbet, ekran görüntüsü veya
+Git dosyasına koyma. Mevcut özel `.env` dosyana `SERPAPI_API_KEY` ekle.
+OpenAI anahtarı farklıdır; bu arama OpenAI modelini açmaz veya bütçesini kullanmaz.
+
+Açık form oturumlarını tamamladıktan sonra paneli arama seçeneğiyle başlat:
+
+```bash
+npm run hub -- --port 3211 --enable-search
+```
+
+Panelde **İlan keşfet** → rol/konum ayarlarını kaydet → sorgu planını incele →
+rol/konum paylaşımı ve ücretsiz kota onayını işaretle → **SerpAPI ile şirket
+kaynaklarını bul**. Gelen kaynak adaylarını kontrol et; şirket adları yalnızca
+kaynak kodundan etiketlenir. **Kaydet ve ilanları bul** resmî Greenhouse/Lever
+okuyucusunu çalıştırır ve filtre eşleşmelerini inceleme listesine aktarır.
+İlanın ülke/dil doğrulaması ve sonraki analiz/başvuru izinleri devam eder.
+
+Arama en çok 4 sorgu/işlem, 8/gün, 200/UTC takvim ayıdır. Aynı sorguların başarılı
+sonuçları 24 saat yerel kayıttan döner; yeni sorgular arasında 15 dakika beklenir.
+Her koşu önce [ücretsiz Account API](https://serpapi.com/account-api) ile etkin
+0 USD planı ve yeterli kalan kotayı doğrular. Hata, kota yetersizliği veya ücretli/
+bilinmeyen plan aramayı durdurur; otomatik tekrar, plan yükseltme veya ödeme yoktur.
+Yerel sayaç sağlayıcının gerçek bakiyesi değildir; başka uygulamaların tüketimi
+sağlayıcı kontrolünde görülür. Sorgu rezervasyonları hata durumunda geri verilmez.
+Her tamamlanan sorgunun kaynakları hemen saklanır. Sonraki sorgu başarısız
+olursa panel kısmi sonuçları ve hata nedenini gösterir. Aynı aramanın önbelleği
+kısmi olduğunu korur; eksik sorgular kendiliğinden tekrar edilmez. Arama isteği
+başına süre sınırı 60 saniye, hesap kontrolü 15 saniyedir.
+Arama yanıtları sınırlı okunur, sonuç hostları filtrelenir; CV veya kişisel profil
+arama servisine gönderilmez. Yalnızca kaynak kodları ve yerel sayaç/önbellek saklanır.
+
+Süreç çökerse `source-search.lock` kalabilir; çalışan panelleri kontrol edip
+kapattıktan sonra yalnızca bu kilit klasörünü kaldır. Sayaç dosyasını silme.
+Bu sürüm otomatik zamanlama yapmaz, internetteki tüm şirketleri kapsamaz; liste
+20 kaynak ve her sorgunun ilk 10 organik bağlantısıyla sınırlıdır. Arama
+servisindeki CAPTCHA yönetimi, başvuru sitelerindeki CAPTCHA'ları kaldırmaz.
+
+Karar kaynakları: [Serper kota ve fiyatları](https://serper.dev/),
+[Serper B2B şartı](https://serper.dev/terms),
+[SerpAPI arama belgeleri](https://serpapi.com/search-api),
+[SerpAPI şartları](https://serpapi.com/legal),
+[Gemini model bazlı fiyatlar](https://ai.google.dev/gemini-api/docs/pricing).
+Ücretsiz kotanın değişmeyeceği veya sonuçların eksiksiz olduğu garanti edilmez.
+
+Keşif ekranı yerel günlük/aylık kalan hakkı ve yeni aramaya kalan süreyi gösterir.
+Sayaç, SerpAPI hesabının gerçek bakiyesi değildir; sağlayıcı kontrolü arama
+başlangıcında yapılır. Durum göstergesi dış servise istek yapmaz. Hazır olmayan
+arama düğmesi pasiftir; süre dolunca açılır. Aynı kriterlerin önbellekteki sonuçları
+bekleme sırasında da yeni sorgu tüketmeden alınabilir.
+
+
+## Rol bazlı doğrudan ilan araması
+
+Güncel panelde **İlan keşfet** ana akışı şirket seçmeden çalışır:
+
+1. Rolleri ve filtreleri düzenle; Türkiye veya Global remote seç.
+2. Rol/bölge paylaşımı ve ücretsiz kota kutusunu onayla.
+3. **İlanları ara ve panele ekle** ayarları kaydeder ve en çok iki sorgu çalıştırır.
+4. Sonuçlar tekil ilan URL'si ve başlık filtresinden geçip doğrudan
+   **İnceleme Bekleyenler** listesine eklenir. Rapor incelenen/eklenen/tekrar/
+   filtre dışı/geçersiz sayıları ayrı gösterir; şirket kaynağı eklemek gerekmez.
+5. İlanı açıp açık olduğunu kontrol et; tam metni, şirketi, ülkeyi ve dili
+   doğrulama alanına gir. Bu adımdan önce özet üzerinden analiz, CV seçimi veya
+   form başlatma yapılamaz. Model varsayılan olarak kapalı kalır.
+
+Bu özellik SerpAPI arama sonuçlarını kullanır, kişisel LinkedIn/Indeed/Kariyer.net
+hesaplarını açmaz veya siteleri kazımaz. Sadece mevcut desteklenen platformların
+tekil ilan adresleri kabul edilir. Şirket/liste sayfaları uygun ilan diye
+aktarılmaz. İlan başlığı/özeti arama motorunun verisidir; başka ilanlardan metin
+veya eski bilgi içerebilir. İlanın açık olduğu veya adayın şartları sağladığı
+iddia edilmez. Tam ilan metni bu sürümde kullanıcı tarafından getirilir.
+
+Arama bölgesi sorguya yön verir; ilanın gerçek çalışma ülkesi veya remote uygunluğu
+otomatik doğrulanmaz. Aynı iş ID'sinin farklı LinkedIn ülke/başlık URL'leri
+birleştirilir; farklı yayın ID'leri aynı işe ait olabilir ve insan kontrolü ister.
+Mevcut başvuru durumları ve analizler üzerine yazılmaz.
+
+Şirket kaynağı bulma ve resmî şirket listelerini tarama seçenekleri **Gelişmiş:
+şirket kaynaklarını takip et** bölümüne taşındı. Kaynak araması en çok dört,
+rol araması en çok iki sorgudur; toplam günlük 8 / aylık 200 sınırı ortaktır.
+Önbellek arama türünü/bölgesini/rolleri ayırır; eski kaynak sonuçları doğrudan
+ilan gibi aktarılmaz. Aynı aramanın önbelleği yeni sorgu harcamaz.
+
+### Hazır rol grupları ve sonuç açıklamaları
+
+İlan keşfet ekranında bir hazır grup seçerek Türkçe/İngilizce unvanları pozisyon
+alanına alabilir, ardından düzenleyebilirsin. Seçim arama başlatmaz veya ayarları
+kaydetmez. Arama planı önizlemesi ücretsizdir ve profil/CV göndermez. İlan araması
+yine açık kota onayı ister; günlük 8 / aylık 200 yerel sınır, 15 dakika bekleme ve
+24 saat aynı sorgu önbelleği değişmedi. Grup değişince eski önbellek yeni arama
+sonucu gibi gösterilmez. Seçili grubun dışındaki kendi rollerin korunarak geri
+alınmak istenirse pencereyi kaydetmeden kapatıp yeniden açabilirsin.
+
+Yeni arama raporu reddedilen bağlantıları ve filtrelenen ilanları nedenleriyle
+ayırır. Eski sonuçların ayrıntısı yoksa bu açıkça belirtilir. İlan ayrıntısındaki
+arama indeksi tarih ifadesi doğrulanmamıştır; yayın tarihi veya ilanın açık
+olduğuna kanıt değildir. Şirket, tam metin, ülke ve dil doğrulanmadan analiz ve
+form yardımcısı açılmaz.
+
+### Son arama özeti
+
+İlan keşfet ekranında aynı rol/bölge ve başlangıç seviyesi kriterleri için son
+arama özeti otomatik görünür. Sayfayı yenilemek veya özeti açmak yeni sorgu
+başlatmaz. Benzersiz ilan bağlantıları, arama içi tekrarlar ve reddedilen adresler
+ayrı sayılır. Bu sayılar panele yeni eklenmiş veya açık olduğu doğrulanmış ilan
+sayısı değildir. “Bağlantılar neden elendi?” ayrıntısında mevcut nedenler görünür;
+eski kayıtta ayrıntı yoksa belirtilir. Farklı arama kriterleri seçince bu rapor
+saklanır; önbellekte son eşleşen arama yoksa özet gösterilmez. Önbellek yalnızca
+son aramayı tutar; bu özellik tüm geçmiş aramaların arşivi değildir.
+
+### FreeHire ile ücretsiz ilan bulma
+
+İlan keşfet → rollerini ve Türkiye/Global remote seçimini kontrol et → FreeHire
+filtre paylaşım kutusunu işaretle → FreeHire ile ilan bul. Bu seçenek API anahtarı
+ve SerpAPI kotası gerektirmez. Kişisel profil/CV göndermez. Kaynak son 30 gün ve
+isteğe bağlı junior filtresiyle sayfa başına 30 kayıt getirir; rol/ek kelime
+filtresi cihazında uygulanır. Başka sonuç varsa sonraki sayfayı kendin istersin.
+Aynı sayfa 10 dakika bellekte tutulur; yeni istekler arasında 30 saniye beklenir.
+429 yanıtı alınırsa 5 dakika beklenir; otomatik tekrar veya ücretli plana geçiş yoktur.
+
+Adayı açınca şirket ve kaynaktan gelen ilan metni doğrulama alanında hazırdır.
+İlanı açıp kontrol et, ülke/dili seç ve bilgileri doğrula. Olası tekrar uyarısı
+varsa benzer kaydı karşılaştır. Doğrulanmamış FreeHire kaydından otomatik form doldurma yapılmaz;
+işveren sitesindeki giriş, CV yüklemesi ve başvuru gönderimi kullanıcıdadır.
+
+### Başvuru takibi ve vazgeçilenleri kaldırma
+
+Başvurulanlar → bir ilan seç → Başvuru takibi alanından aşamayı, başvuru ve
+sonraki takip tarihini, notunu gir → Takibi kaydet. Aşama ve takip tarihi
+filtreleriyle bugün/geciken takipleri görebilirsin. Başvuru tarihini bilmiyorsan
+boş bırak; kayıt güncelleme tarihi otomatik başvuru tarihi olarak kullanılmaz.
+Notlar yereldir; takip tarihi otomatik bildirim veya mesaj göndermez.
+
+Vazgeçilenleri kaldır yalnızca Vazgeçildi durumundakileri listeden gizler.
+Kaldırılanları geri getir ile kurtarabilirsin; kalıcı dosya silme yapılmaz.
+Gizlenen bağlantılar yeniden aramada tekrar eklenmez. Bu kontrol aynı URL/ID
+üzerindedir; farklı yayınların aynı iş olduğu otomatik varsayılmaz.
+
+Tek bir ilanı kaldırmak için ilanı seç → başlığın altındaki **Listeden kaldır**.
+Sonrasında çıkan **Geri al** yalnızca o ilanı, eski durumu ve takip notlarıyla geri
+getirir. Bu işlem başvuruyu işverenden geri çekmez; sadece yerel listeden kaldırır.
+
+### Geniş arama ve olası tekrar grupları
+
+İlan keşfet ekranındaki ortak rol grubu yazılım, veri/iş analizi ve BT denetimi
+ifadelerini birlikte sunar. Kendi rollerini de yazabilirsin. FreeHire'daki
+“Junior etiketi olmayan ilanları da incele” seçeneği aramayı genişletir; açıkça
+kıdemli unvan/minimum deneyim ifadeleri yerel filtrede elenir. Belirsiz adayın
+seviyesini ayrıca kontrol et. Kaynak kategori ve coğrafya eksikleri nedeniyle
+her uygun ilanın bulunacağı garanti edilmez. Daha fazla kayıt için sonraki
+sayfayı iste; SerpAPI ayrı kota ve onayını kullanmaya devam eder.
+
+İncelenecek benzer ilanları grupla kutusuyla olası tekrarları açıp karşılaştır.
+Bu gruplar kesin aynı iş demek değildir; kayıtlar ve durumları ayrı kalır.
+Başvurulanlar takip ekranı gruplanmaz.
+
+### Panelden CV ve ön yazı
+
+İlan ayrıntısında ülke/dil ve kaynak metnini doğruladıktan sonra Başvuru belgeleri
+bölümünden seçilen CV'yi indirebilir, ön yazı taslağını açıp metin olarak
+indirebilirsin. Taslak mevcut onaylı aday anlatımı ve varsa analiz dayanaklarından
+hazırlanır; yeni model çağrısı yapılmaz. Metni göndermeden önce oku. Bu işlem
+CV'yi işverene yüklemez veya başvuruyu göndermez.
+
+
+### İlan kalitesi ve kaynak kontrolü
+
+FreeHire yeni kayıtlarında açıklama en az 200 karakter / 30 kelime olmalıdır;
+şirket bulunmalıdır. Bilinen eski/çelişkili tarihler ve dolaylı WhatJobs kayıtları
+ana listeye alınmaz. Tarih bulunmaması güncellik kanıtı değildir. Kaynak kontrolü
+görünümündeki kayıtlar incelenebilir fırsat sayılmaz; eski veriler silinmez.
+Greenhouse/Lever ilanlarında resmî API'de varlık kontrolü yapılabilir. Kontrolün
+geçerliliği 24 saattir; tarih/adaya uygunluk/sponsorluk garantisi vermez. Erişim
+hatası, listede bulunamama ve desteklenmeyen site ayrı durumlardır. İnsan ülke/dil
+ve içerik doğrulaması, CV seçimi ve ücretli analiz izinleri ayrıca korunur.
+
+
+### Birlikte arama ve finans belgeleri
+
+İlan keşfet → Finans ve muhasebe, Muhasebe ve bağımsız denetim veya Pazarlama ve
+ticari analiz rol grubunu seç → Türkiye/Global remote ve seviye tercihini gözden
+geçir → belge türünü seç → kriter paylaşımı ve ücretsiz kota onayını ver →
+Mevcut kaynaklarda birlikte tara. Özel rollerin ayrıca saklanır; geri seçebilirsin.
+Bu işlem ilk FreeHire sayfasını, iki kota kontrollü web sorgusunu ve kayıtlı resmî
+Greenhouse/Lever kaynaklarını sırayla işler. Tüm şirketler veya sayfalar taranmaz.
+Bir kaynağın hatası diğer kaynakların sonuçlarını silmez; Durdur ile koşu kesilir.
+Son kaynak raporu yeniden açılışta korunur. Otomatik zamanlayıcı değildir.
+
+Web sorgularında son ay indeks filtresi kullanılır; bu gerçek yayın tarihi kanıtı
+değildir. LinkedIn, Indeed ve Kariyer.net arama sonuçları kaynak adaylarıdır;
+Glassdoor için doğrudan entegrasyon yoktur. Hesap/çerez paylaşılmaz. İlan rolü ve
+seviye kriterleri kayıtla birlikte saklanır; sonra rol grubunu değiştirmek eski
+başvuruların kalite kararını değiştirmez.
+
+Başvuru alanı filtresinde Finans / işletme seçebilirsin. Her ilanın belge türünü
+ayrıca değiştirebilirsin. Özel profilin CV listesinde focus: finance olarak
+kaydedilmiş belgeler finans akışında; focus belirtilmeyen belgeler genel akışta
+seçilir. Dil/fotoğraf politikası aynı kalır. Finans belgesi eksikse genel CV'ye
+sessizce dönülmez. financeLetterFactIds yalnızca profildeki gerçek fact ID'lerini
+seçer; bunlardan üretilen taslak kullanıcı tarafından incelenmelidir ve otomatik
+olarak onaylı ön yazı sayılmaz. Belge önizlemesi/indirmesi model çağrısı yapmaz.
+
+Asıl Greenhouse/Lever adresi bulunup içerik ve yönlendirme doğrulanmışsa mevcut
+form yardımcısına devir açılabilir. İletişim paylaşımı için ayrıca hedefe özel
+onay gerekir; bu izin CV yüklemesi veya son başvuru gönderimi değildir.
