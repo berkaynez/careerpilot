@@ -1,6 +1,6 @@
 # CareerPilot
 
-**A local-first job application hub — beta preview.**
+**A local-first job application hub — v0.1.0-beta.1.**
 
 [English](README.md) · [Türkçe](README.tr.md) · [User guide (Turkish)](docs/KULLANIM_KILAVUZU.md)
 
@@ -120,6 +120,8 @@ production reliability benchmark.
 This is a personal, AI-assisted software development project. Beta capabilities,
 validation and remaining gaps are documented separately rather than presented as
 fully autonomous job seeking.
+
+See [release notes](CHANGELOG.md) for this beta baseline.
 
 ## Documentation and project status
 

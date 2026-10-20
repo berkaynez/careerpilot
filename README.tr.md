@@ -1,4 +1,4 @@
-# CareerPilot — Beta
+# CareerPilot — v0.1.0-beta.1
 
 [Türkçe](README.tr.md) · [English](README.md)
 
