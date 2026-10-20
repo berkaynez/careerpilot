@@ -129,6 +129,9 @@ fully autonomous job seeking.
 - [Current work and known gaps](docs/PROJECT_STATUS.md)
 - [Development instructions](AGENTS.md)
 
-No project licence has been added yet. Dependency licences are separate; public
-visibility and code-reuse licensing are separate decisions. This beta preview
-does not change the repository's visibility.
+## Portfolio and reuse
+
+CareerPilot is presented as a portfolio beta. No open-source licence is granted
+for the project; the package is marked `UNLICENSED`. Third-party dependencies
+retain their own licences. See [publication notes](docs/PUBLICATION.md) for the
+release scope and [security notes](SECURITY.md) before sharing diagnostics.

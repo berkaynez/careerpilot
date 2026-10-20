@@ -612,3 +612,29 @@ Repo görünürlüğü değiştirilmedi; lisans/yeniden kullanım tercihi henüz
 Mevcut kodda üçüncü taraf proje atfı bulunmaması, köken/lisans incelemesinin
 kanıtı değildir. Dışarıdan modül eklenmedi, eski Türkçe commit geçmişi yeniden
 yazılmadı. Bu artım ürün mantığını veya özel .env/profil/ledger'ları değiştirmez.
+
+
+### Beta yayın notları ve kullanım izni (20 Ekim 2026)
+
+PR #13 main'e birleşti. Kullanıcı portföy sunumu istedi ve açık kaynak lisansı
+vermemeyi açıkça seçti. docs/beta-publication-notes dalında package.json ve lock
+kök metadatası UNLICENSED oldu; MIT/özel lisans eklenmedi. İngilizce/Türkçe README
+aynı karara bağlandı. SECURITY.md gizli veri içermeyen hata bildirimi ve yerel
+kullanım sınırlarını; docs/PUBLICATION.md görünürlük öncesi kontrol kapsamını
+anlatır. Uygulama kodu, .env, özel kayıtlar ve eski commit'ler değiştirilmedi.
+
+GitHub API'den salt okunur kontrol: private repo; 13 issue/PR gövdesi, 0 issue
+comment, 0 review comment, 0 commit comment ve 0 review. Yerel API anahtarları,
+iletişim e-posta/telefon değerleri ve seçili credential kalıplarında eşleşme yok.
+Actions koşusu/artifact, release/asset ve tanınan gövde ek bağlantısı bulunmadı.
+Bu anlık ve sınırlı taramadır; tam PII/credential güvenlik garantisi değildir.
+Commit metadata kontrolünde 3 benzersiz e-posta: 1 GitHub noreply, 2 noreply
+olmayan adres var. Aday profil e-postası bunlardan biri değil. Adresler rapora
+kopyalanmadı; public olursa commit metadatası da görünür. Geçmiş yeniden yazılmadı.
+Gelecek commit'lerde noreply tercihi kullanıcı kararıdır.
+
+Doküman bağlantıları, paket/lock lisans tutarlılığı ve whitespace kontrolü geçti.
+Ürün mantığı değişmediği için 170 test tabanı yeniden koşturulmadı. Görünürlük
+private kaldı. Repo public yapma kararı ve commit e-posta görünürlüğünün kabulü
+ayrı kullanıcı adımıdır; açık kaynak lisansı vermemek kopyaları teknik olarak
+engellemez. Üçüncü taraf köken/lisansları için tam denetim iddiası yoktur.
