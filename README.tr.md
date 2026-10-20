@@ -1,4 +1,4 @@
-# CareerPilot — Beta
+# CareerPilot — v0.1.0-beta.1
 
 [Türkçe](README.tr.md) · [English](README.md)
 
@@ -121,3 +121,11 @@ FreeHire, kota kontrollü web araması ve kayıtlı Greenhouse/Lever kaynakları
 akışta çalıştırır. Finans/muhasebe, denetim ve pazarlama rol grupları ile ayrı
 finans CV/ön yazı seçimi vardır. Bu, tüm sitelerin eksiksiz tarandığı anlamına
 gelmez. Kullanım ve kaynak sınırları: [USAGE](docs/USAGE.md).
+
+
+## Portföy ve yeniden kullanım
+
+CareerPilot portföyde sergilenmek üzere beta olarak hazırlanmıştır. Projeye açık
+kaynak kullanım lisansı verilmemiştir; paket `UNLICENSED` olarak işaretlidir.
+Bağımlılıklar kendi lisanslarını korur. Ayrıntılar için
+[yayın notları](docs/PUBLICATION.md) ve [gizli bilgi paylaşımı](SECURITY.md).

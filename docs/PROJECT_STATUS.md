@@ -612,3 +612,54 @@ Repo görünürlüğü değiştirilmedi; lisans/yeniden kullanım tercihi henüz
 Mevcut kodda üçüncü taraf proje atfı bulunmaması, köken/lisans incelemesinin
 kanıtı değildir. Dışarıdan modül eklenmedi, eski Türkçe commit geçmişi yeniden
 yazılmadı. Bu artım ürün mantığını veya özel .env/profil/ledger'ları değiştirmez.
+
+
+### Beta yayın notları ve kullanım izni (20 Ekim 2026)
+
+PR #13 main'e birleşti. Kullanıcı portföy sunumu istedi ve açık kaynak lisansı
+vermemeyi açıkça seçti. docs/beta-publication-notes dalında package.json ve lock
+kök metadatası UNLICENSED oldu; MIT/özel lisans eklenmedi. İngilizce/Türkçe README
+aynı karara bağlandı. SECURITY.md gizli veri içermeyen hata bildirimi ve yerel
+kullanım sınırlarını; docs/PUBLICATION.md görünürlük öncesi kontrol kapsamını
+anlatır. Uygulama kodu, .env, özel kayıtlar ve eski commit'ler değiştirilmedi.
+
+GitHub API'den salt okunur kontrol: private repo; 13 issue/PR gövdesi, 0 issue
+comment, 0 review comment, 0 commit comment ve 0 review. Yerel API anahtarları,
+iletişim e-posta/telefon değerleri ve seçili credential kalıplarında eşleşme yok.
+Actions koşusu/artifact, release/asset ve tanınan gövde ek bağlantısı bulunmadı.
+Bu anlık ve sınırlı taramadır; tam PII/credential güvenlik garantisi değildir.
+Commit metadata kontrolünde 3 benzersiz e-posta: 1 GitHub noreply, 2 noreply
+olmayan adres var. Aday profil e-postası bunlardan biri değil. Adresler rapora
+kopyalanmadı; public olursa commit metadatası da görünür. Geçmiş yeniden yazılmadı.
+Gelecek commit'lerde noreply tercihi kullanıcı kararıdır.
+
+Doküman bağlantıları, paket/lock lisans tutarlılığı ve whitespace kontrolü geçti.
+Ürün mantığı değişmediği için 170 test tabanı yeniden koşturulmadı. Görünürlük
+private kaldı. Repo public yapma kararı ve commit e-posta görünürlüğünün kabulü
+ayrı kullanıcı adımıdır; açık kaynak lisansı vermemek kopyaları teknik olarak
+engellemez. Üçüncü taraf köken/lisansları için tam denetim iddiası yoktur.
+
+
+## Beta v0.1.0-beta.1 — sürüm kapanışı (20 Ekim 2026)
+
+Önceki portföy/gizlilik kontrol notları tarihsel kayıttır. Son durum: kişisel Git
+yazar/committer e-postası temizlendi; 56 eski commit'in dosya ağaçları birebir aynı
+kaldı. 15 uzak dal ve 34 yerel/uzak izleme ref'i temiz geçmişe geçirildi; 104 özel
+dosyanın hash'i korundu. Yeni commit'ler GitHub noreply kullanır. Özel geri dönüş
+yedeği .careerpilot/backups altındadır; Git'e/yayın eklerine girmez. GitHub'ın 13
+eski PR referansı önceki commit'leri tutmaya devam ediyor; kullanıcı destek
+başvurusunu gönderdiğini bildirdi. Repo private kalır, tam silinme iddiası yoktur.
+
+Kullanıcı beta PR/merge işlerinin tamamlanıp sürümün kapatılmasını istedi.
+Kontrolde açık PR yoktu; henüz main'e girmemiş yayın notları ile sürüm metadatası
+tek release PR'ında birleştirilmek üzere hazırlandı. Paket/lock sürümü
+0.1.0-beta.1; CHANGELOG beta kapsamını ve eksikleri sabitler. Uygulama mantığı
+bu kapanışta değiştirilmedi. README İngilizce, Türkçe karşılığı ve kullanım
+kılavuzu korunur; açık kaynak lisansı eklenmedi.
+
+Bu baseline özellik geliştirmeye devam etme taahhüdü değildir. Kullanıcı gerçek
+ilanlarla mevcut sürümü kullanır; sonraki çalışma somut kullanım hatalarına
+odaklanır. Yeni sağlayıcı, tarayıcı kazıyıcı veya ücretli koşu eklenmedi.
+
+Kapanış doğrulaması: TypeScript ve 170 çevrimdışı test yeniden geçti; whitespace
+kontrolü temiz. Ücretli model/arama veya gerçek başvuru gönderimi yapılmadı.

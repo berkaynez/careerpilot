@@ -1,6 +1,6 @@
 # CareerPilot
 
-**A local-first job application hub — beta preview.**
+**A local-first job application hub — v0.1.0-beta.1.**
 
 [English](README.md) · [Türkçe](README.tr.md) · [User guide (Turkish)](docs/KULLANIM_KILAVUZU.md)
 
@@ -121,6 +121,8 @@ This is a personal, AI-assisted software development project. Beta capabilities,
 validation and remaining gaps are documented separately rather than presented as
 fully autonomous job seeking.
 
+See [release notes](CHANGELOG.md) for this beta baseline.
+
 ## Documentation and project status
 
 - [Turkish overview](README.tr.md)
@@ -129,6 +131,9 @@ fully autonomous job seeking.
 - [Current work and known gaps](docs/PROJECT_STATUS.md)
 - [Development instructions](AGENTS.md)
 
-No project licence has been added yet. Dependency licences are separate; public
-visibility and code-reuse licensing are separate decisions. This beta preview
-does not change the repository's visibility.
+## Portfolio and reuse
+
+CareerPilot is presented as a portfolio beta. No open-source licence is granted
+for the project; the package is marked `UNLICENSED`. Third-party dependencies
+retain their own licences. See [publication notes](docs/PUBLICATION.md) for the
+release scope and [security notes](SECURITY.md) before sharing diagnostics.
