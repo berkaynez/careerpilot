@@ -41,7 +41,7 @@ export function searchHits(rows: { link: string; title?: string | undefined; sni
   }
   return { hits, rejected, rejectionReasons };
 }
-export function searchFilterReason(title:string, text:string, config:DiscoveryConfig): 'role'|'excludedTitle'|'keyword'|'experience'|null {
+export function searchFilterReason(title:string, text:string, config:Pick<DiscoveryConfig,'roles'|'earlyCareer'|'keywords'|'excludedTitles'>): 'role'|'excludedTitle'|'keyword'|'experience'|null {
   return !roleTerms(config.roles).some(role=>contains(title,role)) ? 'role'
     : config.excludedTitles.some(term=>contains(title,term)) ? 'excludedTitle'
     : config.keywords.length && !config.keywords.some(term=>contains(title+' '+text,term)) ? 'keyword'
@@ -62,7 +62,7 @@ export async function importSearchJobs(store: Awaited<ReturnType<typeof openHubS
       text: 'Arama sonucu özeti — tam ilan metni doğrulanmadı.\n' + hit.snippet,
       sourceUrl: link.url, country: 'ZZ', language: 'en', documentLanguage: null, photoPolicy: 'unspecified', sponsorship: 'not_stated', checkedOn: at.slice(0,10) },
       state: 'review', createdAt: at, updatedAt: at, analysis: null, lastError: null,
-      discovery: { sourceKey: 'search:' + hit.platform, externalId: createHash('sha256').update(link.url).digest('hex'), discoveredAt: at,
+      discovery: { criteria:{roles:config.roles,earlyCareer:config.earlyCareer,keywords:config.keywords,excludedTitles:config.excludedTitles}, sourceKey: 'search:' + hit.platform, externalId: createHash('sha256').update(link.url).digest('hex'), discoveredAt: at,
         location: '', remote: false, routingConfirmed: false, careerLevel: careerLevel({title:hit.title,text:hit.snippet}).level,
         reasons: ['Rol ifadesi arama başlığında eşleşti; adayın şartları sağladığı doğrulanmadı.', 'Arama indeksi güncel/açık ilan veya çalışma ülkesini doğrulamaz.'],
         search: { query: hit.query, snippet: hit.snippet, dateHint: hit.dateHint, verified: false } } });

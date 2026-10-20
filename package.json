@@ -8,6 +8,8 @@
     "node": ">=22"
   },
   "scripts": {
+    "start": "node --import tsx src/hub/cli.ts --port 3211 --enable-search --enable-model",
+    "start:offline": "node --import tsx src/hub/cli.ts --port 3211",
     "test": "tsx --test tests/*.test.ts",
     "typecheck": "tsc --noEmit",
     "check": "npm run typecheck && npm test",

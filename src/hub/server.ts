@@ -1,3 +1,7 @@
+import {runDiscoverySearch} from '../discovery/search-run.js';
+import { createPostingChecker } from '../discovery/check-posting.js';
+import { searchFilterReason } from '../discovery/job-results.js';
+import { jobQuality } from '../discovery/quality.js';
 import { readCVPDF } from '../preparation/files.js';
 import { renderCoverLetter } from '../preparation/letters.js';
 import { basename } from 'node:path';
@@ -56,23 +60,41 @@ export async function startHub(options: { directory: string; profile: Profile; d
   const discovery = await openDiscovery(dirname(options.directory), store, options.discoveryReader);
   const token = randomBytes(32).toString('hex'), busy = new Set<string>();
   const controller = new AbortController();
-  let origin = '', jobSearchBusy = false;
+  let origin = '', jobSearchBusy = false;let searchController:AbortController|null=null;
+  const qualityFor=(record:HubRecord)=>{
+    const config=record.discovery?.criteria,result=jobQuality(record,config?.earlyCareer??true);
+    // The authoritative title/body can differ from an aggregator's rewrite. Apply saved filters again.
+    if(config && record.discovery?.search && !record.discovery.search.verified && result.bucket==='review'){
+      const reason=searchFilterReason(record.posting.title,record.posting.text,config);
+      if(reason)return {...result,bucket:'excluded' as const,label:'Arama kriterlerini karşılamıyor',reasons:[...result.reasons,'Resmî kaynak metni kayıtlı rol/kelime/deneyim filtresini karşılamıyor.']};
+    }
+    return result;
+  };
+  const checkPosting=createPostingChecker(options.discoveryReader);
+  const checkRecord=async(id:string,signal:AbortSignal=controller.signal)=>{
+    const old=store.get(id);if(!old.discovery)throw new Error('DISCOVERY_CHECK_UNSUPPORTED');
+    if(old.discovery.sourceCheck && Date.now()>=Date.parse(old.discovery.sourceCheck.at) && Date.now()-Date.parse(old.discovery.sourceCheck.at)<120_000)return old;
+    const result=await checkPosting(old,signal);
+    return store.update(id,current=>({...current,discovery:{...current.discovery!,sourceCheck:result.check},
+      ...(!current.analysis && current.state==='review' && !current.discovery?.search?.verified && result.job?{posting:{...current.posting,title:result.job.title,text:result.job.text}}:{})}));
+  };
   const freehireSearch = options.freehireSearch ?? createFreehireSearch();
   const jobCriteria = (scope: 'turkey' | 'remote') => { const config = discovery.snapshot().config; return { roles: config.roles, locations: scope === 'turkey' ? ['Türkiye','Turkey','Istanbul'] : ['Remote'], mode: 'jobs' as const, earlyCareer: config.earlyCareer }; };
   const answers = assistAnswersSchema.parse(options.answers ?? {});
   let assistant: { jobId: string; session: AssistSession } | null = null;
   let opening: Promise<AssistSession> | null = null;
   let openingJobId: string | null = null;
+  const assistantURL=(record:HubRecord)=>jobLink(record.discovery?.routingConfirmed && record.discovery.search?.verified && record.discovery.search.originalURL?record.discovery.search.originalURL:record.posting.sourceUrl).url;
   const assistantInfo = (record: HubRecord) => {
     let available = Boolean(options.demo && options.demoFormUrl), recipientOrigin: string | null = null;
-    try { recipientOrigin = new URL(available ? options.demoFormUrl! : jobLink(record.posting.sourceUrl).url).origin; available = Boolean(options.demo && options.demoFormUrl) || jobLink(record.posting.sourceUrl).platform !== 'freehire'; } catch { /* User can still open the unsupported site manually. */ }
+    try { recipientOrigin = new URL(available ? options.demoFormUrl! : assistantURL(record)).origin; available = Boolean(options.demo && options.demoFormUrl) || jobLink(assistantURL(record)).platform !== 'freehire'; } catch { /* User can still open the unsupported site manually. */ }
     if (record.discovery && (!record.discovery.routingConfirmed || record.discovery.search && !record.discovery.search.verified)) available = false;
     const snapshot = assistant?.session.snapshot();
     return { available, recipientOrigin, opening: Boolean(opening), demo: options.demo === true,
       occupiedByOther: Boolean(assistant && assistant.jobId !== record.id && snapshot?.status !== 'closed'),
       session: assistant?.jobId === record.id ? snapshot : null };
   };
-  const summaries = (record: HubRecord) => ({ relatedJobs:relatedJobs(record,store.list()), possibleDuplicate:relatedJobs(record,store.list())[0] ?? null, id: record.id, company: record.posting.company, title: record.posting.title, tracking:record.tracking,
+  const summaries = (record: HubRecord) => ({ documentFocus:record.documentFocus??'general', quality:qualityFor(record), relatedJobs:relatedJobs(record,store.list()), possibleDuplicate:relatedJobs(record,store.list())[0] ?? null, id: record.id, company: record.posting.company, title: record.posting.title, tracking:record.tracking,
     country: record.posting.country, state: record.state, updatedAt: record.updatedAt, analyzing: busy.has(record.id),
     discovery: record.discovery ? { ...record.discovery, careerLevel: careerLevel(record.posting).level, levelReason: careerLevel(record.posting).reason } : null,
     score: record.analysis ? buildMatchAnalysis(profile, record.analysis.job, record.analysis.plan).score : null,
@@ -82,9 +104,9 @@ export async function startHub(options: { directory: string; profile: Profile; d
     const analysis = record.analysis;
     let cv: { id: string; language: string; photo: boolean } | null = null;
     let cvError: string | null = null;
-    try { if (record.discovery && (!record.discovery.routingConfirmed || record.discovery.search && !record.discovery.search.verified)) throw new Error('HUB_ROUTING_REQUIRED'); const asset = selectCV(profile, record.posting); cv = { id: asset.id, language: asset.language, photo: asset.photo }; }
+    try { if (record.discovery && (!record.discovery.routingConfirmed || record.discovery.search && !record.discovery.search.verified)) throw new Error('HUB_ROUTING_REQUIRED'); const asset = selectCV(profile, record.posting,record.documentFocus??'general'); cv = { id: asset.id, language: asset.language, photo: asset.photo }; }
     catch { cvError = record.discovery && !record.discovery.routingConfirmed ? 'CV seçimi için ilanın ülkesini ve dilini doğrula.' : 'Uygun CV seçimi profilinde netleşmeli.'; }
-    return { ...summaries(record), posting: record.posting, cv, cvError, assistant: assistantInfo(record),
+    return { ...summaries(record), documentFocus:record.documentFocus??'general', availableDocumentFocus:[...new Set(profile.cvs.map(cv=>cv.focus??'general'))], posting: record.posting, cv, cvError, assistant: assistantInfo(record),
       analysis: analysis ? { origin: analysis.origin, at: analysis.at, costMicroUsd: analysis.costMicroUsd, job: analysis.job,
         match: buildMatchAnalysis(profile, analysis.job, analysis.plan),
         facts: profile.facts.map(fact => ({ id: fact.id, text: fact.text[record.posting.documentLanguage ?? record.posting.language] })) } : null };
@@ -106,7 +128,7 @@ export async function startHub(options: { directory: string; profile: Profile; d
       if (path === '/api/session' && request.method === 'GET') {
         json(200, { token, demo: options.demo === true, modelEnabled: Boolean(options.analyze), model: options.modelInfo ?? null,
           assistantDefaults: { firstName: answers.firstName ?? '', lastName: answers.lastName ?? '' },
-          profile: { facts: profile.facts.length, cvs: profile.cvs.length } }); return;
+          profile: { facts: profile.facts.length, cvs: profile.cvs.length, documentFocus:[...new Set(profile.cvs.map(cv=>cv.focus??'general'))] } }); return;
       }
       if (request.headers['x-hub-token'] !== token) { json(403, { code: 'HUB_SESSION_REQUIRED' }); return; }
       if (request.method !== 'GET' && request.headers.origin !== origin) { json(403, { code: 'HUB_ORIGIN_REJECTED' }); return; }
@@ -123,6 +145,23 @@ export async function startHub(options: { directory: string; profile: Profile; d
         json(200, { automaticSearchEnabled: Boolean(options.sourceSearch), queries: jobSearchQueries(criteria), roleProfiles, freehireEnabled: !options.demo,
           availability: options.sourceSearch ? await options.sourceSearch.status(criteria) : null }); return;
       }
+      if(path==='/api/discovery/search/stop' && request.method==='POST'){
+        z.strictObject({}).parse(await body(request));searchController?.abort();json(200,{stopping:Boolean(searchController)});return;
+      }
+      if(path==='/api/discovery/search' && request.method==='POST'){
+        const input=z.strictObject({approved:z.literal(true),scope:z.enum(['turkey','remote']),includeUnlabelled:z.boolean().default(true),documentFocus:z.enum(['general','finance']).default('general')}).parse(await body(request));
+        if(options.demo)throw new Error('DISCOVERY_DEMO_OFFLINE');
+        if(jobSearchBusy || busy.size || opening || assistant && assistant.session.snapshot().status!=='closed')throw new Error('DISCOVERY_BUSY');
+        if(input.documentFocus==='finance'&&!profile.cvs.some(cv=>cv.focus==='finance'))throw new Error('HUB_CV_FOCUS_UNAVAILABLE');
+        jobSearchBusy=true;searchController=new AbortController();
+        try{
+          const report=await runDiscoverySearch({store,config:discovery.snapshot().config,scope:input.scope,documentFocus:input.documentFocus,includeUnlabelled:input.includeUnlabelled,
+            freehire:freehireSearch,...(options.sourceSearch?{web:options.sourceSearch}:{}),feeds:signal=>discovery.run(signal,{...discovery.snapshot().config,locations:input.scope==='turkey'?['Türkiye','Turkey','Istanbul','İstanbul','Ankara','Izmir','İzmir']:['Remote']}),check:checkRecord,save:report=>discovery.saveSearch(report),
+            signal:AbortSignal.any([controller.signal,searchController.signal,AbortSignal.timeout(180_000)])});
+          json(200,report);
+        }finally{searchController=null;jobSearchBusy=false;}
+        return;
+      }
       if (path === '/api/discovery/freehire' && request.method === 'POST') {
         const input=z.strictObject({approved:z.boolean(),scope:z.enum(['turkey','remote']),page:z.number().int().min(1).max(10).default(1),includeUnlabelled:z.boolean().default(false)}).parse(await body(request));
         if(!input.approved) throw new Error('DISCOVERY_SEARCH_APPROVAL_REQUIRED');
@@ -132,7 +171,13 @@ export async function startHub(options: { directory: string; profile: Profile; d
           const config=discovery.snapshot().config;
           const result=await freehireSearch({scope:input.scope,earlyCareer:config.earlyCareer,page:input.page,includeUnlabelled:input.includeUnlabelled,categories:discoveryCategories(config.roles)},controller.signal);
           const imported=await importFreehireJobs(store,result.rows,config,input.scope);
-          json(200,{...imported,total:result.total,examined:result.examined,rejected:result.rejected,cached:result.cached,page:input.page,hasMore:input.page<10 && input.page*30<result.total});
+          // At most five employer boards/records per search. Unsupported destinations stay explicitly unchecked.
+          let checked=0;
+          for(const id of imported.newIds){if(checked>=5)break;const record=store.get(id);if(jobQuality(record).canCheck){await checkRecord(id);checked++;}}
+          const addedRecords=imported.newIds.map(id=>store.get(id));
+          const ready=addedRecords.filter(record=>qualityFor(record).bucket==='review').length;
+          const {newIds,...counts}=imported;
+          json(200,{...counts,ready,needsCheck:imported.added-ready,checked,total:result.total,examined:result.examined,rejected:result.rejected,cached:result.cached,page:input.page,hasMore:input.page<10 && input.page*30<result.total});
         } finally {jobSearchBusy=false;}
         return;
       }
@@ -150,6 +195,7 @@ export async function startHub(options: { directory: string; profile: Profile; d
         return;
       }
       if (path === '/api/discovery/source-search' && request.method === 'POST') {
+        if(jobSearchBusy)throw new Error('DISCOVERY_BUSY');
         const { approved } = z.strictObject({ approved: z.boolean() }).parse(await body(request));
         if (!approved) throw new Error('DISCOVERY_SEARCH_APPROVAL_REQUIRED');
         if (!options.sourceSearch) throw new Error('DISCOVERY_SEARCH_NOT_ENABLED');
@@ -162,9 +208,11 @@ export async function startHub(options: { directory: string; profile: Profile; d
       }
       if (path === '/api/discovery' && request.method === 'GET') { json(200, discovery.snapshot()); return; }
       if (path === '/api/discovery/config' && request.method === 'POST') {
+        if(jobSearchBusy)throw new Error('DISCOVERY_BUSY');
         await discovery.configure(await body(request)); json(200, discovery.snapshot()); return;
       }
       if (path === '/api/discovery/run' && request.method === 'POST') {
+        if(jobSearchBusy)throw new Error('DISCOVERY_BUSY');
         z.strictObject({}).parse(await body(request));
         if (options.demo && !options.discoveryReader) { json(409, { code: 'DISCOVERY_DEMO_OFFLINE' }); return; }
         json(200, await discovery.run(controller.signal)); return;
@@ -172,7 +220,7 @@ export async function startHub(options: { directory: string; profile: Profile; d
       if(path==='/api/trash' && request.method==='GET') {json(200,{count:store.list({includeTrashed:true}).filter(row=>row.trashedAt).length});return;}
       if((path==='/api/jobs/clear-archived' || path==='/api/trash/restore') && request.method==='POST') {
         z.strictObject({}).parse(await body(request));
-        if(busy.size || opening || assistant && assistant.session.snapshot().status!=='closed') throw new Error('HUB_RECORD_BUSY');
+        if(busy.size || jobSearchBusy || opening || assistant && assistant.session.snapshot().status!=='closed') throw new Error('HUB_RECORD_BUSY');
         json(200,path==='/api/jobs/clear-archived'?await store.trashArchived():await store.restoreTrash());return;
       }
       if (path === '/api/jobs' && request.method === 'GET') { json(200, store.list().map(summaries)); return; }
@@ -191,28 +239,41 @@ export async function startHub(options: { directory: string; profile: Profile; d
           analysis: { job, plan, origin: 'imported_review', at: now, costMicroUsd: null }, lastError: null });
         json(201, detail(record)); return;
       }
-      const match = /^\/api\/jobs\/([a-f0-9-]{36})(?:\/(status|analyze|assistant|routing|verify-posting|tracking|remove|restore|documents|cv))?$/.exec(path);
+      const match = /^\/api\/jobs\/([a-f0-9-]{36})(?:\/(status|analyze|assistant|routing|verify-posting|tracking|remove|restore|documents|cv|check-source|document-focus))?$/.exec(path);
       if (!match) { json(404, { code: 'HUB_NOT_FOUND' }); return; }
       const id = z.uuid().parse(match[1]), action = match[2];
       if(action==='restore' && request.method==='POST') {
         z.strictObject({}).parse(await body(request));
-        if(busy.size || opening || assistant && assistant.session.snapshot().status!=='closed')throw new Error('HUB_RECORD_BUSY');
+        if(busy.size || jobSearchBusy || opening || assistant && assistant.session.snapshot().status!=='closed')throw new Error('HUB_RECORD_BUSY');
         json(200,detail(await store.restore(id)));return;
       }
+      if(jobSearchBusy && ['status','remove','restore','routing','verify-posting','document-focus','check-source','assistant','analyze'].includes(action??''))throw new Error('HUB_RECORD_BUSY');
       const record = store.get(id);
+      if(action==='document-focus' && request.method==='POST'){
+        const {focus}=z.strictObject({focus:z.enum(['general','finance'])}).parse(await body(request));
+        if(busy.size || jobSearchBusy || opening || assistant && assistant.session.snapshot().status!=='closed')throw new Error('HUB_RECORD_BUSY');
+        if(!profile.cvs.some(cv=>(cv.focus??'general')===focus))throw new Error('HUB_CV_FOCUS_UNAVAILABLE');
+        json(200,detail(await store.update(id,current=>({...current,documentFocus:focus}))));return;
+      }
+      if(action==='check-source' && request.method==='POST'){
+        z.strictObject({}).parse(await body(request));
+        if(options.demo)throw new Error('DISCOVERY_DEMO_OFFLINE');
+        if(busy.size || jobSearchBusy || opening || assistant && assistant.session.snapshot().status!=='closed')throw new Error('HUB_RECORD_BUSY');
+        busy.add(id);try{json(200,detail(await checkRecord(id)));}finally{busy.delete(id);}return;
+      }
       if(action==='remove' && request.method==='POST') {
         z.strictObject({}).parse(await body(request));
-        if(busy.size || opening || assistant && assistant.session.snapshot().status!=='closed')throw new Error('HUB_RECORD_BUSY');
+        if(busy.size || jobSearchBusy || opening || assistant && assistant.session.snapshot().status!=='closed')throw new Error('HUB_RECORD_BUSY');
         json(200,await store.trash(id));return;
       }
       if((action==='documents' || action==='cv') && request.method==='GET') {
         if(record.discovery && (!record.discovery.routingConfirmed || record.discovery.search && !record.discovery.search.verified)) {json(409,{code:'HUB_ROUTING_REQUIRED'});return;}
-        const cv=selectCV(profile,record.posting);
+        const cv=selectCV(profile,record.posting,record.documentFocus??'general');
         if(action==='cv') {
           const pdf=await readCVPDF(cv.path);response.writeHead(200,{'Content-Type':'application/pdf','Content-Disposition':"attachment; filename*=UTF-8''"+encodeURIComponent(basename(cv.path))});response.end(pdf);return;
         }
-        if(!profile.coverLetter && !record.analysis?.plan.coverLetterFactIds.length)throw new Error('HUB_LETTER_EVIDENCE_REQUIRED');
-        const letter=renderCoverLetter(profile,record.posting,{coverLetterFactIds:record.analysis?.plan.coverLetterFactIds ?? []});
+        if(!(record.documentFocus==='finance'?profile.financeLetterFactIds?.length:profile.coverLetter) && !record.analysis?.plan.coverLetterFactIds.length)throw new Error('HUB_LETTER_EVIDENCE_REQUIRED');
+        const letter=renderCoverLetter(profile,record.posting,{coverLetterFactIds:record.analysis?.plan.coverLetterFactIds ?? []},record.documentFocus??'general');
         json(200,{cv:{filename:basename(cv.path),language:cv.language,photo:cv.photo},letter:letter.content,evidence:letter.evidence,modelCalls:0});return;
       }
       if (!action && request.method === 'GET') { json(200, detail(record)); return; }
@@ -244,7 +305,7 @@ export async function startHub(options: { directory: string; profile: Profile; d
           const info = assistantInfo(record);
           if (!info.available) { json(409, { code: 'JOB_PLATFORM_UNSUPPORTED' }); return; }
           openingJobId = id;
-          opening = openAssistSession({ url: record.posting.sourceUrl, profile,
+          opening = openAssistSession({ url: options.demo?record.posting.sourceUrl:assistantURL(record), profile,
             answers: { ...answers, ...(command.firstName ? { firstName: command.firstName } : {}), ...(command.lastName ? { lastName: command.lastName } : {}) },
             directory: join(dirname(options.directory), 'assist-reviews', randomUUID()), contactApproved: true,
             ...(options.demo && options.demoFormUrl ? { demoUrl: options.demoFormUrl } : {}),
@@ -279,6 +340,7 @@ export async function startHub(options: { directory: string; profile: Profile; d
         json(200, detail(saved)); return;
       }
       if (action === 'analyze' && request.method === 'POST') {
+        if(record.discovery && qualityFor(record).bucket==='excluded'){json(409,{code:'HUB_JOB_QUALITY_REQUIRED'});return;}
         if (record.discovery && (!record.discovery.routingConfirmed || record.discovery.search && !record.discovery.search.verified)) { json(409, { code: 'HUB_ROUTING_REQUIRED' }); return; }
         const consent = z.strictObject({ paidCallApproved: z.literal(true), cloudProfileApproved: z.literal(true) }).safeParse(await body(request));
         if (!consent.success) { json(403, { code: 'HUB_ANALYSIS_CONSENT_REQUIRED' }); return; }

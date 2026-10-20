@@ -13,7 +13,7 @@ const accountSchema = z.object({ account_status: z.literal('Active'), plan_month
   total_searches_left: z.number().int().nonnegative(), account_rate_limit_per_hour: z.number().int().positive(), this_hour_searches: z.number().int().nonnegative() });
 type Criteria = Parameters<typeof sourceSearchQueries>[0] & { mode?: 'jobs'; earlyCareer?: boolean };
 const queriesFor = (criteria: Criteria) => criteria.mode === 'jobs' ? jobSearchQueries(criteria) : sourceSearchQueries({roles:criteria.roles,locations:criteria.locations});
-const queryKey = (criteria: Criteria, queries: string[]) => createHash('sha256').update(JSON.stringify(criteria.mode === 'jobs' ? ['jobs',queries] : queries)).digest('hex');
+const queryKey = (criteria: Criteria, queries: string[]) => createHash('sha256').update(JSON.stringify(criteria.mode === 'jobs' ? ['jobs-recent-v2',queries] : queries)).digest('hex');
 const evidence = (cache: z.infer<typeof cacheSchema>) => ({ hits: cache.hits, examined: cache.examined, rejected: cache.rejected, rejectionReasons: cache.rejectionReasons });
 export type SourceSearch = Awaited<ReturnType<typeof openSourceSearch>>;
 
@@ -93,7 +93,7 @@ export async function openSourceSearch(directory: string, apiKey: string, reques
           state.attempts.push(timestamp); await save(state); attempted++;
           try {
             const result = z.object({ error: z.string().optional(), search_metadata: z.object({ status: z.literal('Success') }),
-              organic_results: z.array(z.object({ link: z.string().max(2000), title: z.string().max(1200).optional(), snippet: z.string().max(3000).optional(), date: z.string().max(160).optional() })).max(100).default([]) }).safeParse(await get('/search.json', { engine: 'google', q }, signal));
+              organic_results: z.array(z.object({ link: z.string().max(2000), title: z.string().max(1200).optional(), snippet: z.string().max(3000).optional(), date: z.string().max(160).optional() })).max(100).default([]) }).safeParse(await get('/search.json', { engine: 'google', q, ...(criteria.mode==='jobs'?{tbs:'qdr:m'}:{}) }, signal));
             if (!result.success || result.data.error) throw new Error('DISCOVERY_SEARCH_FORMAT');
             const rows = result.data.organic_results.slice(0, 10), parsed = searchHits(rows, q);
             examined += rows.length; rejected += parsed.rejected;

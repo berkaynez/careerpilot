@@ -1180,7 +1180,7 @@ Aynı sayfa 10 dakika bellekte tutulur; yeni istekler arasında 30 saniye beklen
 
 Adayı açınca şirket ve kaynaktan gelen ilan metni doğrulama alanında hazırdır.
 İlanı açıp kontrol et, ülke/dili seç ve bilgileri doğrula. Olası tekrar uyarısı
-varsa benzer kaydı karşılaştır. FreeHire kaydından otomatik form doldurma yapılmaz;
+varsa benzer kaydı karşılaştır. Doğrulanmamış FreeHire kaydından otomatik form doldurma yapılmaz;
 işveren sitesindeki giriş, CV yüklemesi ve başvuru gönderimi kullanıcıdadır.
 
 ### Başvuru takibi ve vazgeçilenleri kaldırma
@@ -1221,3 +1221,45 @@ bölümünden seçilen CV'yi indirebilir, ön yazı taslağını açıp metin ol
 indirebilirsin. Taslak mevcut onaylı aday anlatımı ve varsa analiz dayanaklarından
 hazırlanır; yeni model çağrısı yapılmaz. Metni göndermeden önce oku. Bu işlem
 CV'yi işverene yüklemez veya başvuruyu göndermez.
+
+
+### İlan kalitesi ve kaynak kontrolü
+
+FreeHire yeni kayıtlarında açıklama en az 200 karakter / 30 kelime olmalıdır;
+şirket bulunmalıdır. Bilinen eski/çelişkili tarihler ve dolaylı WhatJobs kayıtları
+ana listeye alınmaz. Tarih bulunmaması güncellik kanıtı değildir. Kaynak kontrolü
+görünümündeki kayıtlar incelenebilir fırsat sayılmaz; eski veriler silinmez.
+Greenhouse/Lever ilanlarında resmî API'de varlık kontrolü yapılabilir. Kontrolün
+geçerliliği 24 saattir; tarih/adaya uygunluk/sponsorluk garantisi vermez. Erişim
+hatası, listede bulunamama ve desteklenmeyen site ayrı durumlardır. İnsan ülke/dil
+ve içerik doğrulaması, CV seçimi ve ücretli analiz izinleri ayrıca korunur.
+
+
+### Birlikte arama ve finans belgeleri
+
+İlan keşfet → Finans ve muhasebe, Muhasebe ve bağımsız denetim veya Pazarlama ve
+ticari analiz rol grubunu seç → Türkiye/Global remote ve seviye tercihini gözden
+geçir → belge türünü seç → kriter paylaşımı ve ücretsiz kota onayını ver →
+Mevcut kaynaklarda birlikte tara. Özel rollerin ayrıca saklanır; geri seçebilirsin.
+Bu işlem ilk FreeHire sayfasını, iki kota kontrollü web sorgusunu ve kayıtlı resmî
+Greenhouse/Lever kaynaklarını sırayla işler. Tüm şirketler veya sayfalar taranmaz.
+Bir kaynağın hatası diğer kaynakların sonuçlarını silmez; Durdur ile koşu kesilir.
+Son kaynak raporu yeniden açılışta korunur. Otomatik zamanlayıcı değildir.
+
+Web sorgularında son ay indeks filtresi kullanılır; bu gerçek yayın tarihi kanıtı
+değildir. LinkedIn, Indeed ve Kariyer.net arama sonuçları kaynak adaylarıdır;
+Glassdoor için doğrudan entegrasyon yoktur. Hesap/çerez paylaşılmaz. İlan rolü ve
+seviye kriterleri kayıtla birlikte saklanır; sonra rol grubunu değiştirmek eski
+başvuruların kalite kararını değiştirmez.
+
+Başvuru alanı filtresinde Finans / işletme seçebilirsin. Her ilanın belge türünü
+ayrıca değiştirebilirsin. Özel profilin CV listesinde focus: finance olarak
+kaydedilmiş belgeler finans akışında; focus belirtilmeyen belgeler genel akışta
+seçilir. Dil/fotoğraf politikası aynı kalır. Finans belgesi eksikse genel CV'ye
+sessizce dönülmez. financeLetterFactIds yalnızca profildeki gerçek fact ID'lerini
+seçer; bunlardan üretilen taslak kullanıcı tarafından incelenmelidir ve otomatik
+olarak onaylı ön yazı sayılmaz. Belge önizlemesi/indirmesi model çağrısı yapmaz.
+
+Asıl Greenhouse/Lever adresi bulunup içerik ve yönlendirme doğrulanmışsa mevcut
+form yardımcısına devir açılabilir. İletişim paylaşımı için ayrıca hedefe özel
+onay gerekir; bu izin CV yüklemesi veya son başvuru gönderimi değildir.
