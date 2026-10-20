@@ -1,3 +1,5 @@
+import { discoveryConfigSchema } from '../discovery/core.js';
+import { provenanceSchema, sourceCheckSchema } from '../discovery/quality.js';
 import { randomUUID } from 'node:crypto';
 import { mkdir, chmod, readdir, writeFile, rename, rm } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -9,14 +11,24 @@ import { readLocalJSON } from '../preparation/files.js';
 
 export const states = ['saved', 'ready', 'review', 'submitted', 'archived'] as const;
 export const stateSchema = z.enum(states);
+export const trackingSchema = z.strictObject({
+  stage:z.enum(['not_set','awaiting_response','screening','interview','assessment','offer','rejected','closed']),
+  appliedOn:z.iso.date().nullable(), followUpOn:z.iso.date().nullable(), notes:z.string().trim().max(4000),
+}).superRefine((value,context)=>{if(value.appliedOn && value.followUpOn && value.followUpOn<value.appliedOn)
+  context.addIssue({code:'custom',message:'Follow-up precedes application'});});
 export const recordSchema = z.strictObject({
   version: z.literal(1), id: z.uuid(), posting: postingSchema,
+  documentFocus:z.enum(['general','finance']).optional(),
+  trashedAt:z.iso.datetime().nullable().default(null), tracking:trackingSchema.nullable().default(null),
   state: stateSchema, createdAt: z.iso.datetime(), updatedAt: z.iso.datetime(),
   analysis: z.strictObject({ job: jobSchema, plan: planSchema,
     origin: z.enum(['model', 'imported_review', 'demo']), at: z.iso.datetime(), costMicroUsd: z.number().int().nonnegative().nullable() }).nullable(),
   lastError: z.string().regex(/^[A-Z_]+$/).nullable(),
-  discovery: z.strictObject({ sourceKey: z.string().regex(/^(lever|greenhouse):[a-z0-9_-]{1,80}$/), externalId: z.string().max(80),
-    discoveredAt: z.iso.datetime(), location: z.string().max(24000), remote: z.boolean(), reasons: z.array(z.string().max(500)).max(10), routingConfirmed: z.boolean() }).nullable().default(null),
+  discovery: z.strictObject({ sourceKey: z.string().regex(/^(?:(?:lever|greenhouse):[a-z0-9_-]{1,80}|search:(?:linkedin|indeed|kariyer|lever|greenhouse|freehire))$/), externalId: z.string().max(200),
+    search: z.strictObject({ provider: z.enum(['serpapi','freehire']).default('serpapi'), originalURL: z.string().max(2000).nullable().default(null), query: z.string().max(400), snippet: z.string().max(3000), dateHint: z.string().max(160).nullable().default(null), verified: z.boolean() }).nullable().default(null),
+    criteria:z.strictObject({roles:discoveryConfigSchema.shape.roles,earlyCareer:discoveryConfigSchema.shape.earlyCareer,keywords:discoveryConfigSchema.shape.keywords,excludedTitles:discoveryConfigSchema.shape.excludedTitles}).optional(),
+    provenance: provenanceSchema.nullable().default(null), sourceCheck: sourceCheckSchema.nullable().default(null),
+    discoveredAt: z.iso.datetime(), location: z.string().max(24000), remote: z.boolean(), reasons: z.array(z.string().max(500)).max(10), careerLevel: z.enum(['entry', 'experienced', 'unclear']).default('unclear'), routingConfirmed: z.boolean() }).nullable().default(null),
 });
 export type HubRecord = z.infer<typeof recordSchema>;
 
@@ -54,14 +66,34 @@ export async function openHubStore(directory: string, profile: Profile) {
     } finally { await rm(temporary, { force: true }); }
   };
   return {
-    list: () => [...records.values()].map(record => structuredClone(record)).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
-    get(id: string) { const value = records.get(id); if (!value) throw new Error('HUB_NOT_FOUND'); return structuredClone(value); },
+    list: (options: {includeTrashed?:boolean} = {}) => [...records.values()].filter(record=>options.includeTrashed || !record.trashedAt).map(record => structuredClone(record)).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
+    get(id: string) { const value = records.get(id); if (!value || value.trashedAt) throw new Error('HUB_NOT_FOUND'); return structuredClone(value); },
     add: (record: z.input<typeof recordSchema>) => enqueue(async () => {
       if (records.has(record.id)) throw new Error('HUB_RECORD_EXISTS');
       return save(check(record));
     }),
+    trash: (id:string) => enqueue(async()=>{
+      const record=records.get(id);if(!record || record.trashedAt)throw new Error('HUB_NOT_FOUND');
+      await save({...record,trashedAt:new Date().toISOString()});return {removed:1};
+    }),
+    restore: (id:string) => enqueue(async()=>{
+      const record=records.get(id);if(!record || !record.trashedAt)throw new Error('HUB_NOT_FOUND');
+      return save({...record,trashedAt:null});
+    }),
+    trashArchived: () => enqueue(async()=>{
+      let removed=0;
+      for(const record of records.values()) if(record.state==='archived' && !record.trashedAt){
+        await save({...record,trashedAt:new Date().toISOString()});removed++;
+      }
+      return {removed};
+    }),
+    restoreTrash: () => enqueue(async()=>{
+      let restored=0;
+      for(const record of records.values()) if(record.trashedAt){await save({...record,trashedAt:null});restored++;}
+      return {restored};
+    }),
     update: (id: string, change: (record: HubRecord) => HubRecord) => enqueue(async () => {
-      const old = records.get(id); if (!old) throw new Error('HUB_NOT_FOUND');
+      const old = records.get(id); if (!old || old.trashedAt) throw new Error('HUB_NOT_FOUND');
       const next = change(structuredClone(old));
       if (next.id !== old.id) throw new Error('HUB_RECORD_INVALID');
       return save({ ...next, updatedAt: new Date().toISOString() });
