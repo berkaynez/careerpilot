@@ -589,3 +589,26 @@ README bu kılavuza ve günlük başlangıca yönlendirir. TypeScript ve 170 çe
 test yeniden geçti; JavaScript sözdizimi ve whitespace temiz. Kişisel profil/CV,
 .env, harcama/arama ledger'ları ve kullanıcı .vscode ayarları gönderime dahil değil.
 Test sürümü feature/broader-discovery dalında tutulur; main birleştirmesi ayrı.
+
+
+### Portföy beta sunumu — aktif çalışma (20 Ekim 2026)
+
+Son geliştirme PR #12 ile main'e birleştirildi; docs/public-beta-showcase dalı
+bu main üzerinden açıldı. Ana README İngilizce, README.tr.md Türkçe olarak
+bağlandı. Günlük kullanım kılavuzu ve arayüz Türkçe kalır; İngilizce arayüz varmış
+gibi gösterilmez. Kurgusal demo kayıtlarıyla gerçek panel ekran görüntüsü alındı;
+kişisel kayıtlar veya gerçek başvurular görüntüye girmez. Anahtar gerektirmeyen
+demo kurulumu, özel profil başlangıcı, maliyet/gizlilik sınırları ve native
+başvuru desteğindeki eksikler ana README'de açıkça belirtildi.
+
+Fetch sonrasında yerelde erişilebilir tüm ref'lerin 349 benzersiz Git blob'u;
+yerel OpenAI/SerpAPI anahtarları, adayın tam ad/e-posta/telefon eşleşmeleri ve
+bazı yaygın credential kalıpları için tarandı; eşleşme çıkmadı. Bu sınırlı içerik
+kontrolü tam sır/PII tarayıcısı değildir; commit yazar metadatası, uzak PR yorumları,
+Actions log/artifact'ları, silinmiş-erişilemeyen ref'ler ve dönüştürülmüş bilgiler
+kapsanmaz. Özel tarama çıktısı /tmp altında tutuldu, repoya eklenmedi.
+
+Repo görünürlüğü değiştirilmedi; lisans/yeniden kullanım tercihi henüz yapılmadı.
+Mevcut kodda üçüncü taraf proje atfı bulunmaması, köken/lisans incelemesinin
+kanıtı değildir. Dışarıdan modül eklenmedi, eski Türkçe commit geçmişi yeniden
+yazılmadı. Bu artım ürün mantığını veya özel .env/profil/ledger'ları değiştirmez.

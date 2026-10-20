@@ -1,119 +1,134 @@
 # CareerPilot
 
-CareerPilot, **Yarı-Otonom İş Başvuru Komuta Merkezi** (Hybrid Job Application Hub)
-olarak geliştiriliyor: ilanları ve AI analizini tek yerde görmek, doğru belgeleri
-hazırlamak ve form doldurmayı insan gözetiminde hızlandırmak.
+**A local-first job application hub — beta preview.**
 
-Bugünkü sürüm yerelde çalışan bir prototiptir. İlan–profil analizinden açıklanabilir
-0–100 uyum puanı hesaplanır. Yerel panelde ilan ekleme, analiz görüntüleme ve
-başvuru takibi vardır. İlan keşfi, ücretsiz FreeHire araması, kota kontrollü
-SerpAPI araması ve resmî Greenhouse/Lever akışlarını kullanır. Eski/eksik ve
-kaynağı doğrulanmamış sonuçlar incelenebilir fırsatlardan ayrılır. Toplayıcının
-bildirdiği sonuç toplamı uygun veya açık ilan sayısı değildir. İlk sürüm düğmeyle
-çalışır; arka planda zamanlanmış tarama yoktur. Panelden form yardımı açılır,
-bilinen alanlar hazırlanır ve kontrol kullanıcıya bırakılır.
+[English](README.md) · [Türkçe](README.tr.md) · [User guide (Turkish)](docs/KULLANIM_KILAVUZU.md)
 
-## Nereden devam ediyoruz?
+Discover job postings, compare their requirements with your documented experience,
+prepare application materials and track your applications in one local dashboard.
+CareerPilot combines AI-assisted preparation with supervised form assistance;
+you review the result and submit the application yourself.
 
-[Güncel durum ve yol haritası](docs/PROJECT_STATUS.md) projenin tek güncel iş listesidir.
-[Kısa kullanım kılavuzu](docs/KULLANIM_KILAVUZU.md) günlük kullanım ve yeniden başlatmayı anlatır.
-[Teknik kullanım referansı](docs/USAGE.md) komutların ve altyapının ayrıntılarını içerir.
-[Hibrit mimari](docs/HYBRID_ARCHITECTURE.md) hedeflenen kullanıcı akışını ve teknik sınırları,
-[AGENTS.md](AGENTS.md) geliştirme kurallarını belirler.
+![CareerPilot beta dashboard with fictional jobs and a fictional applicant](docs/images/beta-demo.jpg)
 
-Hedef akış: **ilan ekle → dayanaklı uyum analizini incele → formu hazırla →
-kendin kontrol edip gönder → durumunu takip et.** Öncelik Türkiye'deki uygun
-başvurular; uluslararası başvurularda konum ve çalışma hakkı ayrıca doğrulanır.
+*Actual application screenshot in demo mode. All applicant and job data shown is
+fictional. The current interface is in Turkish; job analysis supports Turkish
+and English postings.*
 
-## Günlük başlatma
+## What the beta does
 
-Hazır kurulumu açmak için proje klasöründe:
+- **Job discovery:** runs existing FreeHire, quota-controlled SerpAPI search and
+  configured Greenhouse/Lever feeds in one user-triggered flow. Supports software,
+  data/business analysis, IT audit, finance/accounting and marketing role groups.
+- **Source and quality checks:** separates incomplete, stale, experienced-level
+  and unverified candidates from reviewable postings. Supported employer-feed
+  checks establish current presence, not publication date or candidate fit.
+- **Evidence-based analysis:** links job requirements to existing profile facts,
+  distinguishes direct, partial and missing evidence, and computes a transparent
+  0–100 coverage score. This is not a hiring probability or an external ATS score.
+- **Application materials:** selects a local CV by language, photo policy and
+  general/finance focus; previews factual cover-letter drafts for review.
+- **Supervised form assistance:** opens supported forms and helps fill known
+  visible fields after destination-specific sharing approval.
+- **Application tracking:** stores user-reported application stages, dates and
+  notes, with recoverable removal and duplicate-review groups.
+
+## Try it without API keys
+
+Requires **Node.js 22+** and npm. From the cloned repository:
+
+```sh
+npm ci
+npm run browser:install
+npm run hub -- --demo
+```
+
+Open **http://127.0.0.1:3210/**. Demo mode uses fictional records and a local mock
+form. It does not call a cloud model or search provider. Demo CV paths are
+placeholders; no real CV is bundled. Keep the terminal open; use `Ctrl+C` to stop.
+
+## Use your own profile
+
+Personal setup requires a private `.careerpilot/profile.json`, local CV files
+and, for AI analysis/search, your own provider configuration. See the
+[setup reference](docs/USAGE.md#local-hub-dashboard) and
+[daily-use guide](docs/KULLANIM_KILAVUZU.md).
+
+Copy `.env.example` to `.env` only if `.env` does not already exist. Enter your
+own API credentials, explicit model and verified pricing. Paid calls are disabled
+in the example; enabling them still requires separate approval for each analysis.
+Never commit the completed configuration or your personal profile.
+
+Once configured:
 
 ```sh
 npm start
 ```
 
-Tarayıcıda **http://127.0.0.1:3211/** adresini aç. Terminal açık kalmalı;
-`Ctrl+C` veya terminalin kapanması paneli durdurur. Yeniden açmak için aynı
-komutu çalıştır. Bilgisayar açılınca otomatik başlamaz. Kayıtların diskte kalır.
+Open **http://127.0.0.1:3211/**. This enables the search and analysis features;
+startup itself does not run a search or a paid analysis. To view the same local
+records without model/search connections, use `npm run start:offline`.
+The app is a local process, not an automatically started background service.
 
-Bu komut aramayı ve analiz özelliğini hazırlar; açılışta ücretli çağrı yapmaz.
-Yerel `.env` içindeki izin, API anahtarı ve doğrulanmış fiyatlar yapılandırılmalı;
-her analiz panelde ayrıca onaylanır. Anahtarsız/ücretsiz yerel kullanım için
-`npm run start:offline`; kurgusal örnekler için aşağıdaki demo komutunu kullan.
-İlk kurulum ve adım adım kullanım: [Kılavuz](docs/KULLANIM_KILAVUZU.md).
+## Privacy and cost controls
 
-## Yerel panel
+Profiles, application history and accounting records stay in the ignored
+`.careerpilot/` directory; CVs remain at their private local paths. AI analysis
+sends the job text and professional profile facts after explicit consent.
+Contact fields and CV files are excluded from the analysis request. Search
+providers receive search criteria, not the private applicant profile.
 
-```sh
-npm run hub -- --demo
-```
+A persistent ledger enforces configured monthly and per-run model budgets.
+Uncertain billing retains its reservation, and automatic network retries are
+disabled. Each analysis shows its destination and spending limits before consent.
+Search has its own quota, cache and cooldown controls. These controls do not
+replace reviewing the provider's billing or the actual application form.
 
-Kurgusal örneklerle paneli `http://127.0.0.1:3210` adresinde açar. Gerçek profil
-kullanılmaz, ücretli çağrı yapılamaz. “Örnek formu aç” yalnızca bilgisayardaki
-kurgusal forma gider. İlan ekleme, arama/filtreleme, analiz ayrıntıları, form yardımı
-ve durum takibi çalışır; kayıtlar yeniden açıldığında korunur.
+## Limits to understand
 
-Özel profilinle kullanmak için `npm run hub` çalıştır. Panel varsayılan olarak
-model çağrısı yapmaz; mevcut hazırlık paketlerinden `job.json` ve
-`preparation.json` dosyalarını içe aktarabilir. Model analizini etkinleştirme,
-özel profil ve kayıt dizinleri [kullanım referansında](docs/USAGE.md#local-hub-dashboard) açıklanır.
+This is a beta for individual local use. It is not a hosted multi-user service
+or an unattended application bot. Discovery covers configured sources and bounded
+result pages, not every company or job site. Aggregator totals and recent search
+indexing do not prove that an opening is current or suitable.
 
-## Şu an neler var?
+Login, CAPTCHA, uncertain answers, legal consent, file uploads in the shared
+assistant and final submission remain human-controlled. Recognising a LinkedIn,
+Indeed or Kariyer.net URL does not mean its complete application flow works.
+Workday and LinkedIn Easy Apply do not have verified end-to-end native support;
+Greenhouse filling/upload is not implemented. The separate Lever draft workflow
+has its own explicit approvals. Browser actions performed through a chat are
+not proof of native product compatibility.
 
-- `hub`: yerel ilan listesi, analiz ayrıntıları, form yardımı ve kullanıcı beyanına dayalı durum takibi.
-- `job`: desteklenen bir ilan bağlantısından yerel hazırlık paketi oluşturur.
-  İlan okuyamamak, giriş/CAPTCHA veya belirsiz işveren bağlantısı akışı durdurabilir.
-- `assist`: kullanıcının açtığı başvuru sayfasındaki bilinen boş alanları doldurur.
-  Kullanıcı giriş yapar, adımları ilerletir ve sonucu kontrol eder. Ücretli model kullanmaz.
-- `lever:review`: ayrı onaylarla Lever formunu ve CV yüklemesini hazırlayıp kullanıcıya bırakır.
-- `prepare`: sağlanan ilan, profil ve doğrulanmış değerlendirmeden açıklanabilir
-  uyum puanı, gereksinim bazlı dayanaklar ve yerel CV/ön yazı paketi hazırlar.
-- `agent`: yalnızca yerel kurgusal formlarda modelin karar verdiği deneysel akıştır.
-  Etkinleştirilirse ücretli API kullanabilir; gerçek iş sitelerinin otomasyonu değildir.
+## Engineering and validation
 
-LinkedIn/Indeed/Kariyer.net bağlantısını tanımak, o sitenin bütün başvuru
-akışını desteklemek anlamına gelmez. **Workday ve LinkedIn Easy Apply için
-program üzerinden doğrulanmış uçtan uca destek yoktur.** Sohbette tarayıcıyla
-hazırlanan başvurular ayrıca değerlendirilir.
-
-## Kurulum ve kontrol
-
-Node.js 22 veya üzeri gerekir.
+TypeScript, Node.js, Playwright, Zod and a lightweight HTML/CSS/JavaScript dashboard.
+The model selects factual references; local code validates them, scores evidence
+and enforces privacy, consent and budget boundaries. See the approved
+[architecture](docs/HYBRID_ARCHITECTURE.md) and [current status](docs/PROJECT_STATUS.md).
 
 ```sh
-npm ci
-npm run browser:install
 npm run check
 ```
 
-Bağımlılıklar kurulduktan sonra testler kurgusal verilerle çevrimdışı çalışır;
-API anahtarı veya ücretli model çağrısı gerekmez.
+The current baseline is **170 passing offline tests** (20 October 2026), including
+mocked provider failures, persistent budgets, source filtering, partial search
+results, consent gates, document selection and authored browser forms. These
+tests do not establish compatibility with every live hiring site. A separately
+approved live-model preparation flow has also been exercised; it is not a
+production reliability benchmark.
 
-## Kullanımın ana yolu
+This is a personal, AI-assisted software development project. Beta capabilities,
+validation and remaining gaps are documented separately rather than presented as
+fully autonomous job seeking.
 
-```sh
-npm run job -- "<desteklenen-ilan-bağlantısı>" --country TR --language tr
-npm run assist -- "<desteklenen-ilan-bağlantısı>" --approve-contact-sharing
-```
+## Documentation and project status
 
-Gerçek kullanım için önce özel yerel profil hazırlanmış olmalıdır. Ülke ve dil
-örnektir; gerçek ilandan doğrulanır. Ortak yardımcıda `DOLDUR` alanları hazırlar,
-`DEVAM` kullanıcının sitede ilerlemesini sağlar, `DEVRET` kontrolü bırakır.
-Bu iki komut henüz tek bir kesintisiz uygulama değildir.
+- [Turkish overview](README.tr.md)
+- [Daily user guide (Turkish)](docs/KULLANIM_KILAVUZU.md)
+- [Technical usage reference](docs/USAGE.md)
+- [Current work and known gaps](docs/PROJECT_STATUS.md)
+- [Development instructions](AGENTS.md)
 
-Şifre, CAPTCHA, CV yüklemesi, özel listeler, hukuki onaylar ve son gönderim
-ortak yardımcıda kullanıcıya aittir. İşverenin başka bir sitesine geçildiğinde
-yeni adres ayrıca desteklenmeli ve paylaşım izni verilmelidir. Ayrıntılar için
-[kullanım referansına](docs/USAGE.md#indeed--kariyernet-and-the-shared-visible-form-assistant) bak.
-
-Gerçek profiller ve belgeler `.careerpilot/` gibi Git dışında tutulan özel dizinde
-kalır. `.env` ve API anahtarları paylaşılmaz. Bu proje, kullanıcı onayı olmadan
-ücretli çağrı veya gerçek başvuru gönderimi yapmaz.
-
-İlan keşfet ekranında FreeHire ile anahtarsız Türkiye/remote ilan araması ve
-SerpAPI ile web araması bulunur. **Mevcut kaynaklarda birlikte tara** seçeneği
-FreeHire, kota kontrollü web araması ve kayıtlı Greenhouse/Lever kaynaklarını tek
-akışta çalıştırır. Finans/muhasebe, denetim ve pazarlama rol grupları ile ayrı
-finans CV/ön yazı seçimi vardır. Bu, tüm sitelerin eksiksiz tarandığı anlamına
-gelmez. Kullanım ve kaynak sınırları: [USAGE](docs/USAGE.md).
+No project licence has been added yet. Dependency licences are separate; public
+visibility and code-reuse licensing are separate decisions. This beta preview
+does not change the repository's visibility.
