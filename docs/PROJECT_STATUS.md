@@ -462,7 +462,130 @@ Aşağıdaki teslim bu yön değişikliğini uygular.
   korunup BT denetim/technology risk ifadeleri eklendi. Ücretli model/profil
   paylaşımı/gerçek başvuru gönderimi bu artımda yapılmadı.
 
-Sıradaki tek iş: getirilen yeni adaylardan henüz başvurulmamış birini kullanıcıyla
-seçip işveren kaynağını doğrulayarak CV/ön yazı hazırlığını gerçek adayda tamamlamak.
-Yeni ücretli analiz gerekiyorsa o çağrı için ayrıca onay gerekir. SerpAPI canlı
-aramasını ancak mevcut kota izin verdiğinde kullanıcı onayıyla genişlet.
+## Kalite ve ürün tamamlama — önceki artım
+
+Kullanıcı eski/boş ilanlar ve tamamlanmayan akış nedeniyle özellik genişletmek yerine
+ürünün kullanılabilirliğini önceliklendirdi. Bundan sonraki kabul ölçütü test sayısı
+veya toplayıcının toplam kayıt sayısı değil, gerçek kaynaktan doğrulanmış ilan ve
+panel üzerinden tamamlanan hazırlık akışıdır.
+
+20 Ekim düzeltmesi:
+- FreeHire source/created_at/reality bilgileri artık atılmaz. İlk görülmesi/yayını
+  30 günden eski, gelecekte tarihli veya fake_freshness işaretli yeni kayıtlar elenir.
+  Şirketi/açıklaması eksik ve WhatJobs üzerinden dolaylı yeniden yazılmış kayıtlar
+  ayrıca sayılır; yeni ana liste kaydı yapılmaz. Bu işaretler sağlayıcı beyanıdır,
+  ilanın dolandırıcılık veya kesin kapalı olduğu kararı değildir.
+- Bilgisi eksik eski kayıtlar silinmez. Kaynak kontrolü görünümü, doğrulanmamış ve
+  kalite elemesine takılmış aktif kayıtları incelenebilir ilanlardan ayırır.
+  İnsan doğrulaması, resmî API kontrolü ve yayın tarihi birbirinden ayrılır.
+- Greenhouse/Lever için mevcut sabit resmî API okuyucusuyla tekil ilan varlığı
+  kontrol edilir. Yeni FreeHire kayıtlarında en çok beş kontrol yapılır. Diğer
+  sitelerde kontrol desteklenmiyorsa açık olduğu varsayılmaz. Sonuç 24 saat sonra
+  yeniden kontrol ister; kısa önbellek/hata beklemesi var. Ağ hatası veya eksik
+  parse kapandı diye yorumlanmaz; liste yokluğu kesin kapanış sayılmaz.
+- Resmî içerik bulunursa yalnızca analizi/insan doğrulaması olmayan review kaydının
+  metni ve başlığı güncellenebilir. Başvurular, analizler, takip notları ve gizleme
+  durumları korunur. Kalite elemesini geçemeyen keşif kaydında ücretli analiz engellenir.
+- Deneyim elemesi 3+ yıl ve 4–6 yıl gibi ifadeleri yakalar; tercih edilen şartları
+  ve şirketin kendi geçmişini adaydan istenen deneyim diye değerlendirmez.
+- Gerçek panelde FreeHire iki sayfa/60 kayıt incelendi: 14 bilinen, 36 filtre dışı,
+  9 kalite nedeniyle alınmayan (1 eski/tarih çelişkisi, 8 dolaylı toplayıcı), 1 kaynak
+  kontrolü gereken yeni kayıt. Sıfır yeni doğrulanmış fırsat çıktı. Kaynak toplamı
+  500 idi; tümü taranmadı, uygun ilan sayısı değildir.
+- Aynı üretim kaynak kontrolü koduyla Peak Backend New Grad ilanı resmî Lever
+  akışında bulundu, 1866 karakter metin alındı; başvurulan kayıt değiştirilmedi.
+  Bu kontrol sohbetin tarayıcı form doldurma başarısı değildir.
+- Yerel ücretli çağrı ayarı kapalı olduğundan model etkin başlatma reddedildi;
+  ayar aşılmadı. Panel 3211'de arama açık, model kapalı çalışır. Ücretli analiz,
+  profil/CV paylaşımı veya başvuru gönderimi yapılmadı; SerpAPI sınırı değiştirilmedi.
+
+Doğrulama: TypeScript ve 166 çevrimdışı test, tarayıcı JavaScript sözdizimi ve
+whitespace kontrolü geçti. Yeni kontroller eski/tarih çelişkili içerik, eksik metin,
+dolaylı kaynak, zorunlu/tercih deneyim ayrımı, sabit ATS adresleri, kaynak arızası,
+resmî unvanın rol filtresine yeniden girmesi ve ücretli kalite kapısını sınar.
+Canlı sonuçlar yukarıda ayrıca belirtilmiştir; test sayısı ürün tamamlandı kanıtı değildir.
+Önceden var olan 33 ilan dosyasından yalnızca bir doğrulanmamış review kaydının
+kaynak metadatası güncellendi. 11 başvurulan, 21 gizlenen kayıt ve SerpAPI ledger
+byte olarak korundu. Yeni tek adayla toplam 34, görünür 13 kayıt vardır.
+
+Açık kalan ürün engelleri:
+1. Bu kaynaklarla henüz başvurulmamış, gerçekten güncel/uygun fırsat üretimi düşük.
+   Kaliteyi düşürerek sayı artırmak veya eski kayıtları yeni diye sunmak çözüm değil.
+2. Model analizi kapalı yapılandırmada kullanılamaz. Etkinleştirme ve her gerçek
+   ücretli analiz ayrı kullanıcı kararıdır; çevrimdışı test canlı model kanıtı değildir.
+3. Native Workday/LinkedIn Easy Apply/CV yükleme ve gerçek telefon doldurma doğrulaması
+   tamamlanmadı. Genel yardımcı için gözetimli, bilinen alan sınırı korunur.
+4. Hazırlık süresindeki kazanç henüz ölçülmedi; %80 hedefi başarı diye sunulmaz.
+
+Yeni sağlayıcı, büyük UI değişikliği veya yeni otomasyon eklemeden bu engelleri
+kapat; bir gerçek adayın kaynak → analiz → belge → desteklenen form devri → takip
+akışını native panelde doğrulamadan ürünü tamamlandı olarak etiketleme.
+
+
+## Finans araması ve birleşik hazırlık — aktif durum (20 Ekim 2026)
+
+- Mevcut FreeHire, SerpAPI ve kayıtlı Greenhouse/Lever kaynakları tek kullanıcı
+  tetiklemeli, durdurulabilir, 180 saniye sınırlı akışta birleştirildi. İlk FreeHire
+  sayfası ve iki web sorgusu kullanılır; bütün internet/tüm şirketler taranmaz.
+  Kaynak bazında sonuç/hata raporu kalıcıdır; kısmi başarı korunur. Yeni tarayıcı
+  kazıyıcı, hesap bağlantısı, model arama çağrısı veya zamanlayıcı eklenmedi.
+- Finans/muhasebe, bağımsız denetim ve pazarlama grupları, çift dilli rol eşleştirme
+  ve finans belge odağı eklendi. Eski özel roller korunur. Her kayıt kendi keşif
+  kriterini taşır; aktif grubun değişmesi geçmiş kaydın kriterini değiştirmez.
+- Web aramasında son ay indeks filtresi var; gerçek yayın tarihi sayılmaz.
+  Supervisor/head/chief kıdemli sayılır; tek başına associate junior kanıtı değil.
+  Şirket yerine URL döndüren FreeHire kayıtları yeni alımda engellenir, eskiler
+  silinmeden kalite bölümünde kalır. Bu son düzeltmelerden sonra yeni canlı arama
+  yapılmadı; aşağıdaki rapor önceki aramanın tarihsel sonucudur.
+- Gerçek yerel profilde altı CV (üç genel, üç finans) ve kaynaklı finans eğitim,
+  Excel/SAP/Power BI beyanları bağlandı. Genel belgeler değiştirilmedi. Akademik
+  SAP eğitimi profesyonel FI/CO deneyimi diye gösterilmez. Finans ön yazısı seçili
+  gerçek profil dayanaklarından yerelde oluşur; insan tarafından onaylı sayılmaz.
+- Native panelde finans/Türkiye araması: FreeHire 30 kayıt → 10 yeni / 18 filtre
+  dışı / 2 kalite reddi; web 20 sonuç → 7 yeni / 13 filtre dışı; kayıtlı resmî
+  kaynaklar 314 kayıt → 0 yeni / 292 filtre dışı / 22 desteklenmeyen-geçersiz.
+  Toplam 17 yeni aday: 1 kaynakta doğrulanmış, 16 ek kaynak kontrolü gereken kayıt.
+  Bunlar 17 uygun veya junior ilan değildir. Yerel SerpAPI kullanımı 6/8 günlük,
+  190/200 aylık oldu; kota/ledger sıfırlanmadı.
+- Trendyol Tax & Accounting Professionals - Fintech resmî Lever sayfası açıldı ve
+  karşılaştırıldı. Başlık vergi/muhasebe, gövde Treasury Professional diyor;
+  içerik farkı gizlenmedi. TR/İngilizce içerik yerelde doğrulandı. İngilizce
+  fotoğraflı finans PDF native panelden indirildi ve kaynakla hash eşitliği
+  doğrulandı. Yerel ön yazı görüntülendi. İşverene belge/iletişim aktarılmadı.
+- Kullanıcı bu tek ilan için mesleki profil paylaşımı ve en çok 0,05 USD gerçek
+  analiz izni verdi. Yapılandırılmış modelin fiyatı ve Responses/token-count
+  desteği resmî OpenAI belgelerinden kontrol edildi. Model yalnızca süreç ortamında
+  açıldı; .env değiştirilmedi. Native panel analizi başarıyla kaydetti: 54/100,
+  2 doğrudan / 6 kısmi / 2 belgelenmeyen şart; gerçek hesaplanan maliyet
+  0,006794 USD. POS/ödeme sistemi deneyimi belgelenmiyor. Puan işe alınma veya
+  haricî ATS olasılığı değildir. Analizden sonra panel arama açık, model kapalı
+  yeniden başlatıldı. Başka ücretli koşu yapılmadı.
+- Doğrulanmış asıl işveren adresi mevcut form yardımcısına devredilebilir;
+  paylaşım izni ayrı kalır. Trendyol'a gerçek form devri/alan doldurma/yükleme
+  denenmedi; Workday/Easy Apply ve önceki canlı form engelleri sürer.
+
+Doğrulama: TypeScript ve 170 çevrimdışı test, tarayıcı JavaScript sözdizimi ve
+whitespace kontrolü geçti. Yeni senaryolar finans belge/dil/fotoğraf seçimi,
+kısmi kaynak başarısı, iptal/çakışma, raporun yeniden açılışı, geçmiş kriterlerin
+korunması ve doğrulanmış işverene devir için paylaşım kapısını kapsar.
+Ürün tüm portallarda tamamlandı değildir; kaynak kalitesi ve junior fırsat üretimi
+halen sınırdır. Sonraki kabul adımı uygun bir finans ilanının doğrulanması ve
+ayrı hedef izniyle desteklenen form devrinin native panelden sınanmasıdır.
+
+
+### İlk test sürümünün paketlenmesi (20 Ekim 2026)
+
+Kullanıcı kullanım kılavuzu, GitHub'a test sürümü gönderimi ve analiz özelliğinin
+hazır kalmasını istedi. `npm start` artık 3211 portunda arama ve model seçenekleriyle
+başlatır; `npm run start:offline` aynı kayıtları bağlantısız açar. Yerel .env ücretli
+özellik izni bu talep üzerine etkinleştirildi; Git'e girmez. Panel her analizde
+iki açık izin ister; aylık 5 USD / analiz 0,05 USD sınırları korunur. Yeni ücretli
+çağrı yapılmadı. Native panelde model hazır durumu ve iki kutusu boş analiz izin
+ekranı doğrulandı. Bu servis terminal kapanınca durur; otomatik başlangıç eklenmedi.
+
+`docs/KULLANIM_KILAVUZU.md` günlük başlangıç, ilk kurulum, kaynak kontrolü, arama,
+analiz, belge ve başvuru takibi, özel yedekleme ve sorun gidermeyi anlatır.
+README bu kılavuza ve günlük başlangıca yönlendirir. TypeScript ve 170 çevrimdışı
+test yeniden geçti; JavaScript sözdizimi ve whitespace temiz. Kişisel profil/CV,
+.env, harcama/arama ledger'ları ve kullanıcı .vscode ayarları gönderime dahil değil.
+Test sürümü feature/broader-discovery dalında tutulur; main birleştirmesi ayrı.

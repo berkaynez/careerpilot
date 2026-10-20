@@ -15,12 +15,13 @@ export const profileSchema = z.strictObject({
   contact: z.strictObject({ name: line, email: z.email(), phone: line, location: line }),
   preferences: z.strictObject({ countries: z.array(country).min(1), roles: z.array(line).min(1),
     authorizedCountries: z.array(country), sponsorshipRequiredElsewhere: z.boolean() }),
-  coverLetter: letterProfileSchema.optional(),
+  coverLetter: letterProfileSchema.optional(), financeLetterFactIds:z.array(id).max(4).optional(),
   facts: z.array(z.strictObject({ id, text: texts, source: line })).min(1).max(100),
-  cvs: z.array(z.strictObject({ id, language, photo: z.boolean(),
+  cvs: z.array(z.strictObject({ id, language, photo: z.boolean(), focus:z.enum(['general','finance']).optional(),
     path: z.string().refine(value => isAbsolute(value) && value.toLowerCase().endsWith('.pdf')) })).min(1).max(10),
 }).superRefine((profile, context) => {
   const knownFacts = new Set(profile.facts.map(fact => fact.id));
+  if(profile.financeLetterFactIds && (profile.financeLetterFactIds.some(id=>!knownFacts.has(id)) || new Set(profile.financeLetterFactIds).size!==profile.financeLetterFactIds.length))context.addIssue({code:'custom',message:'Unknown finance letter fact ID'});
   for (const section of profile.coverLetter?.sections ?? []) {
     if (section.factIds.some(id => !knownFacts.has(id))) context.addIssue({ code: 'custom', message: 'Unknown letter fact ID' });
   }
@@ -106,10 +107,10 @@ export function buildMatchAnalysis(profile: Profile, job: Job, rawPlan: unknown)
   };
 }
 
-export function selectCV(profile: Profile, job: Pick<Job, 'language' | 'documentLanguage' | 'country' | 'photoPolicy'>) {
+export function selectCV(profile: Profile, job: Pick<Job, 'language' | 'documentLanguage' | 'country' | 'photoPolicy'>, focus:'general'|'finance'='general') {
   const selectedLanguage = job.documentLanguage ?? job.language;
   const photo = job.photoPolicy === 'required' || (job.photoPolicy === 'unspecified' && job.country === 'TR');
-  const matches = profile.cvs.filter(cv => cv.language === selectedLanguage && cv.photo === photo);
+  const matches = profile.cvs.filter(cv => cv.language === selectedLanguage && cv.photo === photo && (cv.focus??'general')===focus);
   if (matches.length !== 1) throw new Error(matches.length ? 'PREP_CV_AMBIGUOUS' : 'PREP_CV_UNAVAILABLE');
   return matches[0]!;
 }

@@ -56,11 +56,16 @@ async function main() {
   console.log('CareerPilot paneli: ' + hub.origin + (values.demo ? ' — kurgusal örnek modu' : ' — yerel kayıtlar'));
   console.log('Model ' + (analyze ? 'hazır; her çağrı panelden ayrıca onaylanmalı.' : 'kapalı. İlan kaydı ve analiz içe aktarma ücretsizdir.'));
   console.log('Kaynak araması ' + (sourceSearch ? 'hazır; her arama panelden kriter paylaşımı ve ücretsiz kota onayı ister.' : 'kapalı.'));
+  console.log('Bu terminal açık kaldığı sürece panel çalışır. Durdurmak için Ctrl+C; yeniden açmak için npm start.');
   let closing = false;
   const stop = () => { if (!closing) { closing = true; void hub.close().then(() => mock?.close()).catch(() => { process.exitCode = 1; }); } };
   process.once('SIGINT', stop); process.once('SIGTERM', stop);
 }
 void main().catch(error => {
+  if ((error as NodeJS.ErrnoException).code === 'EADDRINUSE') {
+    console.error('Panel portu kullanımda. Açık CareerPilot terminalini kontrol et; ikinci kopyayı başlatma. Farklı port için npm run hub -- --port 3212 --enable-search --enable-model kullan.');
+    process.exitCode = 1; return;
+  }
   const code = error instanceof Error && /^(HUB|CONFIG|PREP|ASSIST|DISCOVERY)_[A-Z_]+$/.test(error.message) ? error.message : 'HUB_START_FAILED';
   console.error(code + ': Panel açılamadı; profil dosyasını, portu ve seçtiysen model/arama ayarlarını kontrol et.'); process.exitCode = 1;
 });

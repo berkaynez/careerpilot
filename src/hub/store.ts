@@ -1,3 +1,5 @@
+import { discoveryConfigSchema } from '../discovery/core.js';
+import { provenanceSchema, sourceCheckSchema } from '../discovery/quality.js';
 import { randomUUID } from 'node:crypto';
 import { mkdir, chmod, readdir, writeFile, rename, rm } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -16,6 +18,7 @@ export const trackingSchema = z.strictObject({
   context.addIssue({code:'custom',message:'Follow-up precedes application'});});
 export const recordSchema = z.strictObject({
   version: z.literal(1), id: z.uuid(), posting: postingSchema,
+  documentFocus:z.enum(['general','finance']).optional(),
   trashedAt:z.iso.datetime().nullable().default(null), tracking:trackingSchema.nullable().default(null),
   state: stateSchema, createdAt: z.iso.datetime(), updatedAt: z.iso.datetime(),
   analysis: z.strictObject({ job: jobSchema, plan: planSchema,
@@ -23,6 +26,8 @@ export const recordSchema = z.strictObject({
   lastError: z.string().regex(/^[A-Z_]+$/).nullable(),
   discovery: z.strictObject({ sourceKey: z.string().regex(/^(?:(?:lever|greenhouse):[a-z0-9_-]{1,80}|search:(?:linkedin|indeed|kariyer|lever|greenhouse|freehire))$/), externalId: z.string().max(200),
     search: z.strictObject({ provider: z.enum(['serpapi','freehire']).default('serpapi'), originalURL: z.string().max(2000).nullable().default(null), query: z.string().max(400), snippet: z.string().max(3000), dateHint: z.string().max(160).nullable().default(null), verified: z.boolean() }).nullable().default(null),
+    criteria:z.strictObject({roles:discoveryConfigSchema.shape.roles,earlyCareer:discoveryConfigSchema.shape.earlyCareer,keywords:discoveryConfigSchema.shape.keywords,excludedTitles:discoveryConfigSchema.shape.excludedTitles}).optional(),
+    provenance: provenanceSchema.nullable().default(null), sourceCheck: sourceCheckSchema.nullable().default(null),
     discoveredAt: z.iso.datetime(), location: z.string().max(24000), remote: z.boolean(), reasons: z.array(z.string().max(500)).max(10), careerLevel: z.enum(['entry', 'experienced', 'unclear']).default('unclear'), routingConfirmed: z.boolean() }).nullable().default(null),
 });
 export type HubRecord = z.infer<typeof recordSchema>;

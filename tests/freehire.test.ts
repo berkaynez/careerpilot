@@ -9,7 +9,7 @@ import {demoProfile} from '../src/hub/demo.js';
 import {defaultDiscoveryConfig} from '../src/discovery/core.js';
 import {startHub} from '../src/hub/server.js';
 const criteria={scope:'turkey' as const,earlyCareer:true,page:1};
-const row={public_slug:'junior-developer-fictional-123',title:'Junior Software Engineer',company:'Fictional Software',description:'Build fictional software and test interfaces with the team.',countries:['tr'],location:'Istanbul',posted_at:'2026-10-19T10:00:00Z',closed_at:null};
+const row={public_slug:'junior-developer-fictional-123',title:'Junior Software Engineer',company:'Fictional Software',description:'Build fictional software and test interfaces with the team. Implement accessible screens, investigate defects, write meaningful unit tests and review changes with experienced colleagues. This fictional entry role accepts new graduates and provides structured mentoring throughout the first months.',countries:['tr'],location:'Istanbul',posted_at:new Date().toISOString(),closed_at:null};
 const json=(value:unknown)=>new Response(JSON.stringify(value),{headers:{'Content-Type':'application/json'}});
 
 test('FreeHire sends only bounded public filters, caches by page/criteria, and does not follow employer links',async()=>{
@@ -66,7 +66,7 @@ test('broader discovery includes unlabelled roles while applying configured role
   const store=await openHubStore(dir,demoProfile);
   const search=createFreehireSearch(async input=>{const url=new URL(String(input));assert.equal(url.searchParams.has('seniority'),false);assert.deepEqual(url.searchParams.getAll('category'),['security','finance']);return json({data:[
     {...row,public_slug:'fictional-technology-risk',title:'Technology Risk Consultant'},
-    {...row,public_slug:'fictional-senior-audit',title:'IT Audit Consultant',description:'Minimum 5 years of experience required to audit fictional systems.'},
+    {...row,public_slug:'fictional-senior-audit',title:'IT Audit Consultant',description:'Minimum 5 years of experience required to audit fictional systems. '+row.description},
     {...row,public_slug:'fictional-sales',title:'Sales Consultant'},
   ],meta:{total:3}});});
   const result=await search({...criteria,includeUnlabelled:true,categories:['security','finance']},new AbortController().signal);

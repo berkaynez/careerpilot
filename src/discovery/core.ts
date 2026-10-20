@@ -1,10 +1,11 @@
+import {roleTerms} from './role-profiles.js';
 import { careerLevel } from './level.js';
 import { z } from 'zod';
 import { sourceSchema } from './sources.js';
 import type { DiscoveredJob } from './sources.js';
 const terms = z.array(z.string().trim().min(1).max(120)).max(20);
 export const discoveryConfigSchema = z.strictObject({ version: z.literal(1), sources: z.array(sourceSchema).max(20),
-  earlyCareer: z.boolean().default(true), roles: terms.min(1), locations: terms, keywords: terms, excludedTitles: terms,
+  customRoles: terms.optional(), earlyCareer: z.boolean().default(true), roles: terms.min(1), locations: terms, keywords: terms, excludedTitles: terms,
 }).superRefine((value, context) => { const keys = value.sources.map(s => s.provider + ':' + s.board.toLowerCase());
   if (new Set(keys).size !== keys.length) context.addIssue({ code: 'custom', message: 'Duplicate board' }); });
 export type DiscoveryConfig = z.infer<typeof discoveryConfigSchema>;
@@ -18,7 +19,7 @@ export function discoveryReasons(job: DiscoveredJob, config: DiscoveryConfig): s
   const level = careerLevel(job);
   if (config.earlyCareer && level.level === 'experienced') return [];
   if (config.excludedTitles.some(term => contains(job.title, term))) return [];
-  const role = config.roles.find(term => contains(job.title, term)); if (!role) return [];
+  const role = roleTerms(config.roles).find(term => contains(job.title, term)); if (!role) return [];
   const location = config.locations.find(term => contains(job.location + (job.remote ? ' Remote' : ''), term));
   if (config.locations.length && !location) return [];
   const keyword = config.keywords.find(term => contains(job.title + ' ' + job.text, term));
