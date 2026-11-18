@@ -139,10 +139,12 @@ tüm siteler için tamamlanmış başvuru robotu değildir. Geliştirici kontrol
 
 ### Mac’te çift tıklayarak hızlı arama
 
-CareerPilot.app dosyasına çift tıkla. Açılan sayfada pozisyonları, şehri, çalışma
+CareerPilot.app dosyasına çift tıklayınca kayıtlı tercihlerle tarama başlar. Yeni bir arama için pozisyonları, şehri, çalışma
 biçimlerini ve junior tercihini seç, ardından **Ücretsiz ilan ara** düğmesine bas.
-Tercihler aynı tarayıcıda otomatik saklanır. Hızlı arama FreeHire'ın ilk Türkiye
-sayfasını kullanır. Kaynakta deneyim veya çalışma biçimi belirsizse sonuçta
+Tercihler aynı tarayıcıda otomatik saklanır. Hızlı arama altı şirketin resmî Lever ve Greenhouse listelerini ve FreeHire Türkiye
+sayfalarını tarar. FreeHire devam sayfası verdiğinde tarama 30 saniyelik kaynak
+beklemesine uyarak en fazla on sayfa ilerler. Dilediğinde durdurabilirsin.
+Kaynak raporu erişilemeyen listeleri gösterir. Kaynakta deneyim veya çalışma biçimi belirsizse sonuçta
 kontrol etmen gereken alanı gösterir. Başlığa tıklayınca ilan açılır.
 
 Başlatıcı Node'u içerir. API anahtarı, kişisel profil veya CV gerektirmez.

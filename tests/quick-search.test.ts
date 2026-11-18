@@ -19,7 +19,7 @@ test('quick preferences apply role, city, work mode, experience and remote count
 });
 
 test('quick screen restores choices and searches fictional transport only',async t=>{
-  const handle=quickRoutes(async()=>({rows:[row],total:1,examined:1,rejected:0,cached:false}));
+  const handle=quickRoutes(async()=>({rows:[row],total:1,examined:1,rejected:0,cached:false}),async()=>[]);
   let origin='';
   const server=createServer(async(req,res)=>{if(!await handle(req,res,origin))res.writeHead(404).end();});
   await new Promise<void>((resolve,reject)=>server.once('error',reject).listen(0,'127.0.0.1',resolve));
@@ -33,4 +33,26 @@ test('quick screen restores choices and searches fictional transport only',async
   await page.getByRole('button',{name:'Ücretsiz ilan ara'}).click();
   await page.getByRole('link',{name:'Junior Data Analyst'}).waitFor();
   assert.equal(await page.locator('#summary').innerText(),'1 kayıt incelendi · 1 sonuç');
+  await page.goto(origin+'/quick?tara=1');
+  await page.getByRole('link',{name:'Junior Data Analyst'}).waitFor();
+  assert.equal(await page.getByLabel('IT uzmanı').isChecked(),false);
+});
+
+test('public boards retain independent successes and cache scans; foreign remote stays outside TR',async()=>{
+  const {employerFeeds}=await import('../src/quick/boards.js');
+  let calls=0;
+  const read=employerFeeds(async source=>{
+    calls++;
+    if(source.board!=='dreamgames')throw Error('offline');
+    const job={externalId:'x',title:'Junior Software Engineer',text:'A fictional vacancy.',
+      url:'https://example.test/opening',location:'Remote',remote:true,workMode:'remote',country:'TR'};
+    return {jobs:[job,{...job,externalId:'y',country:'US'}],rejected:0};
+  });
+  const [a,b]=await Promise.all([read(),read()]);
+  assert.equal(calls,a.length);
+  assert.deepEqual(a,b);
+  assert.equal(a.filter(source=>source.ok).length,1);
+  const results=filterJobs(a.flatMap(source=>source.rows),defaults);
+  assert.equal(results.length,1);
+  assert.equal(results[0]?.url,'https://example.test/opening');
 });

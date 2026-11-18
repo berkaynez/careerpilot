@@ -9,10 +9,10 @@ export const roleNames = {
   data: 'Veri analisti', support: 'IT uzmanı',
 };
 const aliases = {
-  software: ['software engineer','software developer','developer','yazılım geliştirici','yazılım mühendisi','backend engineer','frontend engineer'],
+  software: ['software engineer','software developer','developer','yazılım geliştirici','yazılım mühendisi','backend engineer','frontend engineer','back end engineer','full stack engineer','fullstack engineer','application engineer'],
   business: ['business analyst','iş analisti','business systems analyst'],
-  data: ['data analyst','veri analisti','data analytics analyst'],
-  support: ['IT specialist','IT support','IT operations','bilgi işlem','bilgi teknolojileri uzmanı','BT uzmanı','uygulama destek','IT uzmanı'],
+  data: ['data analyst','veri analisti','data analytics analyst','data and monetization analyst','analytics specialist'],
+  support: ['IT specialist','IT support','IT operations','bilgi işlem','bilgi teknolojileri uzmanı','BT uzmanı','uygulama destek','IT uzmanı','technical support specialist','systems administrator','system administrator','service desk','help desk','teknik destek uzmanı'],
 };
 export const preferences = z.strictObject({
   roles: z.array(z.enum(['software','business','data','support'])).min(1).max(4),
@@ -22,7 +22,8 @@ export const preferences = z.strictObject({
 export type Preferences = z.infer<typeof preferences>;
 export const defaults: Preferences = {roles:['software','business','data','support'], city:'İstanbul',office:true,hybrid:true,remote:true,junior:true};
 
-export function filterJobs(rows: FreehireRow[], prefs: Preferences) {
+export type SearchRow = FreehireRow & { employerUrl?: string; sourceName?: string };
+export function filterJobs(rows: SearchRow[], prefs: Preferences) {
   const jobs = [];
   const seen = new Set<string>();
   for (const row of rows) {
@@ -40,9 +41,9 @@ export function filterJobs(rows: FreehireRow[], prefs: Preferences) {
     const level = careerLevel({title:row.title,text:row.description??''}).level;
     if (prefs.junior && level==='experienced') continue;
     seen.add(row.public_slug);
-    jobs.push({title:row.title, company:row.company || '', location:row.location || 'Türkiye',
+    jobs.push({role:roleNames[role], source:row.sourceName??'FreeHire', title:row.title, company:row.company || '', location:row.location || 'Türkiye',
       mode:needsMode?'Çalışma biçimini kontrol et':mode, level,
-      url:'https://freehire.me/jobs/'+encodeURIComponent(row.public_slug)});
+      url:row.employerUrl ?? 'https://freehire.me/jobs/'+encodeURIComponent(row.public_slug)});
   }
   return jobs;
 }

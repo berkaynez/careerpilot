@@ -3,8 +3,19 @@ set -eu
 resources="$(dirname "$0")/../Resources"
 url=http://127.0.0.1:3214
 ready() {
-  /usr/bin/curl --noproxy '*' -fsS --max-time 1 "$url/quick-config" 2>/dev/null | /usr/bin/grep -q '"app":"careerpilot-quick-v1"'
+  /usr/bin/curl --noproxy '*' -fsS --max-time 1 "$url/quick-config" 2>/dev/null | /usr/bin/grep -q '"app":"careerpilot-quick-v2"'
 }
+# Replace only the previous quick-search process launched by this exact bundle.
+if /usr/bin/curl --noproxy '*' -fsS --max-time 1 "$url/quick-config" 2>/dev/null | /usr/bin/grep -q '"app":"careerpilot-quick-v1"'; then
+  pid=$(/usr/sbin/lsof -nP -t -iTCP:3214 -sTCP:LISTEN 2>/dev/null || true)
+  case "$pid" in
+    ''|*[!0-9]*) ;;
+    *) if [ "$(/bin/ps -p "$pid" -o command=)" = "$resources/node $resources/desktop.mjs" ]; then
+         kill -TERM "$pid"
+         for delay in 1 2 3 4 5; do kill -0 "$pid" 2>/dev/null || break; sleep 0.2; done
+       fi ;;
+  esac
+fi
 if ! ready; then
   unset NODE_OPTIONS NODE_PATH
   /usr/bin/nohup "$resources/node" "$resources/desktop.mjs" </dev/null >/dev/null 2>&1 &
@@ -14,6 +25,6 @@ if ! ready; then
   done
 fi
 if ready; then
-  exec /usr/bin/open "$url/quick"
+  exec /usr/bin/open "$url/quick?tara=1"
 fi
 /usr/bin/osascript -e 'display alert "CareerPilot açılamadı" message "Yerel arama penceresi başlatılamadı. 3214 numaralı bağlantı noktasını kontrol edin."'

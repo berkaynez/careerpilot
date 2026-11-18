@@ -5,7 +5,7 @@ export const sourceSchema = z.strictObject({ provider: z.enum(['greenhouse', 'le
   board: z.string().trim().regex(/^[a-zA-Z0-9_-]{1,80}$/), company: z.string().trim().min(1).max(120),
   locationFallback: z.string().trim().max(120).optional() });
 export type Source = z.infer<typeof sourceSchema>;
-export interface DiscoveredJob { externalId: string; title: string; text: string; url: string; location: string; remote: boolean; }
+export interface DiscoveredJob { externalId: string; title: string; text: string; url: string; location: string; remote: boolean; country?: string; workMode?: string; }
 export type SourceReader = (source: Source, signal: AbortSignal) => Promise<{ jobs: DiscoveredJob[]; rejected: number }>;
 export const sourceKey = (source: Source) => source.provider + ':' + source.board.toLowerCase();
 export function sourceURL(source: Source) {
@@ -42,7 +42,7 @@ const greenhouseRow = z.object({ id: z.number().int().positive(), title: z.strin
   location: z.object({ name: z.string().max(2000) }), content: z.string().min(20).max(500_000) });
 const leverRow = z.object({ id: z.uuid(), text: z.string().min(1).max(1200), hostedUrl: z.string(),
   categories: z.object({ location: z.string().max(2000).optional(), allLocations: z.array(z.string().max(2000)).max(100).optional() }).optional(),
-  workplaceType: z.string().optional(), descriptionPlain: z.string().max(500_000).optional(), description: z.string().max(500_000).optional(),
+  country: z.string().nullable().optional(), workplaceType: z.string().nullable().optional(), descriptionPlain: z.string().max(500_000).optional(), description: z.string().max(500_000).optional(),
   lists: z.array(z.object({ text: z.string(), content: z.string() })).max(100).optional(), additionalPlain: z.string().max(100_000).optional() });
 function checkedJob(source: Source, externalId: string, title: string, url: string, location: string, text: string, remote: boolean): DiscoveredJob {
   const link = jobLink(url), parsed = new URL(link.url), segments = parsed.pathname.split('/');
@@ -68,7 +68,7 @@ export function createSourceReader(request: typeof fetch = fetch): SourceReader 
         const rows = z.array(z.unknown()).max(100).parse(await getJSON(url.href, signal, request));
         for (const raw of rows) { try { const row = leverRow.parse(raw), location = [row.categories?.location, ...(row.categories?.allLocations ?? [])].filter(Boolean).join(' · ');
           const description = [row.descriptionPlain ?? row.description ?? '', ...(row.lists ?? []).map(list => list.text + ' ' + list.content), row.additionalPlain ?? ''].join('\n');
-          jobs.push(checkedJob(source, row.id, row.text, row.hostedUrl, location, description, row.workplaceType === 'remote' || /\bremote\b/i.test(location)));
+          jobs.push({...checkedJob(source, row.id, row.text, row.hostedUrl, location, description, row.workplaceType === 'remote' || /\bremote\b/i.test(location)), country:row.country??'', workMode:row.workplaceType??''});
         } catch { rejected++; } }
         if (rows.length < 100) return { jobs, rejected };
         if (page === 9) throw new Error('DISCOVERY_PAGE_LIMIT');

@@ -669,3 +669,6 @@ Mac başlatıcısı ve yerel panelde hızlı arama ekranı eklendi. Dört rol, �
 çalışma biçimi ve başlangıç seviyesi tercihleri düzenlenebilir. Anahtarsız
 FreeHire Türkiye sorgusu mevcut okuyucuyu kullanır. Sonraki keşif genişlemesi
 kullanıcı bu sürümü deneyene kadar bekler.
+
+Kullanıcı denemesi sonrası hızlı aramada altı açık işveren listesi, FreeHire devam
+sayfaları, kaynak raporu ve junior/deneyimi belirsiz sonuç grupları eklendi.

@@ -4,8 +4,11 @@ import { createFreehireSearch } from '../discovery/freehire.js';
 import { discoveryCategories } from '../discovery/role-profiles.js';
 import { defaults, filterJobs, preferences, roleNames } from './search.js';
 
+import { employerFeeds } from './boards.js';
+import { jobLink } from '../jobs/links.js';
+
 const files = new Map([['/quick','index.html'],['/quick.js','quick.js'],['/quick.css','quick.css']]);
-export function quickRoutes(search = createFreehireSearch()) {
+export function quickRoutes(search = createFreehireSearch(), boards = employerFeeds()) {
   return async (req: IncomingMessage, res: ServerResponse, origin: string) => {
     const path = new URL(req.url ?? '/',origin).pathname;
     if (!files.has(path) && !['/quick-config','/quick-search'].includes(path)) return false;
@@ -24,7 +27,7 @@ export function quickRoutes(search = createFreehireSearch()) {
     }
     res.setHeader('Content-Type','application/json');
     if (path==='/quick-config' && req.method==='GET') {
-      res.end(JSON.stringify({app:'careerpilot-quick-v1',defaults,roleNames})); return true;
+      res.end(JSON.stringify({app:'careerpilot-quick-v2',defaults,roleNames})); return true;
     }
     if (path!=='/quick-search' || req.method!=='POST') {res.writeHead(405).end(); return true;}
     if (req.headers.origin!==origin || req.headers['content-type']!=='application/json') {res.writeHead(403).end();return true;}
@@ -38,14 +41,26 @@ export function quickRoutes(search = createFreehireSearch()) {
     let prefs;
     try { prefs=preferences.parse(JSON.parse(Buffer.concat(parts).toString())); }
     catch {res.writeHead(400).end(JSON.stringify({error:'Rol, şehir ve çalışma biçimini kontrol et.'}));return true;}
-    try {
-      const result=await search({scope:'turkey',earlyCareer:prefs.junior,page:1,includeUnlabelled:true,
-        categories:prefs.roles.includes('support') ? [] : discoveryCategories(prefs.roles.map(key=>roleNames[key]))},AbortSignal.timeout(25_000));
-      res.end(JSON.stringify({jobs:filterJobs(result.rows,prefs),examined:result.examined,cached:result.cached}));
-    } catch(error) {
-      const wait=error instanceof Error && /COOLDOWN|RATE_LIMITED|BUSY/.test(error.message);
-      res.writeHead(503).end(JSON.stringify({error:wait?'Kaynak bekleme süresi uyguluyor. Biraz sonra tekrar dene.':'FreeHire şu anda okunamadı. Daha sonra yeniden dene.'}));
+    const page=Number(new URL(req.url??'/',origin).searchParams.get('page')??1);
+    if (!Number.isInteger(page)||page<1||page>10) {res.writeHead(400).end();return true;}
+    const [boardResults,free]=await Promise.all([
+      page===1?boards():Promise.resolve([]),
+      search({scope:'turkey',earlyCareer:prefs.junior,page,includeUnlabelled:true,
+        categories:prefs.roles.includes('support')?[]:discoveryCategories(prefs.roles.map(key=>roleNames[key]))},AbortSignal.timeout(25_000))
+        .catch(()=>null),
+    ]);
+    const reports=boardResults.map(({source,examined,ok})=>({source,examined,ok}));
+    reports.push({source:'FreeHire',examined:free?.examined??0,ok:Boolean(free)});
+    const rows=boardResults.flatMap(result=>result.rows);
+    for (const row of free?.rows??[]) {
+      let employerUrl:string|undefined;
+      try { if(row.url) employerUrl=jobLink(row.url).url; } catch { /* Keep the aggregator link. */ }
+      rows.push({...row,...(employerUrl?{employerUrl}:{})});
     }
+    const jobs=filterJobs(rows,prefs);
+    const examined=reports.reduce((sum,item)=>sum+item.examined,0);
+    const more=free && page<10 && page*30<free.total && free.examined===30;
+    res.end(JSON.stringify({jobs,examined,reports,nextPage:more?page+1:null}));
     return true;
   };
 }
