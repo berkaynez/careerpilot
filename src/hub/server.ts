@@ -1,3 +1,4 @@
+import { quickRoutes } from '../quick/routes.js';
 import {runDiscoverySearch} from '../discovery/search-run.js';
 import { createPostingChecker } from '../discovery/check-posting.js';
 import { searchFilterReason } from '../discovery/job-results.js';
@@ -79,6 +80,7 @@ export async function startHub(options: { directory: string; profile: Profile; d
       ...(!current.analysis && current.state==='review' && !current.discovery?.search?.verified && result.job?{posting:{...current.posting,title:result.job.title,text:result.job.text}}:{})}));
   };
   const freehireSearch = options.freehireSearch ?? createFreehireSearch();
+  const quick = quickRoutes(freehireSearch);
   const jobCriteria = (scope: 'turkey' | 'remote') => { const config = discovery.snapshot().config; return { roles: config.roles, locations: scope === 'turkey' ? ['Türkiye','Turkey','Istanbul'] : ['Remote'], mode: 'jobs' as const, earlyCareer: config.earlyCareer }; };
   const answers = assistAnswersSchema.parse(options.answers ?? {});
   let assistant: { jobId: string; session: AssistSession } | null = null;
@@ -123,6 +125,7 @@ export async function startHub(options: { directory: string; profile: Profile; d
       if (request.headers.host !== new URL(origin).host || request.headers.origin && request.headers.origin !== origin
         || request.headers['sec-fetch-site'] === 'cross-site') { json(403, { code: 'HUB_ORIGIN_REJECTED' }); return; }
       const url = new URL(request.url ?? '/', origin), path = url.pathname;
+      if (!options.demo && await quick(request,response,origin)) return;
       const asset = assets.get(path);
       if (asset && request.method === 'GET') { response.writeHead(200, { 'Content-Type': asset.type + '; charset=utf-8' }); response.end(asset.data); return; }
       if (path === '/api/session' && request.method === 'GET') {

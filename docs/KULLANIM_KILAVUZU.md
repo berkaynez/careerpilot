@@ -136,3 +136,16 @@ harcama kayıtlarını sıfırlamak için klasörü silme.
 Bu ilk test sürümüdür. Yerel panel, keşif, analiz, belgeler ve takip çalışır;
 tüm siteler için tamamlanmış başvuru robotu değildir. Geliştirici kontrolleri:
 `npm run check` ve `git diff --check`.
+
+### Mac’te çift tıklayarak hızlı arama
+
+CareerPilot.app dosyasına çift tıkla. Açılan sayfada pozisyonları, şehri, çalışma
+biçimlerini ve junior tercihini seç, ardından **Ücretsiz ilan ara** düğmesine bas.
+Tercihler aynı tarayıcıda otomatik saklanır. Hızlı arama FreeHire'ın ilk Türkiye
+sayfasını kullanır. Kaynakta deneyim veya çalışma biçimi belirsizse sonuçta
+kontrol etmen gereken alanı gösterir. Başlığa tıklayınca ilan açılır.
+
+Başlatıcı Node'u içerir. API anahtarı, kişisel profil veya CV gerektirmez.
+Mevcut panelde aynı ekrana **Hızlı ilan ara** ile ulaşabilirsin.
+Mac geliştirici paketi, Node 22+ ve proje bağımlılıkları kurulu bir Mac'te
+`scripts/build-mac-app.sh /istenen/çıktı` ile o Mac'in mimarisi için oluşturulur.

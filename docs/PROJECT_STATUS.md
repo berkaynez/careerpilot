@@ -663,3 +663,9 @@ odaklanır. Yeni sağlayıcı, tarayıcı kazıyıcı veya ücretli koşu eklenm
 
 Kapanış doğrulaması: TypeScript ve 170 çevrimdışı test yeniden geçti; whitespace
 kontrolü temiz. Ücretli model/arama veya gerçek başvuru gönderimi yapılmadı.
+
+### Tek tıkla arama — 1. adım
+Mac başlatıcısı ve yerel panelde hızlı arama ekranı eklendi. Dört rol, şehir,
+çalışma biçimi ve başlangıç seviyesi tercihleri düzenlenebilir. Anahtarsız
+FreeHire Türkiye sorgusu mevcut okuyucuyu kullanır. Sonraki keşif genişlemesi
+kullanıcı bu sürümü deneyene kadar bekler.

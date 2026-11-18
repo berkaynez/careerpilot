@@ -1,0 +1,6 @@
+:root{color:#18322c;background:#f3f6f4;font:16px/1.5 -apple-system,BlinkMacSystemFont,sans-serif}*{box-sizing:border-box}
+main{max-width:48rem;margin:2rem auto;padding:0 1.25rem}header{font-weight:700;color:#21685e}
+h1{font-size:2.4rem;margin:.5rem 0 1rem}form,li{background:white;border:1px solid #cfdbd6;border-radius:12px;padding:1.4rem}
+fieldset{margin:0 0 1rem;padding:.6rem 0;border:0}legend,.city{font-weight:650}label{display:inline-flex;align-items:center;gap:.4rem;margin:.25rem 1rem .25rem 0}
+.city{display:flex;align-items:flex-start;flex-direction:column;margin-bottom:1.2rem}.city input{padding:.5rem;font:inherit;border:1px solid #8baba2;border-radius:5px}input{accent-color:#21685e}
+button{background:#21685e;color:white;border:0;border-radius:7px;padding:.65rem 1.2rem;font:inherit;cursor:pointer}button:disabled{opacity:.55}#save,li p{color:#485e57}ul{padding:0;list-style:none}li{margin:.6rem 0}a{color:#165a50;font-weight:650}
