@@ -9,3 +9,4 @@ main{max-width:82rem;margin:2.4rem auto;padding:0 4vw}.heading{display:flex;alig
 @media(max-width:760px){main{margin:1rem auto}.workspace{grid-template-columns:1fr}.heading a{display:none}.results{min-height:10rem}}
 
 #jobs .group{font-weight:700;font-size:.9rem;color:#31594e;border:0;background:#eef4f1;padding:.5rem .8rem;border-radius:6px;margin:.8rem 0 .2rem}
+#extra-roles label{display:flex}

@@ -13,6 +13,8 @@ test('early career screening distinguishes explicit minimums, optional qualifica
   assert.equal(careerLevel({ ...job, title: 'Junior Software Engineer', text: 'Minimum 5 years of professional experience required.' }).level, 'experienced');
   assert.equal(careerLevel({ ...job, text: 'At least 3 years of experience is preferred.' }).level, 'unclear');
   assert.equal(careerLevel({ ...job, text: 'At least 2 years of experience.' }).level, 'unclear');
+  for (const text of ['3+ years in a software engineering role.', 'En az 4 yıl yazılım geliştirme deneyimi.']) assert.equal(careerLevel({...job,text}).level,'experienced');
+  assert.equal(careerLevel({...job,text:'0–2 years of experience.'}).level,'entry');
   assert.equal(careerLevel(job).level, 'unclear'); assert.ok(discoveryReasons(job, defaultDiscoveryConfig).some(reason => reason.includes('junior kabul edilmedi')));
   assert.ok(discoveryReasons({ ...job, title: 'Intermediate Software Engineer' }, { ...defaultDiscoveryConfig, earlyCareer: false }).length);
 });

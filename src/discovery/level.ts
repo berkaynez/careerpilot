@@ -7,7 +7,7 @@ export function careerLevel(job: Pick<DiscoveredJob, 'title' | 'text'>): { level
   if (/\b(senior|sr\.?|lead|principal|staff|director|manager|supervisor|head|chief|intermediate|mid[ -]level|distinguished)\b/.test(title)
     || /\b(kidemli|yonetici|mud[uü]r)\b/.test(title))
     return { level: 'experienced', reason: 'Başlıkta başlangıç seviyesinin üzerinde bir rol belirtiliyor.' };
-  const minimum = /(?:(?:at least|minimum(?: of)?|en az)\s+)?(\d{1,2})(?:\s*[-–]\s*\d{1,2})?\s*\+?\s*(?:years?\s+(?:of\s+)?(?:(?:relevant|professional|commercial|working|hands-on)\s+)?experience|yil(?:lik)?\s+(?:deneyim|tecrube))/g;
+  const minimum = /(?:(?:at least|minimum(?: of)?|en az)\s+)?(\d{1,2})(?:\s*[-–]\s*\d{1,2})?\s*\+?\s*(?:years?\s+(?:of\s+)?(?:(?:relevant|professional|commercial|working|hands-on)\s+)?experience|years?\s+(?:in|as|of work in)\s+[a-z]|yil(?:(?:lik|dan)\s+|\s+)(?:(?:is|mesleki|profesyonel|ilgili)\s+)?(?:deneyim|tecrube)|yil\s+(?:[a-z]+\s+){1,5}(?:deneyim|tecrube))/g;
   for (const match of text.matchAll(minimum)) {
     const before=text.slice(0,match.index), after=text.slice(match.index!+match[0].length);
     const prefix=before.slice(Math.max(before.lastIndexOf('.'),before.lastIndexOf(';'),before.lastIndexOf('!'))+1);
@@ -19,5 +19,7 @@ export function careerLevel(job: Pick<DiscoveredJob, 'title' | 'text'>): { level
   }
   if (/\b(junior|jr\.?|new[ -]grad(?:uate)?|entry[ -]level|graduate|trainee|intern)\b/.test(title) || /yeni mezun|uzman yardimcisi/.test(title))
     return { level: 'entry', reason: 'Başlıkta yeni mezun / başlangıç seviyesi ifadesi var; diğer şartlar ayrıca kontrol edilmeli.' };
+  if (/\b(?:0|1)\s*[-–]\s*2\s*(?:years?\s+(?:of\s+)?(?:relevant\s+)?experience|yil(?:lik)?\s+(?:deneyim|tecrube))\b/.test(text))
+    return { level: 'entry', reason: 'Açıklamada 0–2 veya 1–2 yıllık deneyim aralığı belirtiliyor.' };
   return { level: 'unclear', reason: 'Seviye açık değil; deneyim şartları kontrol edilmeli. Bu ilan junior kabul edilmedi.' };
 }

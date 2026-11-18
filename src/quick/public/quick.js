@@ -1,8 +1,8 @@
 const byId = id => document.getElementById(id);
 const form = byId('search');
-const flags = ['office','hybrid','remote','junior'];
+const flags = ['office','hybrid','remote','junior','includeUnclear'];
 const storageKey = 'careerpilot.quick.preferences.v1';
-function roleInputs() { return Array.from(byId('roles').querySelectorAll('input')); }
+function roleInputs() { return Array.from(form.querySelectorAll('#roles input, #extra-roles input')); }
 function selection() {
   return {roles:roleInputs().filter(box=>box.checked).map(box=>box.value),city:byId('city').value.trim(),
     ...Object.fromEntries(flags.map(key=>[key,byId(key).checked]))};
@@ -22,12 +22,12 @@ async function init() {
   try {
     const old=JSON.parse(localStorage.getItem(storageKey));
     if (old && typeof old.city==='string' && old.city.trim() && Array.isArray(old.roles) && old.roles.some(role=>Object.hasOwn(roleNames,role))
-      && flags.every(key=>typeof old[key]==='boolean') && (old.office||old.hybrid||old.remote)) prefs=old;
+      && flags.filter(key=>key!=='includeUnclear').every(key=>typeof old[key]==='boolean') && (old.office||old.hybrid||old.remote)) prefs={...defaults,...old};
   } catch {}
   for (const [key,name] of Object.entries(roleNames)) {
     const label=document.createElement('label'), box=document.createElement('input');
     box.type='checkbox'; box.value=key; box.checked=prefs.roles.includes(key);
-    label.append(box,' '+name); byId('roles').append(label);
+    label.append(box,' '+name); byId(defaults.roles.includes(key)?'roles':'extra-roles').append(label);
   }
   byId('city').value=prefs.city;
   for(const key of flags) byId(key).checked=prefs[key];
@@ -51,7 +51,8 @@ function showJobs(jobs) {
     link.href=row.url;link.target='_blank';link.rel='noopener noreferrer';link.textContent=row.title;
     detail.textContent=[row.location,({onsite:'Ofisten',hybrid:'Hibrit',remote:'Uzaktan'})[row.mode]||row.mode].filter(Boolean).join(' · ');
     meta.textContent=[row.role,row.level==='entry'?'Başlangıç seviyesi':row.level==='experienced'?'Deneyimli':'Deneyim şartını kontrol et',row.source].join(' · ');
-    li.append(company,link,detail,meta);list.append(li);
+    li.append(company,link,detail,meta);
+    list.append(li);
   }
 }
 let active;

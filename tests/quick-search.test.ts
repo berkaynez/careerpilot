@@ -16,6 +16,10 @@ test('quick preferences apply role, city, work mode, experience and remote count
   assert.deepEqual(filterJobs(candidates,defaults).map(job=>job.title),[row.title,row.title]);
   assert.deepEqual(filterJobs(candidates,{...defaults,remote:false}).map(job=>job.url),['https://freehire.me/jobs/fictional-analyst']);
   assert.equal(filterJobs(candidates,{...defaults,roles:['support']}).length,0);
+  const unclear={...row,title:'Data Analyst'};
+  assert.equal(filterJobs([unclear],defaults).length,0);
+  assert.equal(filterJobs([unclear],{...defaults,includeUnclear:true}).length,1);
+  assert.equal(filterJobs([{...row,title:'Junior Financial Analyst'}],{...defaults,roles:['finance']}).length,1);
 });
 
 test('quick screen restores choices and searches fictional transport only',async t=>{

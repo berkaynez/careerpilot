@@ -1,7 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { createFreehireSearch } from '../discovery/freehire.js';
-import { discoveryCategories } from '../discovery/role-profiles.js';
 import { defaults, filterJobs, preferences, roleNames } from './search.js';
 
 import { employerFeeds } from './boards.js';
@@ -27,7 +26,7 @@ export function quickRoutes(search = createFreehireSearch(), boards = employerFe
     }
     res.setHeader('Content-Type','application/json');
     if (path==='/quick-config' && req.method==='GET') {
-      res.end(JSON.stringify({app:'careerpilot-quick-v2',defaults,roleNames})); return true;
+      res.end(JSON.stringify({app:'careerpilot-quick-v3',defaults,roleNames})); return true;
     }
     if (path!=='/quick-search' || req.method!=='POST') {res.writeHead(405).end(); return true;}
     if (req.headers.origin!==origin || req.headers['content-type']!=='application/json') {res.writeHead(403).end();return true;}
@@ -46,7 +45,7 @@ export function quickRoutes(search = createFreehireSearch(), boards = employerFe
     const [boardResults,free]=await Promise.all([
       page===1?boards():Promise.resolve([]),
       search({scope:'turkey',earlyCareer:prefs.junior,page,includeUnlabelled:true,
-        categories:prefs.roles.includes('support')?[]:discoveryCategories(prefs.roles.map(key=>roleNames[key]))},AbortSignal.timeout(25_000))
+        categories:[]},AbortSignal.timeout(25_000))
         .catch(()=>null),
     ]);
     const reports=boardResults.map(({source,examined,ok})=>({source,examined,ok}));

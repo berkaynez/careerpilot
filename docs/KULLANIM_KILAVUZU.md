@@ -151,3 +151,7 @@ Başlatıcı Node'u içerir. API anahtarı, kişisel profil veya CV gerektirmez.
 Mevcut panelde aynı ekrana **Hızlı ilan ara** ile ulaşabilirsin.
 Mac geliştirici paketi, Node 22+ ve proje bağımlılıkları kurulu bir Mac'te
 `scripts/build-mac-app.sh /istenen/çıktı` ile o Mac'in mimarisi için oluşturulur.
+
+Junior filtresi açıkken deneyimi belirsiz ilanlar gizlenir. Bu sonuçları
+incelemek için **Deneyimi belirsiz ilanları da göster** kutusunu işaretle.
+**Diğer roller** bölümünden arama kapsamını genişletebilirsin.
