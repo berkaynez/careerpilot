@@ -7,7 +7,7 @@ import { employerFeeds } from './boards.js';
 import { jobLink } from '../jobs/links.js';
 
 const files = new Map([['/quick','index.html'],['/quick.js','quick.js'],['/quick.css','quick.css']]);
-export function quickRoutes(search = createFreehireSearch(), boards = employerFeeds()) {
+export function quickRoutes(search = createFreehireSearch(), boards = employerFeeds(), panel?: string) {
   return async (req: IncomingMessage, res: ServerResponse, origin: string) => {
     const path = new URL(req.url ?? '/',origin).pathname;
     if (!files.has(path) && !['/quick-config','/quick-search'].includes(path)) return false;
@@ -26,7 +26,7 @@ export function quickRoutes(search = createFreehireSearch(), boards = employerFe
     }
     res.setHeader('Content-Type','application/json');
     if (path==='/quick-config' && req.method==='GET') {
-      res.end(JSON.stringify({app:'careerpilot-quick-v3',defaults,roleNames})); return true;
+      res.end(JSON.stringify({app:'careerpilot-quick-v4',defaults,roleNames,panel:panel??'/'})); return true;
     }
     if (path!=='/quick-search' || req.method!=='POST') {res.writeHead(405).end(); return true;}
     if (req.headers.origin!==origin || req.headers['content-type']!=='application/json') {res.writeHead(403).end();return true;}

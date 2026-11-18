@@ -1,0 +1,27 @@
+#!/bin/sh
+set -eu
+resources="$(dirname "$0")/../Resources"
+url=http://127.0.0.1:3211
+health() {
+  /usr/bin/curl --noproxy '*' -fsS --max-time 1 "$url/api/session" 2>/dev/null |
+    /usr/bin/grep -q '"applicationDrafts":true'
+}
+if health; then exec /usr/bin/open "$url/"; fi
+if /usr/bin/curl --noproxy '*' -sS --max-time 1 "$url/" >/dev/null 2>&1; then
+  /usr/bin/osascript -e 'display alert "Önce eski CareerPilot panelini kapat" message "3211 numaralı bağlantı noktasında başka bir panel açık. Kapatınca bu uygulamayı yeniden aç."'
+  exit 1
+fi
+directory=$(/usr/bin/osascript -e 'POSIX path of (choose folder with prompt "Mevcut CareerPilot proje klasörünü seç.")') || exit 0
+mode=$(/usr/bin/osascript -e 'button returned of (display dialog "İlan için profil bilgilerini panelde seçebilirsin. Önceden yapılandırdıysan model analizi de öneri sunabilir." buttons {"İptal", "Modeli etkinleştir", "Yerel aç"} default button "Yerel aç" cancel button "İptal")') || exit 0
+cd "$directory"
+unset NODE_OPTIONS NODE_PATH
+set -- --port 3211
+if [ "$mode" = "Modeli etkinleştir" ]; then set -- "$@" --enable-model; fi
+/usr/bin/nohup "$resources/node" --import "$resources/panel/node_modules/tsx/dist/loader.mjs"   "$resources/panel/src/hub/cli.ts" "$@" </dev/null >/dev/null 2>&1 &
+pid=$!
+for attempt in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+  if health; then exec /usr/bin/open "$url/"; fi
+  kill -0 "$pid" 2>/dev/null || break
+  sleep 0.25
+done
+/usr/bin/osascript -e 'display alert "CareerPilot Panel açılamadı" message "Profilinin bulunduğu proje klasörünü seçtiğini kontrol et. Model ayarları eksikse Yerel aç seçeneğini kullan."'

@@ -17,3 +17,18 @@ codesign --force --sign - "$stage/CareerPilot.app"
 codesign --verify --strict "$stage/CareerPilot.app"
 mkdir -p "$dest"
 ditto "$stage/CareerPilot.app" "$dest/CareerPilot.app"
+
+panel="$stage/CareerPilot Panel.app/Contents"
+mkdir -p "$panel/MacOS" "$panel/Resources/panel/node_modules"
+cp "$app/Resources/node" "$panel/Resources/node"
+cp package.json "$panel/Resources/panel/"
+cp -R src "$panel/Resources/panel/"
+for name in tsx esbuild @esbuild playwright playwright-core zod; do
+  cp -R "node_modules/$name" "$panel/Resources/panel/node_modules/"
+done
+cp scripts/mac-panel-launch "$panel/MacOS/CareerPilot"
+sed -e 's/local.careerpilot.search/local.careerpilot.panel/' -e 's/<string>CareerPilot<\/string>$/<string>CareerPilot Panel<\/string>/'   scripts/mac-info.plist > "$panel/Info.plist"
+/usr/libexec/PlistBuddy -c 'Set :CFBundleExecutable CareerPilot' "$panel/Info.plist"
+codesign --force --sign - "$stage/CareerPilot Panel.app"
+codesign --verify --strict "$stage/CareerPilot Panel.app"
+ditto "$stage/CareerPilot Panel.app" "$dest/CareerPilot Panel.app"

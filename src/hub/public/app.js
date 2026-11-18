@@ -58,6 +58,7 @@ const errors = {
   JOB_PLATFORM_UNSUPPORTED: 'Bu sitede otomatik doldurma henüz hazır değil. İlanı açıp elle devam edebilirsin.',
   HUB_INPUT_INVALID: 'Bilgileri kontrol et. Bağlantı https ile başlamalı; ilan metni en az 20 karakter olmalı.',
   HUB_SESSION_REQUIRED: 'Oturum yenilenmeli. Sayfayı yeniden açıp tekrar dene.',
+  PREP_DRAFT_EVIDENCE_REQUIRED:'Taslağa eklemek için kayıtlı profilinden en az bir bilgi seç.',
   HUB_ANALYSIS_REQUIRED: 'Bu ilan için önce bir analiz oluştur veya hazır analizi içe aktar.',
   HUB_ANALYSIS_BUSY: 'Bir analiz zaten çalışıyor. Tamamlandığında yeniden deneyebilirsin.',
   HUB_MODEL_NOT_ENABLED: 'Model bu oturumda etkin değil. Hazır bir analizi içe aktarabilirsin.',
@@ -204,7 +205,10 @@ async function showDetail(id) {
   for(const value of record.availableDocumentFocus||['general'])focus.append(new Option(value==='finance'?'Finans / işletme':'Genel / teknoloji',value));focus.value=record.documentFocus||'general';focus.disabled=record.analyzing||record.assistantActive;
   focus.addEventListener('change',async()=>{focus.disabled=true;try{await api('/api/jobs/'+id+'/document-focus',{focus:focus.value});await refresh(id);notify('Bu ilanın CV ve ön yazı türü kaydedildi.');}catch(error){notify(error.message,true);focus.disabled=false;}});
   const focusLabel=node('label','','CV ve ön yazı türü');focusLabel.append(focus);cvBox.append(focusLabel);
-  cvBox.append(downloadCV,preview);pane.append(cvBox);
+  const draft=node('button','primary','İlana özel CV ve ön yazı hazırla');
+  draft.disabled=Boolean(record.discovery && (!record.discovery.routingConfirmed || record.discovery.search && !record.discovery.search.verified));
+  draft.addEventListener('click',()=>openApplicationDraft(record,draft));
+  cvBox.append(draft,downloadCV,preview);pane.append(cvBox);
   const tracking = node('section', 'tracking'); tracking.append(node('h3', '', 'Başvuru durumun'));
   const select = node('select'); select.setAttribute('aria-label', 'Başvuru durumunu değiştir');
   for (const [value, label] of Object.entries(states)) { const option = node('option', '', label); option.value = value; select.append(option); } select.value = record.state;
@@ -343,7 +347,75 @@ formHandler('#analyze-form', async form => {
   const result = await api('/api/jobs/' + id + '/analyze', { paidCallApproved: $('#paid-consent').checked, cloudProfileApproved: $('#profile-consent').checked });
   form.closest('dialog').close(); form.reset(); await refresh(result.id); notify('Analiz hazır. İlan şartlarını ve dayanakları gözden geçir.');
 });
-(async () => { try { session = await api('/api/session'); $('#quick-open').hidden=session.demo; $('#mode').textContent = session.demo ? 'ÖRNEK MOD · Kurgusal aday ve ilanlar. Gerçek başvuru veya ücretli model çağrısı yok.' : 'YEREL ÇALIŞMA ALANI · ' + session.profile.facts + ' mesleki bilgi, ' + session.profile.cvs + ' CV kayıtlı. Model ' + (session.modelEnabled ? 'onayla kullanılabilir.' : 'kapalı.'); await refresh(); } catch (error) { notify(error.message, true); $('#jobs').replaceChildren(node('p', 'empty', 'Kayıtlar yüklenemedi. Panel bağlantısını kontrol edip sayfayı yenile.')); } })();
+(async () => { try { session = await api('/api/session'); $('#quick-open').hidden=session.demo; $('#mode').textContent = session.demo ? 'ÖRNEK MOD · Kurgusal aday ve ilanlar. Gerçek başvuru veya ücretli model çağrısı yok.' : 'YEREL ÇALIŞMA ALANI · ' + session.profile.facts + ' mesleki bilgi, ' + session.profile.cvs + ' CV kayıtlı. Model ' + (session.modelEnabled ? 'onayla kullanılabilir.' : 'kapalı.'); await refresh(); prefillPosting(); } catch (error) { notify(error.message, true); $('#jobs').replaceChildren(node('p', 'empty', 'Kayıtlar yüklenemedi. Panel bağlantısını kontrol edip sayfayı yenile.')); } })();
+
+async function openApplicationDraft(record, button) {
+  button.disabled=true;
+  try {
+    const endpoint='/api/jobs/'+record.id+'/application-draft';
+    const {facts}=await api(endpoint);
+    const dialog=$('#draft-dialog'), list=$('#draft-facts'), review=$('#draft-review');
+    const form=$('#draft-form');
+    list.replaceChildren();review.replaceChildren();$('#draft-generate').hidden=false;
+    for (const fact of facts) {
+      const label=node('label','check'), checkbox=node('input');
+      checkbox.type='checkbox';checkbox.value=fact.id;checkbox.checked=fact.selected;
+      label.append(checkbox,document.createTextNode(fact.text));list.append(label);
+    }
+    $('#draft-intro').textContent=facts.some(fact=>fact.selected)
+      ? 'İlan analizinden önerilen profil bilgilerini kontrol et.'
+      : 'İlanla ilgili kayıtlı deneyim ve proje bilgilerini seç.';
+    form.onsubmit=async event=>{
+      event.preventDefault();
+      const generate=$('#draft-generate'), status=form.querySelector('.form-error');
+      const ids=Array.from(list.querySelectorAll('input:checked'),input=>input.value);
+      if (!ids.length || ids.length>20) {status.textContent='1 ile 20 arasında profil bilgisi seç.';return;}
+      status.textContent='';generate.disabled=true;
+      try {
+        const result=await api(endpoint,{ids});
+        if (!dialog.open) return;
+        review.replaceChildren();
+        for (const [key,title,filename] of [['cv','CV taslağı','CV_Taslak.txt'],['letter','Ön yazı','On_Yazi.txt']]) {
+          const label=node('label','',title), editor=node('textarea');editor.rows=10;editor.value=result[key];
+          label.append(editor);
+          const download=node('button','secondary',title+' indir');
+          download.type='button';
+          download.addEventListener('click',()=>downloadLocalFile(new Blob([editor.value],{type:'text/plain;charset=utf-8'}),filename));
+          review.append(label,download);
+        }
+        if (record.assistant.available && !record.assistant.occupiedByOther && !record.assistant.session && !record.assistant.opening) {
+          const start=node('button','primary','Taslağı inceledim, form yardımcısını aç');
+          start.type='button';
+          start.addEventListener('click',()=>{dialog.close();assistantConsent(record);});
+          review.append(start);
+        } else {
+          const open=node('a','secondary','İlana git');
+          open.href=record.posting.sourceUrl;open.target='_blank';open.rel='noopener noreferrer';review.append(open);
+        }
+        review.scrollIntoView({block:'nearest'});
+      } catch(error){status.textContent=error.message;}
+      finally {generate.disabled=false;}
+    };
+    openDialog('#draft-dialog');
+  } catch(error){notify(error.message,true);}
+  finally{button.disabled=false;}
+}
+
+function prefillPosting() {
+  const hash=location.hash;
+  if (!hash.startsWith('#ilan=') || hash.length>310000) return;
+  history.replaceState(null,'',location.pathname+location.search);
+  try {
+    const job=JSON.parse(decodeURIComponent(hash.slice(6)));
+    if (!job || !['company','title','sourceUrl','text'].every(key=>typeof job[key]==='string')) throw new Error();
+    const existing=records.find(record=>record.sourceUrl===job.sourceUrl);
+    if (existing) {resetFilters();void refresh(existing.id);return;}
+    const form=$('#new-form');
+    for (const key of ['company','title','sourceUrl','text']) form.elements.namedItem(key).value=job[key];
+    form.elements.namedItem('language').selectedIndex=-1;
+    openDialog('#new-dialog');
+  } catch {notify('İlan bilgileri açılamadı.',true);}
+}
 
 function renderDiscovery(record, pane) {
   if (!record.discovery) return;

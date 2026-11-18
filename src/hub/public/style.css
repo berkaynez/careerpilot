@@ -613,3 +613,6 @@ font-size:12px}
 
 .cleanup-actions { display:flex; flex-wrap:wrap; gap:8px; margin:12px 0; }
 .tracking form { display:grid; gap:12px; }
+#draft-facts{max-height:16rem;overflow:auto;margin:0 0 1rem;padding:.75rem;border:1px solid var(--border);border-radius:8px}
+#draft-review:not(:empty){display:grid;gap:.8rem;margin-top:1.2rem}
+#draft-review textarea{width:100%}

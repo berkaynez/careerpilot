@@ -50,7 +50,7 @@ export function filterJobs(rows: SearchRow[], prefs: Preferences) {
     const level = careerLevel({title:row.title,text:row.description??''}).level;
     if (prefs.junior && (level==='experienced' || level==='unclear' && !prefs.includeUnclear)) continue;
     seen.add(row.public_slug);
-    jobs.push({role:roleNames[role], source:row.sourceName??'FreeHire', title:row.title, company:row.company || '', location:row.location || 'Türkiye',
+    jobs.push({role:roleNames[role], source:row.sourceName??'FreeHire', title:row.title, company:row.company || '', description:row.description??'', location:row.location || 'Türkiye',
       mode:needsMode?'Çalışma biçimini kontrol et':mode, level,
       url:row.employerUrl ?? 'https://freehire.me/jobs/'+encodeURIComponent(row.public_slug)});
   }

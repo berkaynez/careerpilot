@@ -672,3 +672,9 @@ kullanıcı bu sürümü deneyene kadar bekler.
 
 Kullanıcı denemesi sonrası hızlı aramada altı açık işveren listesi, FreeHire devam
 sayfaları, kaynak raporu ve junior/deneyimi belirsiz sonuç grupları eklendi.
+
+### İlan kartından başvuru taslağı
+Hızlı aramadan tam panele ilan metni aktarımı, mevcut profil dayanaklarından
+düzenlenebilir CV ve ön yazı taslakları, ayrı alıcı onayı ile form yardımına
+geçiş ve Lever başvuru formunu doğrudan açma eklendi. Mac Panel başlatıcısı
+kullanıcının seçtiği proje klasöründen mevcut paneli çalıştırır.

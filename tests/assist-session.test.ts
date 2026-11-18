@@ -123,3 +123,37 @@ test('hub buttons start one session, fill through the shared engine and hand off
   await request(endpoint, { action: 'close' });
   const logs = await readdir(join(app.directory, 'hub', 'assist-reviews'));assert.equal(logs.length, 1);
 });
+
+test('a fictional posting opens in review, generates factual drafts and reaches guarded form fill', async t => {
+  const app=await fixture(t);
+  const hub=await startHub({directory:join(app.directory,'hub','jobs'),profile:demoProfile,
+    demo:true,demoFormUrl:app.url,launchAssistantBrowser:()=>chromium.launch({headless:true})});
+  t.after(()=>hub.close());
+  const browser=await chromium.launch();t.after(()=>browser.close());
+  const page=await browser.newPage();
+  const posting={company:'Fictional Studio',title:'Junior Developer',sourceUrl:'https://example.invalid/job',
+    text:'A fictional posting for reviewing a tailored draft.'};
+  await page.goto(hub.origin+'/#ilan='+encodeURIComponent(JSON.stringify(posting)));
+  const intake=page.locator('#new-dialog');
+  await intake.waitFor({state:'visible'});
+  assert.equal(await intake.locator('[name=title]').inputValue(),posting.title);
+  assert.equal(await intake.locator('[name=language]').inputValue(),'');
+  await intake.locator('[name=language]').selectOption('en');
+  await intake.getByRole('button',{name:'İlanı kaydet'}).click();
+  await page.getByRole('button',{name:'İlana özel CV ve ön yazı hazırla'}).click();
+  const draft=page.locator('#draft-dialog');
+  await draft.locator('input[value=degree]').check();
+  await draft.getByRole('button',{name:'CV ve ön yazı oluştur'}).click();
+  const cv=await draft.getByRole('textbox',{name:'CV taslağı',exact:true}).inputValue();
+  const letter=await draft.getByRole('textbox',{name:'Ön yazı',exact:true}).inputValue();
+  const statement=demoProfile.facts.find(fact=>fact.id==='degree')!.text.en;
+  assert.ok(cv.includes(statement));assert.ok(letter.includes(statement));assert.ok(letter.includes(posting.company));
+  assert.ok(!cv.includes(posting.title));
+  await draft.getByRole('button',{name:'Taslağı inceledim, form yardımcısını aç'}).click();
+  const consent=page.locator('#assistant-dialog');
+  await consent.locator('#assistant-consent').check();
+  await consent.getByRole('button',{name:'Onayla ve aç'}).click();
+  await page.getByRole('button',{name:'Boş alanları doldur'}).click();
+  await page.getByText(/Son doldurma: 3 alan dolduruldu/).waitFor();
+  assert.equal(app.writes(),0);
+});

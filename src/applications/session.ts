@@ -3,6 +3,7 @@ import type { Browser } from 'playwright';
 import { randomUUID } from 'node:crypto';
 import { mkdir, chmod, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { leverUrls } from '../lever/form.js';
 import { jobLink } from '../jobs/links.js';
 import { profileSchema } from '../preparation/core.js';
 import type { Profile } from '../preparation/core.js';
@@ -25,7 +26,8 @@ export async function openAssistSession(input: { url: string; profile: Profile; 
   launch: () => Promise<Browser> = () => chromium.launch({ headless: false })) {
   if (!input.contactApproved) throw new Error('ASSIST_CONTACT_CONSENT_REQUIRED');
   const profile = profileSchema.parse(input.profile), answers = assistAnswersSchema.parse(input.answers);
-  const target = input.demoUrl ? localDemoURL(input.demoUrl) : jobLink(input.url).url;
+  const link = input.demoUrl ? null : jobLink(input.url);
+  const target = link ? (link.platform==='lever' ? leverUrls(link.url).apply : link.url) : localDemoURL(input.demoUrl!);
   const initialOrigin = new URL(target).origin;
   await mkdir(input.directory, { recursive: true, mode: 0o700 }); await chmod(input.directory, 0o700);
   const browser = await launch();

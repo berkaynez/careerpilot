@@ -1,3 +1,4 @@
+import { applicationDraft } from '../preparation/application-draft.js';
 import { quickRoutes } from '../quick/routes.js';
 import {runDiscoverySearch} from '../discovery/search-run.js';
 import { createPostingChecker } from '../discovery/check-posting.js';
@@ -97,7 +98,7 @@ export async function startHub(options: { directory: string; profile: Profile; d
       session: assistant?.jobId === record.id ? snapshot : null };
   };
   const summaries = (record: HubRecord) => ({ documentFocus:record.documentFocus??'general', quality:qualityFor(record), relatedJobs:relatedJobs(record,store.list()), possibleDuplicate:relatedJobs(record,store.list())[0] ?? null, id: record.id, company: record.posting.company, title: record.posting.title, tracking:record.tracking,
-    country: record.posting.country, state: record.state, updatedAt: record.updatedAt, analyzing: busy.has(record.id),
+    country: record.posting.country, sourceUrl: record.posting.sourceUrl, state: record.state, updatedAt: record.updatedAt, analyzing: busy.has(record.id),
     discovery: record.discovery ? { ...record.discovery, careerLevel: careerLevel(record.posting).level, levelReason: careerLevel(record.posting).reason } : null,
     score: record.analysis ? buildMatchAnalysis(profile, record.analysis.job, record.analysis.plan).score : null,
     analysisOrigin: record.analysis?.origin ?? null, lastError: record.lastError,
@@ -129,7 +130,7 @@ export async function startHub(options: { directory: string; profile: Profile; d
       const asset = assets.get(path);
       if (asset && request.method === 'GET') { response.writeHead(200, { 'Content-Type': asset.type + '; charset=utf-8' }); response.end(asset.data); return; }
       if (path === '/api/session' && request.method === 'GET') {
-        json(200, { token, demo: options.demo === true, modelEnabled: Boolean(options.analyze), model: options.modelInfo ?? null,
+        json(200, { token, applicationDrafts:true, demo: options.demo === true, modelEnabled: Boolean(options.analyze), model: options.modelInfo ?? null,
           assistantDefaults: { firstName: answers.firstName ?? '', lastName: answers.lastName ?? '' },
           profile: { facts: profile.facts.length, cvs: profile.cvs.length, documentFocus:[...new Set(profile.cvs.map(cv=>cv.focus??'general'))] } }); return;
       }
@@ -242,7 +243,7 @@ export async function startHub(options: { directory: string; profile: Profile; d
           analysis: { job, plan, origin: 'imported_review', at: now, costMicroUsd: null }, lastError: null });
         json(201, detail(record)); return;
       }
-      const match = /^\/api\/jobs\/([a-f0-9-]{36})(?:\/(status|analyze|assistant|routing|verify-posting|tracking|remove|restore|documents|cv|check-source|document-focus))?$/.exec(path);
+      const match = /^\/api\/jobs\/([a-f0-9-]{36})(?:\/(status|analyze|assistant|routing|verify-posting|tracking|remove|restore|documents|application-draft|cv|check-source|document-focus))?$/.exec(path);
       if (!match) { json(404, { code: 'HUB_NOT_FOUND' }); return; }
       const id = z.uuid().parse(match[1]), action = match[2];
       if(action==='restore' && request.method==='POST') {
@@ -268,6 +269,30 @@ export async function startHub(options: { directory: string; profile: Profile; d
         z.strictObject({}).parse(await body(request));
         if(busy.size || jobSearchBusy || opening || assistant && assistant.session.snapshot().status!=='closed')throw new Error('HUB_RECORD_BUSY');
         json(200,await store.trash(id));return;
+      }
+      if (action==='application-draft' && ['GET','POST'].includes(request.method??'')) {
+        if (record.discovery && (!record.discovery.routingConfirmed || record.discovery.search && !record.discovery.search.verified)) {
+          json(409,{code:'HUB_ROUTING_REQUIRED'});return;
+        }
+        if (request.method==='GET') {
+          const analysis=record.analysis, selected=new Set<string>();
+          if (analysis) {
+            const weights={essential:3,preferred:1,responsibility:0};
+            const priorities=new Map(analysis.job.requirements.map(item=>[item.id,weights[item.priority]]));
+            const scores=new Map(profile.facts.map(fact=>[fact.id,0]));
+            for (const item of analysis.plan.assessments) for (const id of item.factIds) {
+              scores.set(id,scores.get(id)!+(priorities.get(item.requirementId)??0)*(item.evidenceLevel==='documented'?2:1));
+            }
+            for (const [id,score] of [...scores].sort((a,b)=>b[1]-a[1])) {
+              if (score>0 && selected.size<10) selected.add(id);
+            }
+          }
+          const language=record.posting.documentLanguage??record.posting.language;
+          const facts=profile.facts.map(fact=>({id:fact.id,text:fact.text[language],selected:selected.has(fact.id)}));
+          json(200,{facts});return;
+        }
+        const {ids}=z.strictObject({ids:z.array(z.string()).min(1).max(20)}).parse(await body(request));
+        json(200,applicationDraft(profile,record.posting,ids));return;
       }
       if((action==='documents' || action==='cv') && request.method==='GET') {
         if(record.discovery && (!record.discovery.routingConfirmed || record.discovery.search && !record.discovery.search.verified)) {json(409,{code:'HUB_ROUTING_REQUIRED'});return;}

@@ -10,3 +10,5 @@ main{max-width:82rem;margin:2.4rem auto;padding:0 4vw}.heading{display:flex;alig
 
 #jobs .group{font-weight:700;font-size:.9rem;color:#31594e;border:0;background:#eef4f1;padding:.5rem .8rem;border-radius:6px;margin:.8rem 0 .2rem}
 #extra-roles label{display:flex}
+
+#jobs .prepare{font-size:.9rem;justify-self:start;margin-top:.35rem;padding:.35rem .7rem;background:#edf4f1;border-radius:6px}

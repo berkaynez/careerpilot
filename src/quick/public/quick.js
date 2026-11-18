@@ -1,6 +1,7 @@
 const byId = id => document.getElementById(id);
 const form = byId('search');
 const flags = ['office','hybrid','remote','junior','includeUnclear'];
+let panelUrl='/';
 const storageKey = 'careerpilot.quick.preferences.v1';
 function roleInputs() { return Array.from(form.querySelectorAll('#roles input, #extra-roles input')); }
 function selection() {
@@ -17,7 +18,9 @@ function save() {
   return true;
 }
 async function init() {
-  const {defaults,roleNames}=await (await fetch('/quick-config')).json();
+  const {defaults,roleNames,panel}=await (await fetch('/quick-config')).json();
+  panelUrl=panel;
+  byId('panel-hint').hidden=panel==='/';
   let prefs=defaults;
   try {
     const old=JSON.parse(localStorage.getItem(storageKey));
@@ -52,6 +55,15 @@ function showJobs(jobs) {
     detail.textContent=[row.location,({onsite:'Ofisten',hybrid:'Hibrit',remote:'Uzaktan'})[row.mode]||row.mode].filter(Boolean).join(' · ');
     meta.textContent=[row.role,row.level==='entry'?'Başlangıç seviyesi':row.level==='experienced'?'Deneyimli':'Deneyim şartını kontrol et',row.source].join(' · ');
     li.append(company,link,detail,meta);
+    if (row.description.trim().length>=20) {
+      const prepare=document.createElement('a');
+      prepare.className='prepare';
+      prepare.textContent='Başvuru taslağı hazırla';
+      const posting={company:row.company,title:row.title,sourceUrl:row.url,text:row.description.slice(0,24000)};
+      prepare.href=panelUrl+'#ilan='+encodeURIComponent(JSON.stringify(posting));
+      prepare.target='_blank';prepare.rel='noopener noreferrer';
+      li.append(prepare);
+    }
     list.append(li);
   }
 }

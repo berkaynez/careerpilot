@@ -3,10 +3,10 @@ set -eu
 resources="$(dirname "$0")/../Resources"
 url=http://127.0.0.1:3214
 ready() {
-  /usr/bin/curl --noproxy '*' -fsS --max-time 1 "$url/quick-config" 2>/dev/null | /usr/bin/grep -q '"app":"careerpilot-quick-v3"'
+  /usr/bin/curl --noproxy '*' -fsS --max-time 1 "$url/quick-config" 2>/dev/null | /usr/bin/grep -q '"app":"careerpilot-quick-v4"'
 }
 # Replace only the previous quick-search process launched by this exact bundle.
-if /usr/bin/curl --noproxy '*' -fsS --max-time 1 "$url/quick-config" 2>/dev/null | /usr/bin/grep -Eq '"app":"careerpilot-quick-v[12]"'; then
+if /usr/bin/curl --noproxy '*' -fsS --max-time 1 "$url/quick-config" 2>/dev/null | /usr/bin/grep -Eq '"app":"careerpilot-quick-v[123]"'; then
   pid=$(/usr/sbin/lsof -nP -t -iTCP:3214 -sTCP:LISTEN 2>/dev/null || true)
   case "$pid" in
     ''|*[!0-9]*) ;;

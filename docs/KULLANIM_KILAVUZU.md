@@ -155,3 +155,17 @@ Mac geliştirici paketi, Node 22+ ve proje bağımlılıkları kurulu bir Mac'te
 Junior filtresi açıkken deneyimi belirsiz ilanlar gizlenir. Bu sonuçları
 incelemek için **Deneyimi belirsiz ilanları da göster** kutusunu işaretle.
 **Diğer roller** bölümünden arama kapsamını genişletebilirsin.
+
+### İlan kartından başvuru taslağına
+
+**CareerPilot Panel.app** dosyasını aç ve mevcut CareerPilot proje klasörünü
+seç. **Yerel aç** ile model anahtarı olmadan belge hazırlayabilirsin. Modeli
+etkinleştirirsen mevcut izin ve bütçe kontrolleri analiz sırasında uygulanır.
+
+Hızlı aramada **Başvuru taslağı hazırla** ile ilan bilgilerini tam panele taşı.
+İlanı ve dilini kontrol edip kaydet. Sonra **İlana özel CV ve ön yazı hazırla**
+düğmesine bas. Analiz varsa önerilen profil bilgileri işaretli gelir. Yerel
+modda bilgileri kendin seçebilirsin. İki taslağı incele, düzenle ve metin
+dosyası olarak indir. Uygun bir sitede aynı ekrandan form yardımcısı için
+iletişim bilgisi paylaşımını onayla. Yardımcı bilinen boş alanları doldurur.
+Belge yükleme, kalan sorular ve son gönderim kullanıcıdadır.
