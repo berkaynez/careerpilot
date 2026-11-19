@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { jobLink } from '../jobs/links.js';
 import { plain } from './sources.js';
 import { careerLevel } from './level.js';
-import { containsTerm as contains, roleTerms } from './role-profiles.js';
+import { accountingTitle, containsTerm as contains, roleTerms } from './role-profiles.js';
 import type { DiscoveryConfig } from './core.js';
 import type { openHubStore } from '../hub/store.js';
 
@@ -42,6 +42,7 @@ export function searchHits(rows: { link: string; title?: string | undefined; sni
   return { hits, rejected, rejectionReasons };
 }
 export function searchFilterReason(title:string, text:string, config:Pick<DiscoveryConfig,'roles'|'earlyCareer'|'keywords'|'excludedTitles'>): 'role'|'excludedTitle'|'keyword'|'experience'|null {
+  if (accountingTitle(title)) return 'excludedTitle';
   return !roleTerms(config.roles).some(role=>contains(title,role)) ? 'role'
     : config.excludedTitles.some(term=>contains(title,term)) ? 'excludedTitle'
     : config.keywords.length && !config.keywords.some(term=>contains(title+' '+text,term)) ? 'keyword'

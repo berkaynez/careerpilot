@@ -118,7 +118,7 @@ kalır. `.env` ve API anahtarları paylaşılmaz. Bu proje, kullanıcı onayı o
 İlan keşfet ekranında FreeHire ile anahtarsız Türkiye/remote ilan araması ve
 SerpAPI ile web araması bulunur. **Mevcut kaynaklarda birlikte tara** seçeneği
 FreeHire, kota kontrollü web araması ve kayıtlı Greenhouse/Lever kaynaklarını tek
-akışta çalıştırır. Finans/muhasebe, denetim ve pazarlama rol grupları ile ayrı
+akışta çalıştırır. Finansal analiz, denetim ve pazarlama rol grupları ile ayrı
 finans CV/ön yazı seçimi vardır. Bu, tüm sitelerin eksiksiz tarandığı anlamına
 gelmez. Kullanım ve kaynak sınırları: [USAGE](docs/USAGE.md).
 

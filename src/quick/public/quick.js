@@ -1,7 +1,7 @@
 const byId = id => document.getElementById(id);
-const form = byId('search');
+const form = byId('quick-form');
 const flags = ['office','hybrid','remote','junior','includeUnclear'];
-let panelUrl='/';
+
 const storageKey = 'careerpilot.quick.preferences.v1';
 function roleInputs() { return Array.from(form.querySelectorAll('#roles input, #extra-roles input')); }
 function selection() {
@@ -18,9 +18,13 @@ function save() {
   return true;
 }
 async function init() {
-  const {defaults,roleNames,panel}=await (await fetch('/quick-config')).json();
-  panelUrl=panel;
-  byId('panel-hint').hidden=panel==='/';
+  const {defaults,roleNames,sources}=await (await fetch('/quick-config')).json();
+  for(const source of sources){
+    const item=document.createElement('li');
+    item.textContent=source.name+' · '+source.provider;byId('report').append(item);
+  }
+  const initialSources=byId('report').cloneNode(true);
+  form.addEventListener('submit',()=>byId('report').replaceChildren(...Array.from(initialSources.children,li=>li.cloneNode(true))));
   let prefs=defaults;
   try {
     const old=JSON.parse(localStorage.getItem(storageKey));
@@ -30,7 +34,7 @@ async function init() {
   for (const [key,name] of Object.entries(roleNames)) {
     const label=document.createElement('label'), box=document.createElement('input');
     box.type='checkbox'; box.value=key; box.checked=prefs.roles.includes(key);
-    label.append(box,' '+name); byId(defaults.roles.includes(key)?'roles':'extra-roles').append(label);
+    label.append(box,' '+name); byId(defaults.roles.includes(key)||key==='finance'?'roles':'extra-roles').append(label);
   }
   byId('city').value=prefs.city;
   for(const key of flags) byId(key).checked=prefs[key];
@@ -39,7 +43,7 @@ async function init() {
 }
 form.addEventListener('input',save);
 function showJobs(jobs) {
-  const list=byId('jobs');
+  const list=byId('quick-jobs');
   list.replaceChildren();
   let lastGroup='';
   for (const row of jobs) {
@@ -55,15 +59,12 @@ function showJobs(jobs) {
     detail.textContent=[row.location,({onsite:'Ofisten',hybrid:'Hibrit',remote:'Uzaktan'})[row.mode]||row.mode].filter(Boolean).join(' · ');
     meta.textContent=[row.role,row.level==='entry'?'Başlangıç seviyesi':row.level==='experienced'?'Deneyimli':'Deneyim şartını kontrol et',row.source].join(' · ');
     li.append(company,link,detail,meta);
-    if (row.description.trim().length>=20) {
-      const prepare=document.createElement('a');
-      prepare.className='prepare';
-      prepare.textContent='Başvuru taslağı hazırla';
-      const posting={company:row.company,title:row.title,sourceUrl:row.url,text:row.description.slice(0,24000)};
-      prepare.href=panelUrl+'#ilan='+encodeURIComponent(JSON.stringify(posting));
-      prepare.target='_blank';prepare.rel='noopener noreferrer';
-      li.append(prepare);
-    }
+    const prepare=document.createElement('button');
+    prepare.type='button';prepare.className='secondary';prepare.textContent='Başvuru belgelerini hazırla';
+    prepare.addEventListener('click',()=>document.dispatchEvent(new CustomEvent('careerpilot:prepare',{detail:{
+      company:row.company,title:row.title,sourceUrl:row.url,text:row.description.slice(0,24000),documentFocus:row.documentFocus
+    }})));
+    li.append(prepare);
     list.append(li);
   }
 }
@@ -83,7 +84,7 @@ form.addEventListener('submit',async event=>{
   const signal=active.signal, prefs=selection(), jobs=new Map(), reports=new Map();
   let page=1, examined=0;
   byId('go').disabled=true;byId('stop').hidden=false;byId('summary').textContent='Şirket ilanları ve FreeHire taranıyor…';
-  byId('sources').hidden=true;byId('jobs').replaceChildren();
+  byId('quick-jobs').replaceChildren();
   try {
     while(page && !signal.aborted) {
       const response=await fetch('/quick-search?page='+page,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(prefs),signal});
@@ -95,13 +96,13 @@ form.addEventListener('submit',async event=>{
       showJobs(sorted);
       for(const item of data.reports) {
         const previous=reports.get(item.source);
-        reports.set(item.source,{count:(previous?.count??0)+item.examined,ok:item.ok});
+        reports.set(item.source,{count:(previous?.count??0)+item.examined,ok:(previous?.ok??true)&&item.ok,matched:(previous?.matched??0)+item.matched,provider:item.provider});
       }
       byId('report').replaceChildren(...Array.from(reports,([source,status])=>{
         const li=document.createElement('li');
-        li.textContent=source+' · '+status.count+' kayıt'+(status.ok?'':' · erişilemedi');return li;
+        li.textContent=source+' ('+status.provider+') · '+status.count+' incelendi · '+status.matched+' eşleşme'+(status.ok?'':' · erişilemedi');return li;
       }));
-      byId('sources').hidden=false;
+
       byId('summary').textContent=examined+' kayıt incelendi · '+jobs.size+' sonuç';
       if(Array.from(reports.values()).some(source=>!source.ok))byId('summary').textContent+=' · Eksik kaynak var';
       page=data.nextPage;
@@ -109,6 +110,7 @@ form.addEventListener('submit',async event=>{
     }
   } catch(error) {if(!signal.aborted)byId('summary').textContent=error.message;}
   finally {
+    if(!signal.aborted && examined && !jobs.size)byId('summary').textContent+=' · Bu tercihlerle ilan bulunamadı.';
     if(signal.aborted)byId('summary').textContent=examined+' kayıt incelendi · '+jobs.size+' sonuç · Tarama durduruldu';
     active=null;byId('stop').hidden=true;byId('go').disabled=false;
   }

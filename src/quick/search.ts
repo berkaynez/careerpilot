@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { careerLevel } from '../discovery/level.js';
-import { containsTerm, normalizeRole } from '../discovery/role-profiles.js';
+import { accountingTitle, containsTerm, normalizeRole } from '../discovery/role-profiles.js';
 import { freshnessProblem } from '../discovery/quality.js';
 import type { FreehireRow } from '../discovery/freehire.js';
 
@@ -19,7 +19,7 @@ const aliases: Record<keyof typeof roleNames, string[]> = {
   audit: ['IT auditor', 'IT audit', 'BT denetim', 'technology risk', 'technology assurance'],
   product: ['product analyst', 'ürün analisti', 'fintech analyst', 'payment analyst'],
   security: ['cybersecurity analyst', 'cyber security analyst', 'security analyst', 'siber güvenlik', 'SOC analyst'],
-  finance: ['financial analyst', 'finansal analist', 'finans analisti', 'FP&A analyst'],
+  finance: ['finance analyst', 'financial planning analyst', 'financial analyst', 'finansal analist', 'finans analisti', 'FP&A analyst'],
   externalAudit: ['audit associate', 'audit assistant', 'audit trainee', 'denetçi yardımcısı', 'bağımsız denetim'],
   project: ['project coordinator', 'proje koordinatörü', 'project assistant'],
 };
@@ -29,14 +29,14 @@ export const preferences = z.strictObject({
   junior: z.boolean(), includeUnclear: z.boolean().default(false),
 }).refine(value => value.office || value.hybrid || value.remote);
 export type Preferences = z.infer<typeof preferences>;
-export const defaults: Preferences = {roles:['software','business','data','support'], city:'İstanbul',office:true,hybrid:true,remote:true,junior:true,includeUnclear:false};
+export const defaults: Preferences = {roles:['software','business','data','support'], city:'İstanbul',office:false,hybrid:true,remote:true,junior:true,includeUnclear:false};
 
 export type SearchRow = FreehireRow & { employerUrl?: string; sourceName?: string };
 export function filterJobs(rows: SearchRow[], prefs: Preferences) {
   const jobs = [];
   const seen = new Set<string>();
   for (const row of rows) {
-    if (row.closed_at || seen.has(row.public_slug) || !row.countries.some(c => c.toUpperCase()==='TR')) continue;
+    if (accountingTitle(row.title) || row.closed_at || seen.has(row.public_slug) || !row.countries.some(c => c.toUpperCase()==='TR')) continue;
     if (freshnessProblem({source:null, firstSeenAt:row.created_at??null, postedAt:row.posted_at??null,
       ageDays:row.reality?.age_days??null, fakeFreshness:row.reality?.fake_freshness??false},new Date())) continue;
     const role = prefs.roles.find(key => aliases[key].some(term => containsTerm(row.title, term)));
@@ -50,7 +50,7 @@ export function filterJobs(rows: SearchRow[], prefs: Preferences) {
     const level = careerLevel({title:row.title,text:row.description??''}).level;
     if (prefs.junior && (level==='experienced' || level==='unclear' && !prefs.includeUnclear)) continue;
     seen.add(row.public_slug);
-    jobs.push({role:roleNames[role], source:row.sourceName??'FreeHire', title:row.title, company:row.company || '', description:row.description??'', location:row.location || 'Türkiye',
+    jobs.push({role:roleNames[role], documentFocus:role==='finance'||role==='externalAudit'?'finance':'general', source:row.sourceName??'FreeHire', title:row.title, company:row.company || '', description:row.description??'', location:row.location || 'Türkiye',
       mode:needsMode?'Çalışma biçimini kontrol et':mode, level,
       url:row.employerUrl ?? 'https://freehire.me/jobs/'+encodeURIComponent(row.public_slug)});
   }

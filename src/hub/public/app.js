@@ -58,6 +58,8 @@ const errors = {
   JOB_PLATFORM_UNSUPPORTED: 'Bu sitede otomatik doldurma henüz hazır değil. İlanı açıp elle devam edebilirsin.',
   HUB_INPUT_INVALID: 'Bilgileri kontrol et. Bağlantı https ile başlamalı; ilan metni en az 20 karakter olmalı.',
   HUB_SESSION_REQUIRED: 'Oturum yenilenmeli. Sayfayı yeniden açıp tekrar dene.',
+  PREP_CV_FILE_UNAVAILABLE:'Kayıtlı PDF açılamadı. Dosya taşınmış, okunamıyor veya geçerli bir PDF olmayabilir. İstersen profil bilgilerinden PDF taslağı oluştur.',
+  PREP_CV_UNAVAILABLE:'Bu belge türü, dil ve fotoğraf seçimi için kayıtlı PDF bulunamadı.',
   PREP_DRAFT_EVIDENCE_REQUIRED:'Taslağa eklemek için kayıtlı profilinden en az bir bilgi seç.',
   HUB_ANALYSIS_REQUIRED: 'Bu ilan için önce bir analiz oluştur veya hazır analizi içe aktar.',
   HUB_ANALYSIS_BUSY: 'Bir analiz zaten çalışıyor. Tamamlandığında yeniden deneyebilirsin.',
@@ -68,6 +70,7 @@ const errors = {
   BUDGET_RUN_STOP: 'Bu analizin koşu bütçesi sınırına ulaşıldı.',
   BUDGET_MONTHLY_STOP: 'Aylık analiz bütçesi sınırına ulaşıldı.',
 };
+const visibleInHistory=item=>!item.discovery || !item.accounting || ['submitted','archived'].includes(item.state) || $('#show-previous').checked;
 let session, records = [], selectedId = null, poll, detailSequence = 0, assistantRequestPending = false, assistantIntent = null, detailSignature = '';
 function node(tag, className, text) { const element = document.createElement(tag); if (className) element.className = className; if (text !== undefined) element.textContent = text; return element; }
 function friendly(code) { return errors[code] || 'İşlem tamamlanamadı. Kaydın korunuyor; bilgileri ve bağlantını kontrol edip tekrar deneyebilirsin.'; }
@@ -80,14 +83,16 @@ function badge(state) { return node('span', 'badge ' + state, states[state]); }
 function openDialog(id) { const dialog = $(id); dialog.querySelector('.form-error').textContent = ''; dialog.showModal(); }
 async function refresh(preferred) {
   const [jobs,trash]=await Promise.all([api('/api/jobs'),api('/api/trash')]); records=jobs;
+  const shown=records.filter(visibleInHistory);
+  $('#past-accounting').hidden=!records.some(item=>item.discovery && item.accounting && !['submitted','archived'].includes(item.state));
   const archived=records.filter(item=>item.state==='archived').length;
   $('#clear-archived').hidden=!archived;$('#clear-archived').textContent='Vazgeçilenleri kaldır ('+archived+')';
   $('#restore-trash').hidden=!trash.count;$('#restore-trash').textContent='Kaldırılanları geri getir ('+trash.count+')';
-  $('#stat-all').textContent = records.length;
-  $('#stat-ready').textContent = records.filter(item => item.analysisOrigin).length;
-  $('#stat-review').textContent = records.filter(item => item.state === 'review' && !needsQuality(item)).length;
+  $('#stat-all').textContent = shown.length;
+  $('#stat-ready').textContent = shown.filter(item => item.analysisOrigin).length;
+  $('#stat-review').textContent = shown.filter(item => item.state === 'review' && !needsQuality(item)).length;
   $('#stat-submitted').textContent = records.filter(item => item.state === 'submitted').length;
-  $('#nav-count').textContent = records.length;
+  $('#nav-count').textContent = shown.length;
   renderList();
   const visible = visibleRecords();
   const wanted = visible.find(item => item.id === (preferred || selectedId)) || visible[0];
@@ -97,7 +102,7 @@ async function refresh(preferred) {
 }
 function visibleRecords() {
   const query = $('#search').value.toLocaleLowerCase('tr'), state = $('#filter').value;
-  const matchesView=item=>($('#document-filter').value==='all'||(item.documentFocus||'general')===$('#document-filter').value) && (state==='all' || (state==='quality'?needsQuality(item):item.state===state && (state!=='review'||!needsQuality(item))));
+  const matchesView=item=>visibleInHistory(item) && ($('#document-filter').value==='all'||(item.documentFocus||'general')===$('#document-filter').value) && (state==='all' || (state==='quality'?needsQuality(item):item.state===state && (state!=='review'||!needsQuality(item))));
   const visible = records.filter(item => (state !== 'submitted' || (($('#tracking-stage-filter').value==='all' || (item.tracking?.stage || 'not_set')===$('#tracking-stage-filter').value) && ($('#tracking-followup-filter').value==='all' || ($('#tracking-followup-filter').value==='due'?followUpDue(item):!item.tracking?.followUpOn)))) && matchesView(item) && (item.company + ' ' + item.title).toLocaleLowerCase('tr').includes(query));
   return state === 'submitted' ? visible.sort((a,b)=>Number(followUpDue(b))-Number(followUpDue(a)) || (a.tracking?.followUpOn || '9999').localeCompare(b.tracking?.followUpOn || '9999')) : state === 'review' ? visible.sort((a, b) => Number(b.discovery?.careerLevel === 'entry') - Number(a.discovery?.careerLevel === 'entry')) : visible;
 }
@@ -113,11 +118,11 @@ function resetFilters() { $('#document-filter').value='all'; $('#search').value 
 function renderList() {
   const view = $('#filter').value;
   for (const button of document.querySelectorAll('[data-view]')) {
-    const active = button.dataset.view === view;
+    const active = $('#quick-view').hidden && button.dataset.view === view;
     button.classList.toggle('active', active); button.setAttribute('aria-pressed', String(active));
   }
   $('#nav-submitted-count').textContent = records.filter(item => item.state === 'submitted').length;
-  $('#nav-quality-count').textContent=records.filter(needsQuality).length;
+  $('#nav-quality-count').textContent=records.filter(visibleInHistory).filter(needsQuality).length;
   $('#quality-overview').textContent=view==='quality'?'Bu kayıtlar açık ve güncel fırsat sayısına dahil değil. Kaynak kontrolü veya tam metin gerekiyor; kayıtlar silinmedi.':view==='review'?'Resmî kaynakta bulunan veya senin doğruladığın ilanlar. Başlangıç seviyesi ve diğer şartlar ayrıca değerlendirilir.':'';
   $('#list-title').textContent = view === 'quality' ? 'Kaynak kontrolü gerekenler' : view === 'submitted' ? 'Başvurulanlar' : view === 'review' ? 'İncelenebilir ilanlar' : 'İlanların';
   $('#tracking-filters').hidden=view!=='submitted';$('#tracking-overview').hidden=view!=='submitted';
@@ -190,25 +195,20 @@ async function showDetail(id) {
   if (record.analysis) renderAnalysis(pane, record);
   else { const box = node('div', 'analysis-empty'); box.append(node('span', 'eyebrow', 'SIRADAKİ ADIM'), node('h3', '', 'Bu fırsat sana ne kadar yakın?'), node('p', 'muted', 'Analiz eklendiğinde güçlü yönlerin, belgelenmeyen şartlar ve puanın dayanakları burada görünecek.')); pane.append(box); }
   const cvBox = node('section', 'cv-box'); cvBox.append(node('h3', '', 'Başvuru belgeleri'), node('p', '', record.cv ? (record.cv.language === 'en' ? 'İngilizce' : 'Türkçe') + ' CV · ' + (record.cv.photo ? 'Fotoğraflı' : 'Fotoğrafsız') : record.cvError), node('p', 'small muted', 'CV otomatik yüklenmedi. İlanın belge talimatlarını kontrol ederek başvuru sitesinde seç.')); const docsReady=Boolean(record.cv) && !(record.discovery?.search && !record.discovery.search.verified);
-  const downloadCV=node('button','secondary','Seçilen CV’yi indir');downloadCV.disabled=!docsReady;
-  downloadCV.addEventListener('click',async()=>{downloadCV.disabled=true;try{
-    const response=await fetch('/api/jobs/'+id+'/cv',{headers:{'X-Hub-Token':session.token}});if(!response.ok){const error=await response.json();throw new Error(friendly(error.code));}
-    downloadLocalFile(await response.blob(),'CV_'+record.posting.company.replace(/[^\p{L}\p{N}]+/gu,'_').slice(0,60)+'.pdf');
-  }catch(error){notify(error.message,true);}finally{downloadCV.disabled=false;}});
   const preview=node('button','secondary','Ön yazı taslağını aç');preview.disabled=!docsReady;
   preview.addEventListener('click',async()=>{preview.disabled=true;try{
     const data=await api('/api/jobs/'+id+'/documents');const letter=node('textarea');letter.rows=12;letter.readOnly=true;letter.setAttribute('aria-label','Ön yazı taslağı');letter.value=data.letter;
-    const save=node('button','secondary','Ön yazıyı indir');save.addEventListener('click',()=>downloadLocalFile(new Blob([data.letter],{type:'text/plain;charset=utf-8'}),'On_Yazi_'+record.posting.company.replace(/[^\p{L}\p{N}]+/gu,'_').slice(0,60)+'.txt'));
+    const save=node('button','secondary','Ön yazıyı indir');save.addEventListener('click',()=>saveDraftPDF(save,data.letter,'letter',record));
     cvBox.append(node('p','small muted','Şirket, pozisyon, kayıtlı profil anlatımın ve varsa analizde seçilen dayanaklarla hazırlanır. Göndermeden önce oku.'),letter,save);preview.hidden=true;
   }catch(error){notify(error.message,true);preview.disabled=false;}});
   const focus=node('select');focus.setAttribute('aria-label','Başvuru belgelerinin odağı');
-  for(const value of record.availableDocumentFocus||['general'])focus.append(new Option(value==='finance'?'Finans / işletme':'Genel / teknoloji',value));focus.value=record.documentFocus||'general';focus.disabled=record.analyzing||record.assistantActive;
+  for(const value of ['general','finance'])focus.append(new Option(value==='finance'?'Finans / işletme':'Genel / teknoloji',value));focus.value=record.documentFocus||'general';focus.disabled=record.analyzing||record.assistantActive;
   focus.addEventListener('change',async()=>{focus.disabled=true;try{await api('/api/jobs/'+id+'/document-focus',{focus:focus.value});await refresh(id);notify('Bu ilanın CV ve ön yazı türü kaydedildi.');}catch(error){notify(error.message,true);focus.disabled=false;}});
   const focusLabel=node('label','','CV ve ön yazı türü');focusLabel.append(focus);cvBox.append(focusLabel);
   const draft=node('button','primary','İlana özel CV ve ön yazı hazırla');
   draft.disabled=Boolean(record.discovery && (!record.discovery.routingConfirmed || record.discovery.search && !record.discovery.search.verified));
   draft.addEventListener('click',()=>openApplicationDraft(record,draft));
-  cvBox.append(draft,downloadCV,preview);pane.append(cvBox);
+  cvBox.append(registeredCV(record),draft,preview);pane.insertBefore(cvBox,actions.nextSibling);
   const tracking = node('section', 'tracking'); tracking.append(node('h3', '', 'Başvuru durumun'));
   const select = node('select'); select.setAttribute('aria-label', 'Başvuru durumunu değiştir');
   for (const [value, label] of Object.entries(states)) { const option = node('option', '', label); option.value = value; select.append(option); } select.value = record.state;
@@ -312,13 +312,22 @@ function renderAnalysis(pane, record) {
   }
   const formula = node('details', 'source'); formula.append(node('summary', '', 'Puan nasıl hesaplandı?'), node('p', 'small muted', 'Temel şartlar 3, tercihler 1 ağırlığında. Doğrudan dayanak tam, kısmi dayanak yarım değerli. ' + match.totals.earned + ' / ' + match.totals.possible + ' × 100, tam sayıya yuvarlanır. Görevler puana katılmaz. İlandan çıkarılan şartları ve eşleştirmeleri kontrol et.')); pane.append(formula);
 }
-$('#new-open').addEventListener('click', () => openDialog('#new-dialog'));
+let preparing=false;
+function showSearch(search) {
+  $('#quick-view').hidden=!search;$('#saved-view').hidden=search;
+  $('#quick-open').classList.toggle('active',search);$('#quick-open').setAttribute('aria-pressed',String(search));
+  $('#page-heading').textContent=search?'İlan ara':'İlanlarım';
+  renderList();
+}
+$('#quick-open').addEventListener('click',()=>showSearch(true));
+$('#new-open').addEventListener('click', () => {preparing=false;$('#new-form').reset();openDialog('#new-dialog');});
 $('#import-open').addEventListener('click', () => openDialog('#import-dialog'));
 for (const button of document.querySelectorAll('.close-dialog')) button.addEventListener('click', () => button.closest('dialog').close());
+$('#show-previous').addEventListener('change',()=>refresh().catch(error=>notify(error.message,true)));
 $('#document-filter').addEventListener('change',()=>applyFilters().catch(error=>notify(error.message,true)));
 $('#search').addEventListener('input', () => applyFilters().catch(error => notify(error.message, true))); $('#filter').addEventListener('change', () => applyFilters().catch(error => notify(error.message, true)));
 for (const button of document.querySelectorAll('[data-view]')) button.addEventListener('click', () => {
-  $('#search').value = ''; $('#filter').value = button.dataset.view;
+  showSearch(false);$('#search').value = ''; $('#filter').value = button.dataset.view;
   void applyFilters().catch(error => notify(error.message, true));
 });
 function formHandler(selector, action) {
@@ -336,7 +345,9 @@ formHandler('#assistant-form', async form => {
   form.closest('dialog').close(); await refresh(result.id);
   notify(intent.action === 'start' ? 'Form penceresi açıldı. Girişini tamamlayıp panelden doldurabilirsin.' : 'Bu adres için paylaşım izni verildi.');
 });
-formHandler('#new-form', async form => { const data = Object.fromEntries(new FormData(form)); const result = await api('/api/jobs', data); form.closest('dialog').close(); form.reset(); resetFilters(); await refresh(result.id); notify('İlan kaydedildi. Henüz model çağrısı yapılmadı.'); });
+formHandler('#new-form', async form => { const data = Object.fromEntries(new FormData(form)); const result = await api('/api/jobs', data); form.closest('dialog').close(); form.reset(); resetFilters();showSearch(false);await refresh(result.id);
+  if(preparing){preparing=false;await openApplicationDraft(result,$('#new-open'));}
+  else notify('İlan kaydedildi.'); });
 formHandler('#import-form', async form => {
   const jobFile = $('#import-job').files[0], planFile = $('#import-plan').files[0]; if (!jobFile || !planFile || jobFile.size > 200000 || planFile.size > 200000) throw new Error('İki JSON dosyasını da seç; dosyalar 200 KB altında olmalı.');
   let job, plan; try { job = JSON.parse(await jobFile.text()); plan = JSON.parse(await planFile.text()).plan; } catch { throw new Error('JSON dosyaları okunamadı. Paketteki job.json ve preparation.json dosyalarını seç.'); }
@@ -347,7 +358,12 @@ formHandler('#analyze-form', async form => {
   const result = await api('/api/jobs/' + id + '/analyze', { paidCallApproved: $('#paid-consent').checked, cloudProfileApproved: $('#profile-consent').checked });
   form.closest('dialog').close(); form.reset(); await refresh(result.id); notify('Analiz hazır. İlan şartlarını ve dayanakları gözden geçir.');
 });
-(async () => { try { session = await api('/api/session'); $('#quick-open').hidden=session.demo; $('#mode').textContent = session.demo ? 'ÖRNEK MOD · Kurgusal aday ve ilanlar. Gerçek başvuru veya ücretli model çağrısı yok.' : 'YEREL ÇALIŞMA ALANI · ' + session.profile.facts + ' mesleki bilgi, ' + session.profile.cvs + ' CV kayıtlı. Model ' + (session.modelEnabled ? 'onayla kullanılabilir.' : 'kapalı.'); await refresh(); prefillPosting(); } catch (error) { notify(error.message, true); $('#jobs').replaceChildren(node('p', 'empty', 'Kayıtlar yüklenemedi. Panel bağlantısını kontrol edip sayfayı yenile.')); } })();
+(async () => { try { session = await api('/api/session'); $('#quick-open').hidden=session.demo; $('#mode').textContent = session.demo ? 'ÖRNEK MOD · Kurgusal aday ve ilanlar. Gerçek başvuru veya ücretli model çağrısı yok.' : 'YEREL ÇALIŞMA ALANI · ' + session.profile.facts + ' mesleki bilgi, ' + session.profile.cvs + ' CV kayıtlı. Model ' + (session.modelEnabled ? 'onayla kullanılabilir.' : 'kapalı.'); await refresh();
+    if(!session.demo){
+      await import('/quick.js');
+      showSearch(!location.hash.startsWith('#ilan=') && new URLSearchParams(location.search).get('view')!=='saved');
+    }
+    prefillPosting(); } catch (error) { notify(error.message, true); $('#jobs').replaceChildren(node('p', 'empty', 'Kayıtlar yüklenemedi. Panel bağlantısını kontrol edip sayfayı yenile.')); } })();
 
 async function openApplicationDraft(record, button) {
   button.disabled=true;
@@ -356,18 +372,20 @@ async function openApplicationDraft(record, button) {
     const {facts}=await api(endpoint);
     const dialog=$('#draft-dialog'), list=$('#draft-facts'), review=$('#draft-review');
     const form=$('#draft-form');
-    list.replaceChildren();review.replaceChildren();$('#draft-generate').hidden=false;
+    list.replaceChildren();review.replaceChildren();
+    const original=$('#draft-original');original.replaceChildren(registeredCV(record));
+    if(!record.cv)original.append(node('p','small muted',record.cvError));$('#draft-generate').hidden=false;
     for (const fact of facts) {
       const label=node('label','check'), checkbox=node('input');
       checkbox.type='checkbox';checkbox.value=fact.id;checkbox.checked=fact.selected;
       label.append(checkbox,document.createTextNode(fact.text));list.append(label);
     }
     $('#draft-intro').textContent=facts.some(fact=>fact.selected)
-      ? 'İlan analizinden önerilen profil bilgilerini kontrol et.'
+      ? 'Bu ilan için işaretlenen profil bilgilerini kontrol et.'
       : 'İlanla ilgili kayıtlı deneyim ve proje bilgilerini seç.';
     form.onsubmit=async event=>{
       event.preventDefault();
-      const generate=$('#draft-generate'), status=form.querySelector('.form-error');
+      const generate=$('#draft-generate'), status=form.querySelector('p.form-error');
       const ids=Array.from(list.querySelectorAll('input:checked'),input=>input.value);
       if (!ids.length || ids.length>20) {status.textContent='1 ile 20 arasında profil bilgisi seç.';return;}
       status.textContent='';generate.disabled=true;
@@ -375,12 +393,12 @@ async function openApplicationDraft(record, button) {
         const result=await api(endpoint,{ids});
         if (!dialog.open) return;
         review.replaceChildren();
-        for (const [key,title,filename] of [['cv','CV taslağı','CV_Taslak.txt'],['letter','Ön yazı','On_Yazi.txt']]) {
+        for (const [key,title] of [['cv','CV taslağı'],['letter','Ön yazı']]) {
           const label=node('label','',title), editor=node('textarea');editor.rows=10;editor.value=result[key];
           label.append(editor);
-          const download=node('button','secondary',title+' indir');
+          const download=node('button','secondary',title+' indir (PDF)');
           download.type='button';
-          download.addEventListener('click',()=>downloadLocalFile(new Blob([editor.value],{type:'text/plain;charset=utf-8'}),filename));
+          download.addEventListener('click',()=>saveDraftPDF(download,editor.value,key,record));
           review.append(label,download);
         }
         if (record.assistant.available && !record.assistant.occupiedByOther && !record.assistant.session && !record.assistant.opening) {
@@ -401,6 +419,59 @@ async function openApplicationDraft(record, button) {
   finally{button.disabled=false;}
 }
 
+function registeredCV(record){
+  const box=node('div','cv-download'),status=node('span','form-error');status.setAttribute('role','alert');
+  const downloadCV=node('button','secondary',record.documentFocus==='finance'?'Kayıtlı finans CV’sini indir (PDF)':'Kayıtlı CV’yi indir (PDF)');
+  downloadCV.type='button';
+  const choice=node('select');
+  const blocked=Boolean(record.discovery && (!record.discovery.routingConfirmed || record.discovery.search && !record.discovery.search.verified));
+  choice.setAttribute('aria-label','İndirilecek kayıtlı CV');
+  choice.append(new Option('PDF seç',''));
+  for(const asset of record.cvChoices)choice.append(new Option(asset.filename+' · '+(asset.photo?'fotoğraflı':'fotoğrafsız'),asset.id));
+  choice.value=record.cv?.id??'';
+  if(!blocked && record.cvChoices.length && (!record.cv || record.cvChoices.length>1))box.append(choice);
+  downloadCV.disabled=blocked||!choice.value;
+  choice.onchange=()=>{downloadCV.disabled=blocked||!choice.value;};
+  downloadCV.addEventListener('click',async()=>{downloadCV.disabled=true;status.textContent='';try{
+    const response=await fetch('/api/jobs/'+record.id+'/cv?asset='+encodeURIComponent(choice.value),{headers:{'X-Hub-Token':session.token}});
+    if(!response.ok)throw new Error(friendly((await response.json()).code));
+    const filename=record.cvChoices.find(asset=>asset.id===choice.value).filename;
+    downloadLocalFile(await response.blob(),filename);
+  }catch(error){status.textContent=error.message;}finally{downloadCV.disabled=blocked||!choice.value;}});
+  box.append(downloadCV,status);return box;
+}
+
+let pdfLibrary;
+function loadPdfLibrary(){
+  if(!pdfLibrary){
+    const script=src=>new Promise((resolve,reject)=>{
+      const tag=node('script');tag.src=src;tag.onload=resolve;
+      tag.onerror=()=>{tag.remove();reject(new Error('PDF aracı yüklenemedi. Sayfayı yenileyip tekrar dene.'));};
+      document.head.append(tag);
+    });
+    pdfLibrary=script('/pdfmake.min.js').then(()=>script('/vfs_fonts.js')).catch(error=>{pdfLibrary=null;throw error;});
+  }
+  return pdfLibrary;
+}
+async function saveDraftPDF(button,text,kind,record){
+  button.disabled=true;
+  const errorBox=button.closest('form')?.querySelector('.form-error[role=alert]:not(span)')??$('#notice');
+  try{
+    if(!text.trim())throw new Error('PDF için önce bir metin ekle.');
+    await loadPdfLibrary();
+    const title=kind==='cv'?'CV':'On_Yazi';
+    const suffix=[record.posting.company,record.posting.title].join('_').replace(/[^\p{L}\p{N}]+/gu,'_').slice(0,100);
+    const content=text.split(/\r?\n/).map((line,index)=>({
+      text:line||' ',fontSize:kind==='cv'&&index===0?19:11,bold:kind==='cv'&&index===0,
+      margin:[0,0,0,line?4:2],
+    }));
+    const doc=window.pdfMake.createPdf({pageSize:'A4',pageMargins:[48,48,48,48],defaultStyle:{lineHeight:1.22},content});
+    const blob=await new Promise(resolve=>doc.getBlob(resolve));
+    downloadLocalFile(blob,title+'_'+suffix+'.pdf');
+  }catch(error){errorBox.textContent=error.message||'PDF oluşturulamadı.';}
+  finally{button.disabled=false;}
+}
+
 function prefillPosting() {
   const hash=location.hash;
   if (!hash.startsWith('#ilan=') || hash.length>310000) return;
@@ -408,14 +479,24 @@ function prefillPosting() {
   try {
     const job=JSON.parse(decodeURIComponent(hash.slice(6)));
     if (!job || !['company','title','sourceUrl','text'].every(key=>typeof job[key]==='string')) throw new Error();
-    const existing=records.find(record=>record.sourceUrl===job.sourceUrl);
-    if (existing) {resetFilters();void refresh(existing.id);return;}
-    const form=$('#new-form');
-    for (const key of ['company','title','sourceUrl','text']) form.elements.namedItem(key).value=job[key];
-    form.elements.namedItem('language').selectedIndex=-1;
-    openDialog('#new-dialog');
+    void reviewSearchResult(job,false).catch(error=>notify(error.message,true));
   } catch {notify('İlan bilgileri açılamadı.',true);}
 }
+
+async function reviewSearchResult(job,openDraft){
+  preparing=openDraft;
+  const existing=records.find(record=>record.sourceUrl===job.sourceUrl);
+  if(existing){
+    resetFilters();showSearch(false);await refresh(existing.id);
+    if(openDraft)await openApplicationDraft(await api('/api/jobs/'+existing.id),$('#new-open'));
+    return;
+  }
+  const form=$('#new-form');form.reset();
+  for(const key of ['company','title','sourceUrl','text'])form.elements.namedItem(key).value=job[key];
+  form.elements.namedItem('documentFocus').value=job.documentFocus==='finance'?'finance':'general';
+  form.elements.namedItem('language').selectedIndex=-1;openDialog('#new-dialog');
+}
+document.addEventListener('careerpilot:prepare',event=>reviewSearchResult(event.detail,true).catch(error=>notify(error.message,true)));
 
 function renderDiscovery(record, pane) {
   if (!record.discovery) return;
@@ -681,7 +762,7 @@ $('#restore-trash').addEventListener('click',async()=>{const button=$('#restore-
 
 $('#group-related').addEventListener('change',renderList);
 
-function downloadLocalFile(blob,filename){const url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download=filename;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+function downloadLocalFile(blob,filename){const url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download=filename;document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 
 
 const searchSourceNames={freehire:'FreeHire',web:'Web araması · LinkedIn / Indeed / Kariyer.net / Lever / Greenhouse',feeds:'Kayıtlı resmî Greenhouse / Lever akışları'};

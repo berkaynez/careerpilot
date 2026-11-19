@@ -1,34 +1,41 @@
 #!/bin/sh
 set -eu
-# Build a local, relocatable app for the current Mac architecture.
 cd "$(dirname "$0")/.."
 dest=${1:?Bir çıktı klasörü belirt}
 stage=$(mktemp -d)
 trap 'rm -rf "$stage"' EXIT
 app="$stage/CareerPilot.app/Contents"
-mkdir -p "$app/MacOS" "$app/Resources/public"
+runtime="$app/Resources/panel"
+mkdir -p "$app/MacOS" "$runtime/node_modules/pdfmake/build"
 cp "$(node -p 'process.execPath')" "$app/Resources/node"
-node_modules/.bin/esbuild src/quick/desktop.ts --bundle --platform=node --format=esm --target=node22 --outfile="$app/Resources/desktop.mjs"
-cp src/quick/public/* "$app/Resources/public/"
+cp package.json "$runtime/"
+cp -R src "$runtime/"
+for name in tsx esbuild @esbuild playwright playwright-core zod; do
+  cp -R "node_modules/$name" "$runtime/node_modules/"
+done
+cp node_modules/pdfmake/LICENSE node_modules/pdfmake/package.json "$runtime/node_modules/pdfmake/"
+cp node_modules/pdfmake/build/pdfmake.min.js node_modules/pdfmake/build/vfs_fonts.js "$runtime/node_modules/pdfmake/build/"
 cp scripts/mac-launch "$app/MacOS/CareerPilot"
 cp scripts/mac-info.plist "$app/Info.plist"
 chmod +x "$app/MacOS/CareerPilot"
 codesign --force --sign - "$stage/CareerPilot.app"
 codesign --verify --strict "$stage/CareerPilot.app"
 mkdir -p "$dest"
-ditto "$stage/CareerPilot.app" "$dest/CareerPilot.app"
-
-panel="$stage/CareerPilot Panel.app/Contents"
-mkdir -p "$panel/MacOS" "$panel/Resources/panel/node_modules"
-cp "$app/Resources/node" "$panel/Resources/node"
-cp package.json "$panel/Resources/panel/"
-cp -R src "$panel/Resources/panel/"
-for name in tsx esbuild @esbuild playwright playwright-core zod; do
-  cp -R "node_modules/$name" "$panel/Resources/panel/node_modules/"
-done
-cp scripts/mac-panel-launch "$panel/MacOS/CareerPilot"
-sed -e 's/local.careerpilot.search/local.careerpilot.panel/' -e 's/<string>CareerPilot<\/string>$/<string>CareerPilot Panel<\/string>/'   scripts/mac-info.plist > "$panel/Info.plist"
-/usr/libexec/PlistBuddy -c 'Set :CFBundleExecutable CareerPilot' "$panel/Info.plist"
-codesign --force --sign - "$stage/CareerPilot Panel.app"
-codesign --verify --strict "$stage/CareerPilot Panel.app"
-ditto "$stage/CareerPilot Panel.app" "$dest/CareerPilot Panel.app"
+target="$dest/CareerPilot.app"
+install_dir=$(mktemp -d "$dest/.careerpilot-install.XXXXXX")
+ditto --norsrc --noextattr "$stage/CareerPilot.app" "$install_dir/CareerPilot.app"
+# The clean build passed strict verification above. Synced destinations add Finder metadata.
+codesign --verify "$install_dir/CareerPilot.app"
+if [ -e "$target" ]; then
+  if [ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$target/Contents/Info.plist")" != local.careerpilot.search ]; then
+    echo "Çıktı konumunda farklı bir uygulama var." >&2
+    exit 1
+  fi
+  mv "$target" "$install_dir/previous.app"
+fi
+if mv "$install_dir/CareerPilot.app" "$target"; then
+  rm -rf "$install_dir"
+else
+  if [ -d "$install_dir/previous.app" ]; then mv "$install_dir/previous.app" "$target"; fi
+  exit 1
+fi

@@ -13,8 +13,7 @@ const groups = [
   ['IT auditor', 'IT audit', 'BT denetim', 'bilgi teknolojileri denetçisi', 'bilgi sistemleri denetimi', 'technology risk', 'technology assurance'],
 ];
 export const roleProfiles = [
-  {id:'finance',label:'Finans ve muhasebe',documentFocus:'finance',roles:['finance','finans','financial analyst','muhasebe','accountant','treasury','hazine','audit associate','banking','denetim']},
-  {id:'accounting',label:'Muhasebe ve bağımsız denetim',documentFocus:'finance',roles:['muhasebe','accountant','accounting','accounts payable','accounts receivable','audit associate','denetçi yardımcısı']},
+  {id:'finance',label:'Finansal analiz ve hazine',documentFocus:'finance',roles:['financial analyst','finance analyst','finansal analist','finans analisti','treasury','hazine','audit associate','denetçi yardımcısı']},
   {id:'marketing',label:'Pazarlama ve ticari analiz',documentFocus:'finance',roles:['marketing','pazarlama','marketing analyst','digital marketing']},
   {id:'all-targets',label:'Yazılım + analiz + BT denetimi',roles:['software engineer','developer','data analyst','business analyst','AI engineer','IT audit','BT denetim','technology risk']},
   { id: 'software', label: 'Yazılım geliştirme', roles: [...groups[0]!] },
@@ -44,4 +43,12 @@ export function discoveryCategories(roles:string[]):(typeof discoveryCategoryVal
   if(terms.some(term=>containsTerm(term,'marketing')||containsTerm(term,'pazarlama')))add(['marketing']);
   if(terms.some(term=>containsTerm(term,'product'))) add(['product']);
   return [...found].sort();
+}
+
+export function accountingTitle(title: string) {
+  return /\b(muhasebe[a-z]*|mali musavir[a-z]*|accountants?|accounting|bookkeepers?|bookkeeping|accounts? (?:payable|receivable)|general ledger|on muhasebe)\b/.test(normalizeRole(title));
+}
+
+export function titleDocumentFocus(title: string): 'finance' | 'general' {
+  return /\b(finance|financial|finans[a-z]*|fp a|treasury|hazine|audit (associate|assistant|trainee)|bagimsiz denetim|denetci yardimcisi)\b/.test(normalizeRole(title)) ? 'finance' : 'general';
 }

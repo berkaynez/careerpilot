@@ -3,14 +3,15 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { createFreehireSearch } from '../discovery/freehire.js';
 import { defaults, filterJobs, preferences, roleNames } from './search.js';
 
-import { employerFeeds } from './boards.js';
+import { employers, employerFeeds } from './boards.js';
 import { jobLink } from '../jobs/links.js';
 
-const files = new Map([['/quick','index.html'],['/quick.js','quick.js'],['/quick.css','quick.css']]);
-export function quickRoutes(search = createFreehireSearch(), boards = employerFeeds(), panel?: string) {
+const sources = [...employers.map(({company,provider})=>({name:company,provider:provider==='lever'?'Lever':'Greenhouse'})),
+  {name:'FreeHire',provider:'Türkiye ilan akışı'}];
+export function quickRoutes(search = createFreehireSearch(), boards = employerFeeds()) {
   return async (req: IncomingMessage, res: ServerResponse, origin: string) => {
     const path = new URL(req.url ?? '/',origin).pathname;
-    if (!files.has(path) && !['/quick-config','/quick-search'].includes(path)) return false;
+    if (!['/quick.js','/quick-config','/quick-search'].includes(path)) return false;
     res.setHeader('Cache-Control','no-store');
     res.setHeader('X-Content-Type-Options','nosniff');
     res.setHeader('Referrer-Policy','no-referrer');
@@ -18,15 +19,13 @@ export function quickRoutes(search = createFreehireSearch(), boards = employerFe
     if (req.headers.host !== new URL(origin).host || req.headers['sec-fetch-site']==='cross-site') {
       res.writeHead(403).end(); return true;
     }
-    const file = files.get(path);
-    if (file && req.method==='GET') {
-      const type = file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':'text/html';
-      const data = await readFile(new URL('./public/'+file,import.meta.url));
-      res.writeHead(200,{'Content-Type':type+'; charset=utf-8'}).end(data); return true;
+    if (path==='/quick.js' && req.method==='GET') {
+      const data=await readFile(new URL('./public/quick.js',import.meta.url));
+      res.writeHead(200,{'Content-Type':'text/javascript; charset=utf-8'}).end(data);return true;
     }
     res.setHeader('Content-Type','application/json');
     if (path==='/quick-config' && req.method==='GET') {
-      res.end(JSON.stringify({app:'careerpilot-quick-v4',defaults,roleNames,panel:panel??'/'})); return true;
+      res.end(JSON.stringify({defaults,roleNames,sources})); return true;
     }
     if (path!=='/quick-search' || req.method!=='POST') {res.writeHead(405).end(); return true;}
     if (req.headers.origin!==origin || req.headers['content-type']!=='application/json') {res.writeHead(403).end();return true;}
@@ -57,9 +56,11 @@ export function quickRoutes(search = createFreehireSearch(), boards = employerFe
       rows.push({...row,...(employerUrl?{employerUrl}:{})});
     }
     const jobs=filterJobs(rows,prefs);
+    const details=reports.map(item=>({...item,provider:sources.find(source=>source.name===item.source)?.provider??item.source,
+      matched:new Set(jobs.filter(job=>job.source===item.source).map(job=>job.url)).size}));
     const examined=reports.reduce((sum,item)=>sum+item.examined,0);
     const more=free && page<10 && page*30<free.total && free.examined===30;
-    res.end(JSON.stringify({jobs,examined,reports,nextPage:more?page+1:null}));
+    res.end(JSON.stringify({jobs,examined,reports:details,nextPage:more?page+1:null}));
     return true;
   };
 }

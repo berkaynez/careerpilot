@@ -2,6 +2,10 @@
 
 ## Her gün nasıl açarım?
 
+Mac’te **CareerPilot.app** dosyasına çift tıkla. İlk açılışta kendi proje klasörünü seç. **İlan ara** ile arama yapabilir, sonucun üzerinden PDF belgelerini hazırlayabilirsin.
+
+### Terminalden açmak isteyenler için
+
 VS Code'da CareerPilot klasörünü aç → Terminal → New Terminal.
 Terminal proje klasöründe değilse `cd <proje-klasörünün-yolu>` ile geç.
 Ardından:
@@ -27,7 +31,7 @@ npm run start:offline
 ```
 
 Bu modda mevcut analizleri ve başvuru takibini görebilirsin; yeni AI analizi ve
-dış kaynak araması kapalıdır. Her iki komut aynı yerel kayıtları kullanır.
+SerpAPI araması kapalıdır. Ücretsiz şirket kaynakları ve FreeHire kullanılabilir. Her iki komut aynı yerel kayıtları kullanır.
 
 ## İlk kurulum veya başka bilgisayar
 
@@ -52,7 +56,7 @@ Anahtarı sohbete, ekran görüntüsüne veya Git'e koyma.
 ## İlan bulma
 
 1. **İlan keşfet** ekranını aç.
-2. Rol grubunu seç: yazılım/veri, BT denetimi, finans/muhasebe veya pazarlama.
+2. Rol grubunu seç: yazılım/veri, BT denetimi, finansal analiz veya pazarlama.
    Kendi rollerin de saklanır; finans araması eski yazılım kayıtlarını silmez.
 3. Türkiye veya global remote seçimini, seviye tercihlerini kontrol et.
 4. Finans başvurularında **Finans / işletme** belge türünü seç.
@@ -137,35 +141,14 @@ Bu ilk test sürümüdür. Yerel panel, keşif, analiz, belgeler ve takip çalı
 tüm siteler için tamamlanmış başvuru robotu değildir. Geliştirici kontrolleri:
 `npm run check` ve `git diff --check`.
 
-### Mac’te çift tıklayarak hızlı arama
+### Mac’te ilan ara ve belgeleri indir
 
-CareerPilot.app dosyasına çift tıklayınca kayıtlı tercihlerle tarama başlar. Yeni bir arama için pozisyonları, şehri, çalışma
-biçimlerini ve junior tercihini seç, ardından **Ücretsiz ilan ara** düğmesine bas.
-Tercihler aynı tarayıcıda otomatik saklanır. Hızlı arama altı şirketin resmî Lever ve Greenhouse listelerini ve FreeHire Türkiye
-sayfalarını tarar. FreeHire devam sayfası verdiğinde tarama 30 saniyelik kaynak
-beklemesine uyarak en fazla on sayfa ilerler. Dilediğinde durdurabilirsin.
-Kaynak raporu erişilemeyen listeleri gösterir. Kaynakta deneyim veya çalışma biçimi belirsizse sonuçta
-kontrol etmen gereken alanı gösterir. Başlığa tıklayınca ilan açılır.
+**CareerPilot.app** dosyasına çift tıkla. İlk açılışta mevcut CareerPilot proje klasörünü seç. Başarılı açılıştan sonra uygulama bu klasörü hatırlar. Kayıtlı ilanlar **İlanlarım**, arama sonuçları **İlan ara** bölümündedir. İki bölüm arasında geçiş yaparken sonuçlar aynı sekmede kalır.
 
-Başlatıcı Node'u içerir. API anahtarı, kişisel profil veya CV gerektirmez.
-Mevcut panelde aynı ekrana **Hızlı ilan ara** ile ulaşabilirsin.
-Mac geliştirici paketi, Node 22+ ve proje bağımlılıkları kurulu bir Mac'te
-`scripts/build-mac-app.sh /istenen/çıktı` ile o Mac'in mimarisi için oluşturulur.
+Başlatıcı ücretsiz aramayı açar. Rol ve çalışma biçimi tercihlerini değiştirdiğinde **Ücretsiz ilan ara** ile yeniden tara. **Diğer roller** altında finansal analiz ve bağımsız denetim de seçilebilir. Muhasebe başlıkları elenir. **Taranan kaynaklar** her şirketin ilan sistemini, incelenen kayıt ve eşleşme sayısını gösterir. FreeHire sayfaları arasında en az 30 saniye beklenir. Bir kaynağın yanıt vermemesi raporda belirtilir.
 
-Junior filtresi açıkken deneyimi belirsiz ilanlar gizlenir. Bu sonuçları
-incelemek için **Deneyimi belirsiz ilanları da göster** kutusunu işaretle.
-**Diğer roller** bölümünden arama kapsamını genişletebilirsin.
+Sonuçta **Başvuru belgelerini hazırla** düğmesine bas. İlanın dilini ve belge türünü kontrol edip kaydet. Finansal analist ve bağımsız denetim ilanlarında finans seçili gelir. **Kayıtlı finans CV’sini indir (PDF)** profilindeki uygun dosyayı orijinal adıyla indirir. Uygun dosya bulunamazsa panel sebebini gösterir. İlanla ilgili profil bilgilerini seçerek CV ve ön yazı taslaklarını da düzenleyip PDF olarak indirebilirsin.
 
-### İlan kartından başvuru taslağına
+Form yardımcısı desteklenen sitelerde paylaşım onayından sonra bilinen alanları doldurur. Dosya yükleme ve son gönderim sende kalır. Başlatıcı yerel modda açılır. İsteğe bağlı model analizi için paneli kapatıp model seçeneğiyle açma komutu üstte açıklanmıştır.
 
-**CareerPilot Panel.app** dosyasını aç ve mevcut CareerPilot proje klasörünü
-seç. **Yerel aç** ile model anahtarı olmadan belge hazırlayabilirsin. Modeli
-etkinleştirirsen mevcut izin ve bütçe kontrolleri analiz sırasında uygulanır.
-
-Hızlı aramada **Başvuru taslağı hazırla** ile ilan bilgilerini tam panele taşı.
-İlanı ve dilini kontrol edip kaydet. Sonra **İlana özel CV ve ön yazı hazırla**
-düğmesine bas. Analiz varsa önerilen profil bilgileri işaretli gelir. Yerel
-modda bilgileri kendin seçebilirsin. İki taslağı incele, düzenle ve metin
-dosyası olarak indir. Uygun bir sitede aynı ekrandan form yardımcısı için
-iletişim bilgisi paylaşımını onayla. Yardımcı bilinen boş alanları doldurur.
-Belge yükleme, kalan sorular ve son gönderim kullanıcıdadır.
+Mac paketi için Node 22+ ile proje bağımlılıklarını kurup `scripts/build-mac-app.sh /istenen/çıktı` komutunu çalıştır.

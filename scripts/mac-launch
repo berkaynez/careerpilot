@@ -1,30 +1,52 @@
 #!/bin/sh
 set -eu
 resources="$(dirname "$0")/../Resources"
-url=http://127.0.0.1:3214
-ready() {
-  /usr/bin/curl --noproxy '*' -fsS --max-time 1 "$url/quick-config" 2>/dev/null | /usr/bin/grep -q '"app":"careerpilot-quick-v4"'
+url=http://127.0.0.1:3211
+health() {
+  /usr/bin/curl --noproxy '*' -fsS --max-time 1 "$url/api/desktop-version" 2>/dev/null | /usr/bin/grep -q '"unified":1'
 }
-# Replace only the previous quick-search process launched by this exact bundle.
-if /usr/bin/curl --noproxy '*' -fsS --max-time 1 "$url/quick-config" 2>/dev/null | /usr/bin/grep -Eq '"app":"careerpilot-quick-v[123]"'; then
-  pid=$(/usr/sbin/lsof -nP -t -iTCP:3214 -sTCP:LISTEN 2>/dev/null || true)
-  case "$pid" in
-    ''|*[!0-9]*) ;;
-    *) if [ "$(/bin/ps -p "$pid" -o command=)" = "$resources/node $resources/desktop.mjs" ]; then
-         kill -TERM "$pid"
-         for delay in 1 2 3 4 5; do kill -0 "$pid" 2>/dev/null || break; sleep 0.2; done
-       fi ;;
+previous_directory=''
+if health; then exec /usr/bin/open "$url/?view=search&tara=1"; fi
+if /usr/bin/curl --noproxy '*' -sS --max-time 1 "$url/" >/dev/null 2>&1; then
+  old_pid=$(/usr/sbin/lsof -nP -t -iTCP:3211 -sTCP:LISTEN 2>/dev/null || true)
+  case "$old_pid" in
+    ''|*[!0-9]*) command='' ;;
+    *) command=$(/bin/ps -p "$old_pid" -o command=) ;;
+  esac
+  # A CLI launch from the project and a desktop launch both serve these static assets.
+  if ! /usr/bin/curl --noproxy '*' -fsS --max-time 2 "$url/app.js" 2>/dev/null | /usr/bin/grep 'renderDiscovery(record' >/dev/null; then
+    command=''
+  fi
+  case "$command" in
+    *"/panel/src/hub/cli.ts --port 3211"*|*" src/hub/cli.ts --port 3211"*|*"/src/hub/cli.ts --port 3211"*)
+      /usr/bin/osascript -e 'display dialog "Eski panel açık. Devam eden form işlemini bitirdikten sonra yeni sürüme geçebilirsin." buttons {"İptal","Eski paneli kapat ve devam et"} default button "İptal" cancel button "İptal"' >/dev/null || exit 0
+      previous_directory=$(/usr/sbin/lsof -a -p "$old_pid" -d cwd -Fn 2>/dev/null | /usr/bin/sed -n 's/^n//p')
+      kill -TERM "$old_pid"
+      for wait in 1 2 3 4 5 6 7 8 9 10; do kill -0 "$old_pid" 2>/dev/null || break; sleep 0.25; done ;;
+    *) /usr/bin/osascript -e 'display alert "CareerPilot bağlantısı kullanımda" message "Önce 3211 üzerinde çalışan eski paneli kapat. Terminalden açtıysan Ctrl+C kullan."'; exit 1 ;;
   esac
 fi
-if ! ready; then
+directory=$(/usr/bin/defaults read local.careerpilot.search ProjectDirectory 2>/dev/null || true)
+if [ -z "$directory" ] && [ -d "$previous_directory" ]; then directory=$previous_directory; fi
+for attempt in 1 2; do
+  if [ ! -d "$directory" ]; then
+    directory=$(/usr/bin/osascript -e 'POSIX path of (choose folder with prompt "Mevcut CareerPilot proje klasörünü seç. Uygulama bu klasörü sonraki açılışlarda hatırlayacak.")') || exit 0
+  fi
+  cd "$directory"
   unset NODE_OPTIONS NODE_PATH
-  /usr/bin/nohup "$resources/node" "$resources/desktop.mjs" </dev/null >/dev/null 2>&1 &
-  for delay in 1 2 3 4 5 6 7 8 9 10; do
-    ready && break
-    sleep 0.2
+  /usr/bin/nohup "$resources/node" --import "$resources/panel/node_modules/tsx/dist/loader.mjs" "$resources/panel/src/hub/cli.ts" --port 3211 </dev/null >/dev/null 2>&1 &
+  pid=$!
+  for wait in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+    if health; then
+      /usr/bin/defaults write local.careerpilot.search ProjectDirectory -string "$directory"
+      exec /usr/bin/open "$url/?view=search&tara=1"
+    fi
+    kill -0 "$pid" 2>/dev/null || break
+    sleep 0.25
   done
-fi
-if ready; then
-  exec /usr/bin/open "$url/quick?tara=1"
-fi
-/usr/bin/osascript -e 'display alert "CareerPilot açılamadı" message "Yerel arama penceresi başlatılamadı. 3214 numaralı bağlantı noktasını kontrol edin."'
+  if kill -0 "$pid" 2>/dev/null; then
+    /usr/bin/osascript -e 'display alert "Panel henüz hazır değil" message "Birkaç saniye sonra CareerPilot’u tekrar aç."'; exit 1
+  fi
+  directory=''
+done
+/usr/bin/osascript -e 'display alert "CareerPilot açılamadı" message "Kayıtlı profilinin bulunduğu proje klasörünü seçmen gerekiyor."'

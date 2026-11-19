@@ -1,4 +1,5 @@
 import { applicationDraft } from '../preparation/application-draft.js';
+import { employerFeeds } from '../quick/boards.js';
 import { quickRoutes } from '../quick/routes.js';
 import {runDiscoverySearch} from '../discovery/search-run.js';
 import { createPostingChecker } from '../discovery/check-posting.js';
@@ -9,7 +10,7 @@ import { renderCoverLetter } from '../preparation/letters.js';
 import { basename } from 'node:path';
 import { relatedJobs } from './related.js';
 import { createFreehireSearch, importFreehireJobs } from '../discovery/freehire.js';
-import { roleProfiles, discoveryCategories } from '../discovery/role-profiles.js';
+import { accountingTitle, titleDocumentFocus, roleProfiles, discoveryCategories } from '../discovery/role-profiles.js';
 import type { SourceSearch } from '../discovery/search-provider.js';
 import { careerLevel } from '../discovery/level.js';
 import { sourceSearchQueries, jobSearchQueries, sourcesFromSearchURLs } from '../discovery/source-search.js';
@@ -42,7 +43,8 @@ const assistantCommand = z.discriminatedUnion('action', [
   z.strictObject({ action: z.literal('select'), tabId: z.uuid() }),
   z.strictObject({ action: z.literal('approve'), origin: z.string().max(500), contactApproved: z.boolean() }),
 ]);
-const inputSchema = postingSchema.omit({ version: true, id: true, checkedOn: true });
+const inputSchema = postingSchema.omit({ version: true, id: true, checkedOn: true }).extend({documentFocus:z.enum(['finance','general']).optional()});
+const focusFor=(record:HubRecord)=>record.documentFocus??titleDocumentFocus(record.posting.title);
 const safeCode = (error: unknown) => error instanceof Error && /^(HUB|PREP|CONFIG|BUDGET|PROVIDER|ASSIST|JOB|DISCOVERY)_[A-Z_]+$/.test(error.message) ? error.message : 'HUB_REQUEST_FAILED';
 async function body(request: IncomingMessage): Promise<unknown> {
   if (!request.headers['content-type']?.startsWith('application/json')) throw new Error('HUB_JSON_REQUIRED');
@@ -81,7 +83,7 @@ export async function startHub(options: { directory: string; profile: Profile; d
       ...(!current.analysis && current.state==='review' && !current.discovery?.search?.verified && result.job?{posting:{...current.posting,title:result.job.title,text:result.job.text}}:{})}));
   };
   const freehireSearch = options.freehireSearch ?? createFreehireSearch();
-  const quick = quickRoutes(freehireSearch);
+  const quick = quickRoutes(freehireSearch, employerFeeds(options.discoveryReader));
   const jobCriteria = (scope: 'turkey' | 'remote') => { const config = discovery.snapshot().config; return { roles: config.roles, locations: scope === 'turkey' ? ['Türkiye','Turkey','Istanbul'] : ['Remote'], mode: 'jobs' as const, earlyCareer: config.earlyCareer }; };
   const answers = assistAnswersSchema.parse(options.answers ?? {});
   let assistant: { jobId: string; session: AssistSession } | null = null;
@@ -97,7 +99,7 @@ export async function startHub(options: { directory: string; profile: Profile; d
       occupiedByOther: Boolean(assistant && assistant.jobId !== record.id && snapshot?.status !== 'closed'),
       session: assistant?.jobId === record.id ? snapshot : null };
   };
-  const summaries = (record: HubRecord) => ({ documentFocus:record.documentFocus??'general', quality:qualityFor(record), relatedJobs:relatedJobs(record,store.list()), possibleDuplicate:relatedJobs(record,store.list())[0] ?? null, id: record.id, company: record.posting.company, title: record.posting.title, tracking:record.tracking,
+  const summaries = (record: HubRecord) => ({ accounting:accountingTitle(record.posting.title), documentFocus:focusFor(record), quality:qualityFor(record), relatedJobs:relatedJobs(record,store.list()), possibleDuplicate:relatedJobs(record,store.list())[0] ?? null, id: record.id, company: record.posting.company, title: record.posting.title, tracking:record.tracking,
     country: record.posting.country, sourceUrl: record.posting.sourceUrl, state: record.state, updatedAt: record.updatedAt, analyzing: busy.has(record.id),
     discovery: record.discovery ? { ...record.discovery, careerLevel: careerLevel(record.posting).level, levelReason: careerLevel(record.posting).reason } : null,
     score: record.analysis ? buildMatchAnalysis(profile, record.analysis.job, record.analysis.plan).score : null,
@@ -106,10 +108,15 @@ export async function startHub(options: { directory: string; profile: Profile; d
   const detail = (record: HubRecord) => {
     const analysis = record.analysis;
     let cv: { id: string; language: string; photo: boolean } | null = null;
+    const focus=focusFor(record), language=record.posting.documentLanguage??record.posting.language;
+    const cvChoices=profile.cvs.filter(asset=>(asset.focus??'general')===focus && asset.language===language &&
+      (record.posting.photoPolicy==='unspecified'||asset.photo===(record.posting.photoPolicy==='required')))
+      .map(asset=>({id:asset.id,filename:basename(asset.path),photo:asset.photo}));
     let cvError: string | null = null;
-    try { if (record.discovery && (!record.discovery.routingConfirmed || record.discovery.search && !record.discovery.search.verified)) throw new Error('HUB_ROUTING_REQUIRED'); const asset = selectCV(profile, record.posting,record.documentFocus??'general'); cv = { id: asset.id, language: asset.language, photo: asset.photo }; }
-    catch { cvError = record.discovery && !record.discovery.routingConfirmed ? 'CV seçimi için ilanın ülkesini ve dilini doğrula.' : 'Uygun CV seçimi profilinde netleşmeli.'; }
-    return { ...summaries(record), documentFocus:record.documentFocus??'general', availableDocumentFocus:[...new Set(profile.cvs.map(cv=>cv.focus??'general'))], posting: record.posting, cv, cvError, assistant: assistantInfo(record),
+    try { if (record.discovery && (!record.discovery.routingConfirmed || record.discovery.search && !record.discovery.search.verified)) throw new Error('HUB_ROUTING_REQUIRED'); const asset = selectCV(profile, record.posting,focusFor(record)); cv = { id: asset.id, language: asset.language, photo: asset.photo }; }
+    catch { cvError = record.discovery && !record.discovery.routingConfirmed ? 'CV seçimi için ilanın ülkesini ve dilini doğrula.' : cvChoices.length?'Kullanmak istediğin kayıtlı PDF’yi seç.':
+      (focus==='finance'?'Finans':'Genel')+' için ilan dili ve fotoğraf koşuluna uygun kayıtlı PDF bulunamadı. Aşağıdan seçtiğin profil bilgileriyle PDF taslağı hazırlayabilirsin.'; }
+    return { ...summaries(record), documentFocus:focusFor(record), availableDocumentFocus:[...new Set(profile.cvs.map(cv=>cv.focus??'general'))], posting: record.posting, cv, cvChoices, cvError, assistant: assistantInfo(record),
       analysis: analysis ? { origin: analysis.origin, at: analysis.at, costMicroUsd: analysis.costMicroUsd, job: analysis.job,
         match: buildMatchAnalysis(profile, analysis.job, analysis.plan),
         facts: profile.facts.map(fact => ({ id: fact.id, text: fact.text[record.posting.documentLanguage ?? record.posting.language] })) } : null };
@@ -126,7 +133,15 @@ export async function startHub(options: { directory: string; profile: Profile; d
       if (request.headers.host !== new URL(origin).host || request.headers.origin && request.headers.origin !== origin
         || request.headers['sec-fetch-site'] === 'cross-site') { json(403, { code: 'HUB_ORIGIN_REJECTED' }); return; }
       const url = new URL(request.url ?? '/', origin), path = url.pathname;
+      if (path==='/quick' && request.method==='GET') {
+        response.writeHead(302,{Location:'/?view=search'+(url.searchParams.get('tara')==='1'?'&tara=1':'')});response.end();return;
+      }
+      if (path==='/api/desktop-version' && request.method==='GET') {json(200,{unified:1});return;}
       if (!options.demo && await quick(request,response,origin)) return;
+      if(request.method==='GET' && (path==='/pdfmake.min.js'||path==='/vfs_fonts.js')){
+        const file=await readFile(new URL(import.meta.resolve('pdfmake/build'+path)));
+        response.writeHead(200,{'Content-Type':'text/javascript; charset=utf-8'});response.end(file);return;
+      }
       const asset = assets.get(path);
       if (asset && request.method === 'GET') { response.writeHead(200, { 'Content-Type': asset.type + '; charset=utf-8' }); response.end(asset.data); return; }
       if (path === '/api/session' && request.method === 'GET') {
@@ -156,7 +171,6 @@ export async function startHub(options: { directory: string; profile: Profile; d
         const input=z.strictObject({approved:z.literal(true),scope:z.enum(['turkey','remote']),includeUnlabelled:z.boolean().default(true),documentFocus:z.enum(['general','finance']).default('general')}).parse(await body(request));
         if(options.demo)throw new Error('DISCOVERY_DEMO_OFFLINE');
         if(jobSearchBusy || busy.size || opening || assistant && assistant.session.snapshot().status!=='closed')throw new Error('DISCOVERY_BUSY');
-        if(input.documentFocus==='finance'&&!profile.cvs.some(cv=>cv.focus==='finance'))throw new Error('HUB_CV_FOCUS_UNAVAILABLE');
         jobSearchBusy=true;searchController=new AbortController();
         try{
           const report=await runDiscoverySearch({store,config:discovery.snapshot().config,scope:input.scope,documentFocus:input.documentFocus,includeUnlabelled:input.includeUnlabelled,
@@ -229,9 +243,9 @@ export async function startHub(options: { directory: string; profile: Profile; d
       }
       if (path === '/api/jobs' && request.method === 'GET') { json(200, store.list().map(summaries)); return; }
       if (path === '/api/jobs' && request.method === 'POST') {
-        const input = inputSchema.parse(await body(request)), now = new Date().toISOString(), id = randomUUID();
+        const {documentFocus,...input} = inputSchema.parse(await body(request)), now = new Date().toISOString(), id = randomUUID();
         const posting = postingSchema.parse({ ...input, version: 1, id, checkedOn: now.slice(0, 10) });
-        const record = await store.add({ version: 1, id, posting, state: 'saved', createdAt: now, updatedAt: now, analysis: null, lastError: null });
+        const record = await store.add({ version: 1, id, posting, documentFocus:documentFocus??titleDocumentFocus(posting.title), state: 'saved', createdAt: now, updatedAt: now, analysis: null, lastError: null });
         json(201, detail(record)); return;
       }
       if (path === '/api/import' && request.method === 'POST') {
@@ -256,7 +270,6 @@ export async function startHub(options: { directory: string; profile: Profile; d
       if(action==='document-focus' && request.method==='POST'){
         const {focus}=z.strictObject({focus:z.enum(['general','finance'])}).parse(await body(request));
         if(busy.size || jobSearchBusy || opening || assistant && assistant.session.snapshot().status!=='closed')throw new Error('HUB_RECORD_BUSY');
-        if(!profile.cvs.some(cv=>(cv.focus??'general')===focus))throw new Error('HUB_CV_FOCUS_UNAVAILABLE');
         json(200,detail(await store.update(id,current=>({...current,documentFocus:focus}))));return;
       }
       if(action==='check-source' && request.method==='POST'){
@@ -287,6 +300,7 @@ export async function startHub(options: { directory: string; profile: Profile; d
               if (score>0 && selected.size<10) selected.add(id);
             }
           }
+          if(!selected.size && focusFor(record)==='finance')for(const id of profile.financeLetterFactIds??[])selected.add(id);
           const language=record.posting.documentLanguage??record.posting.language;
           const facts=profile.facts.map(fact=>({id:fact.id,text:fact.text[language],selected:selected.has(fact.id)}));
           json(200,{facts});return;
@@ -296,12 +310,14 @@ export async function startHub(options: { directory: string; profile: Profile; d
       }
       if((action==='documents' || action==='cv') && request.method==='GET') {
         if(record.discovery && (!record.discovery.routingConfirmed || record.discovery.search && !record.discovery.search.verified)) {json(409,{code:'HUB_ROUTING_REQUIRED'});return;}
-        const cv=selectCV(profile,record.posting,record.documentFocus??'general');
+        const assetId=action==='cv'?url.searchParams.get('asset'):null;
+        if(assetId && !detail(record).cvChoices.some(cv=>cv.id===assetId))throw new Error('PREP_CV_UNAVAILABLE');
+        const cv=assetId?profile.cvs.find(item=>item.id===assetId)!:selectCV(profile,record.posting,focusFor(record));
         if(action==='cv') {
-          const pdf=await readCVPDF(cv.path);response.writeHead(200,{'Content-Type':'application/pdf','Content-Disposition':"attachment; filename*=UTF-8''"+encodeURIComponent(basename(cv.path))});response.end(pdf);return;
+          const pdf=await readCVPDF(cv.path).catch(()=>{throw new Error('PREP_CV_FILE_UNAVAILABLE');});response.writeHead(200,{'Content-Type':'application/pdf','Content-Disposition':"attachment; filename*=UTF-8''"+encodeURIComponent(basename(cv.path))});response.end(pdf);return;
         }
-        if(!(record.documentFocus==='finance'?profile.financeLetterFactIds?.length:profile.coverLetter) && !record.analysis?.plan.coverLetterFactIds.length)throw new Error('HUB_LETTER_EVIDENCE_REQUIRED');
-        const letter=renderCoverLetter(profile,record.posting,{coverLetterFactIds:record.analysis?.plan.coverLetterFactIds ?? []},record.documentFocus??'general');
+        if(!(focusFor(record)==='finance'?profile.financeLetterFactIds?.length:profile.coverLetter) && !record.analysis?.plan.coverLetterFactIds.length)throw new Error('HUB_LETTER_EVIDENCE_REQUIRED');
+        const letter=renderCoverLetter(profile,record.posting,{coverLetterFactIds:record.analysis?.plan.coverLetterFactIds ?? []},focusFor(record));
         json(200,{cv:{filename:basename(cv.path),language:cv.language,photo:cv.photo},letter:letter.content,evidence:letter.evidence,modelCalls:0});return;
       }
       if (!action && request.method === 'GET') { json(200, detail(record)); return; }
@@ -392,7 +408,7 @@ export async function startHub(options: { directory: string; profile: Profile; d
       json(405, { code: 'HUB_METHOD_NOT_ALLOWED' });
     } catch (error) {
       const code = error instanceof z.ZodError ? 'HUB_INPUT_INVALID' : safeCode(error);
-      json(code === 'HUB_NOT_FOUND' ? 404 : code.startsWith('HUB_') || code.startsWith('ASSIST_') || code.startsWith('JOB_') || code.startsWith('DISCOVERY_') || code === 'PREP_PLAN_INVALID' ? 400 : 502, { code });
+      json(code === 'HUB_NOT_FOUND' ? 404 : code.startsWith('HUB_') || code.startsWith('ASSIST_') || code.startsWith('JOB_') || code.startsWith('DISCOVERY_') || code === 'PREP_CV_UNAVAILABLE' || code === 'PREP_PLAN_INVALID' ? 400 : 502, { code });
     }
   });
   server.requestTimeout = 180_000; server.headersTimeout = 10_000;

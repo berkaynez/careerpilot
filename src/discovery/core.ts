@@ -1,4 +1,4 @@
-import {roleTerms} from './role-profiles.js';
+import {accountingTitle, roleTerms} from './role-profiles.js';
 import { careerLevel } from './level.js';
 import { z } from 'zod';
 import { sourceSchema } from './sources.js';
@@ -18,7 +18,7 @@ const contains = (text: string, term: string) => Boolean(normal(term)) && (' ' +
 export function discoveryReasons(job: DiscoveredJob, config: DiscoveryConfig): string[] {
   const level = careerLevel(job);
   if (config.earlyCareer && level.level === 'experienced') return [];
-  if (config.excludedTitles.some(term => contains(job.title, term))) return [];
+  if (accountingTitle(job.title) || config.excludedTitles.some(term => contains(job.title, term))) return [];
   const role = roleTerms(config.roles).find(term => contains(job.title, term)); if (!role) return [];
   const location = config.locations.find(term => contains(job.location + (job.remote ? ' Remote' : ''), term));
   if (config.locations.length && !location) return [];

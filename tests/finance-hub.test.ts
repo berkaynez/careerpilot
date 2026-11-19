@@ -23,8 +23,9 @@ test('finance and marketing role families use supported categories and preserve 
  const config={...defaultDiscoveryConfig,roles:finance.roles};
  assert.deepEqual(discoveryCategories(finance.roles),['finance']);
  assert.deepEqual(discoveryCategories(roleProfiles.find(profile=>profile.id==='marketing')!.roles),['marketing']);
- for(const title of ['Finansal Raporlama Uzman Yardımcısı','Muhasebe Elemanı','Junior Financial Analyst','Accounts Payable Assistant','Hazine Uzman Yardımcısı','Audit Associate'])assert.equal(searchFilterReason(title,text,config),null,title);
+ for(const title of ['Finansal Raporlama Uzman Yardımcısı','Junior Financial Analyst','Hazine Uzman Yardımcısı','Audit Associate'])assert.equal(searchFilterReason(title,text,config),null,title);
  assert.equal(searchFilterReason('Senior Financial Analyst',text,config),'excludedTitle');assert.equal(searchFilterReason('Junior Developer',text,config),'role');
+ for(const title of ['Ön Muhasebe Elemanı','Junior Financial Analyst / Accounting','Accounts Payable Assistant','Accounting Business Analyst'])assert.equal(searchFilterReason(title,text,config),'excludedTitle');
  assert.ok(roleTerms(['finance']).includes('finansal'));
  assert.equal(careerLevel({title:'Supervisor-Accounting',text}).level,'experienced');assert.equal(careerLevel({title:'Accounts Payable Associate',text}).level,'unclear');
  for(const preset of roleProfiles){const queries=jobSearchQueries({roles:preset.roles,locations:['Turkey','Türkiye','Istanbul']});assert.equal(queries.length,2);assert.ok(queries.every(query=>query.length<=400));assert.ok(queries.some(query=>query.includes('uzman yardımcısı')));}
@@ -65,6 +66,12 @@ test('one native search isolates provider failure, persists results, prepares fi
  await send('/api/jobs/'+record.id+'/routing',{country:'TR',language:'en'});
  const docs=await(await send('/api/jobs/'+record.id+'/documents')).json();assert.equal(docs.cv.filename,'finance.pdf');assert.match(docs.letter,/finance and accounting/);assert.equal(docs.modelCalls,0);
  assert.match(await(await send('/api/jobs/'+record.id+'/cv')).text(),/^%PDF-/);
+ const offered=await(await send('/api/jobs/'+record.id)).json();
+ const pdfAsset='/api/jobs/'+record.id+'/cv?asset=';
+ assert.match(await(await send(pdfAsset+offered.cv.id)).text(),/^%PDF-/);
+ assert.equal((await send(pdfAsset+demoProfile.cvs[0]!.id)).status,400);
+ await rm(pdf);
+ assert.equal((await(await send(pdfAsset+offered.cv.id)).json()).code,'PREP_CV_FILE_UNAVAILABLE');
  // A different active role search cannot relabel a previously discovered finance record.
  await send('/api/discovery/config',{...config,roles:['software engineer']});
  assert.equal((await(await send('/api/jobs/'+record.id)).json()).quality.bucket,'review');

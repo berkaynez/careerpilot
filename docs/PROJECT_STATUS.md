@@ -1,6 +1,6 @@
 # CareerPilot — güncel durum ve devam planı
 
-Son düzenleme: 20 Ekim 2026. Bu dosya güncel kapsamın ve sıradaki işin tek kaynağıdır.
+Son düzenleme: 19 Kasım 2026. Bu dosya güncel kapsamın ve sıradaki işin tek kaynağıdır.
 Bir iş tamamlandığında buradaki durum değiştirilir; yeni bir paralel plan eklenmez.
 
 ## Ürün hedefi
@@ -15,6 +15,8 @@ belgesindedir. Aşağıdaki aktif iş listesi uygulamanın tek güncel devam kay
 0–100 uyum puanı ve dayanak raporu mevcut hazırlık akışına eklendi.
 Yerel panelde ilan kaydı, analiz görüntüleme ve durum takibi eklendi.
 Panelden form yardımı açma, doldurma, sekme/izin seçimi ve kullanıcı devri eklendi.
+
+Mac başlatıcısı ilan arama, kayıtlı ilanlar, finans/genel CV seçimi ve PDF taslaklarını aynı panelde açar. Taranan kaynaklar ve sonuç sayıları ekranda görünür. Hızlı arama, resmî şirket kaynakları ve toplayıcı sonuçları muhasebe başlıklarını eler. Son gönderim kullanıcıdadır.
 
 ## Mevcut parçalar ve kanıtları
 
